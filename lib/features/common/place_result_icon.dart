@@ -5,16 +5,21 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 /// locality, a building — anything whose category has no bespoke glyph.
 const IconData _pin = PhosphorIconsRegular.mapPin;
 
-/// A Phosphor icon for a place's provider category, or [_pin] for an ordinary
-/// result (addresses, roads, localities, unknown types …).
+/// The **single source of truth** for place/category iconography: a Phosphor
+/// icon for a place's category, or [_pin] for an ordinary result (addresses,
+/// roads, localities, unknown types …).
 ///
-/// The category comes from whichever backend answered the search — an
-/// OpenStreetMap value (`bus_stop`, `subway_entrance`, `cafe`, `drinking_water`)
-/// or a Mapbox category id (`train_station`, `coffee_shop`, `gas_station`) — so
-/// the match is on the normalised, tokenised value rather than one provider's
-/// exact spelling: `train_station` matches on `train`, `coffee_shop` on
-/// `coffee`. Our own iconography (Phosphor Icons, MIT) — never an asset copied
-/// from another app.
+/// The same function paints the search-result rows **and** the browse-category
+/// chips / picker (there is deliberately no second icon table, so a category
+/// chip always shows exactly the glyph its results will). The category comes
+/// from whichever backend answered the search — an OpenStreetMap value
+/// (`bus_stop`, `subway_entrance`, `cafe`, `drinking_water`) or a Mapbox
+/// category id (`train_station`, `coffee_shop`, `gas_station`) — or from a
+/// canonical browse-category id (`cafe`, `grocery`, `drinking_water`); the match
+/// is on the normalised, tokenised value rather than one provider's exact
+/// spelling: `train_station` matches on `train`, `coffee_shop` on `coffee`. Our
+/// own iconography (Phosphor Icons, MIT) — never an asset copied from another
+/// app.
 IconData placeResultIcon(String? category) {
   final String key = _normalise(category);
   if (key.isEmpty) {
@@ -33,14 +38,20 @@ IconData placeResultIcon(String? category) {
   return _pin;
 }
 
-/// Categories that need a whole-value match (a bare token would be too broad):
-/// a drinking-water tap is not just "water".
+/// Categories that need a whole-value match (a bare token would be too broad or
+/// point at the wrong glyph): a drinking-water tap is not just "water", and
+/// "music venue" must not be read as the "music" of a music school.
 const Map<String, IconData> _exact = <String, IconData>{
   'drinking water': PhosphorIconsRegular.drop,
   'water point': PhosphorIconsRegular.drop,
   'water tap': PhosphorIconsRegular.drop,
   'water well': PhosphorIconsRegular.drop,
   'watering place': PhosphorIconsRegular.drop,
+  'arts centre': PhosphorIconsRegular.palette,
+  'community centre': PhosphorIconsRegular.usersThree,
+  'music venue': PhosphorIconsRegular.musicNote,
+  'public bookcase': PhosphorIconsRegular.books,
+  'photo booth': PhosphorIconsRegular.camera,
 };
 
 /// The first recognised token of a category wins, in the order it appears, so
@@ -116,6 +127,7 @@ const Map<String, IconData> _icons = <String, IconData>{
   'supermarket': PhosphorIconsRegular.shoppingCart,
   'grocery': PhosphorIconsRegular.shoppingCart,
   'groceries': PhosphorIconsRegular.shoppingCart,
+  'greengrocer': PhosphorIconsRegular.shoppingCart,
   'convenience': PhosphorIconsRegular.shoppingCart,
   'shop': PhosphorIconsRegular.storefront,
   'shopping': PhosphorIconsRegular.storefront,
@@ -163,6 +175,8 @@ const Map<String, IconData> _icons = <String, IconData>{
   'mail': PhosphorIconsRegular.envelope,
   'police': PhosphorIconsRegular.policeCar,
   'fire': PhosphorIconsRegular.fireTruck,
+  'telephone': PhosphorIconsRegular.phone,
+  'phone': PhosphorIconsRegular.phone,
   'library': PhosphorIconsRegular.books,
   'school': PhosphorIconsRegular.graduationCap,
   'college': PhosphorIconsRegular.graduationCap,
@@ -186,6 +200,8 @@ const Map<String, IconData> _icons = <String, IconData>{
   'hostel': PhosphorIconsRegular.bed,
   'motel': PhosphorIconsRegular.bed,
   'guesthouse': PhosphorIconsRegular.bed,
+  'guest': PhosphorIconsRegular.bed,
+  'apartment': PhosphorIconsRegular.bed,
   'camp': PhosphorIconsRegular.tent,
   'campsite': PhosphorIconsRegular.tent,
   'cinema': PhosphorIconsRegular.filmReel,
@@ -225,6 +241,17 @@ const Map<String, IconData> _icons = <String, IconData>{
   'toilets': PhosphorIconsRegular.toilet,
   'restroom': PhosphorIconsRegular.toilet,
   'shower': PhosphorIconsRegular.shower,
+  'bench': PhosphorIconsRegular.seat,
+  'shelter': PhosphorIconsRegular.tent,
+  'clock': PhosphorIconsRegular.clock,
+  'vending': PhosphorIconsRegular.storefront,
+
+  // Facilities & waste ----------------------------------------------------
+  'recycling': PhosphorIconsRegular.recycle,
+  'recycle': PhosphorIconsRegular.recycle,
+  'waste': PhosphorIconsRegular.trash,
+  'trash': PhosphorIconsRegular.trash,
+  'rubbish': PhosphorIconsRegular.trash,
 };
 
 /// Lower-cases [category], drops everything that is not a letter or digit and

@@ -7,7 +7,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../domain/entities/place_category.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/settings.dart';
-import 'category_icons.dart';
+import '../../common/place_result_icon.dart';
 
 /// Presents the category picker: every browse category, grouped, with the
 /// pinned ones highlighted.
@@ -132,7 +132,7 @@ class CategoryPickerSheet extends ConsumerWidget {
         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         visualDensity: VisualDensity.comfortable,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-        avatar: Icon(categoryIcon(category.id), size: 18),
+        avatar: Icon(placeResultIcon(category.id), size: 18),
         label: Text(category.label),
         selected: pinned,
         showCheckmark: false,

@@ -9,7 +9,7 @@ import '../../../domain/entities/place_category.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/home.dart';
 import '../../../state/settings.dart';
-import 'category_icons.dart';
+import '../../common/place_result_icon.dart';
 import 'category_picker_sheet.dart';
 
 @Preview()
@@ -82,7 +82,7 @@ class _CategoryChip extends ConsumerWidget {
         ),
       ),
       avatar: Icon(
-        categoryIcon(category.id),
+        placeResultIcon(category.id),
         size: 18,
         color: selected ? scheme.primary : scheme.onSurfaceVariant,
       ),

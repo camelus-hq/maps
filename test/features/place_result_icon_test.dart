@@ -1,4 +1,6 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:openmaps/domain/entities/place_category.dart';
 import 'package:openmaps/features/common/place_result_icon.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
@@ -74,6 +76,45 @@ void main() {
 
     test('handles a null category', () {
       expect(placeResultIcon(null), PhosphorIconsRegular.mapPin);
+    });
+
+    test('maps the browse-category facilities to bespoke glyphs', () {
+      // Chips and results share this table, so the facilities the picker lists
+      // keep a real glyph instead of the generic pin.
+      expect(placeResultIcon('telephone'), PhosphorIconsRegular.phone);
+      expect(placeResultIcon('recycling'), PhosphorIconsRegular.recycle);
+      expect(placeResultIcon('waste_basket'), PhosphorIconsRegular.trash);
+      expect(placeResultIcon('waste_disposal'), PhosphorIconsRegular.trash);
+      expect(placeResultIcon('bench'), PhosphorIconsRegular.seat);
+      expect(placeResultIcon('shelter'), PhosphorIconsRegular.tent);
+      expect(placeResultIcon('clock'), PhosphorIconsRegular.clock);
+      expect(
+        placeResultIcon('vending_machine'),
+        PhosphorIconsRegular.storefront,
+      );
+      expect(placeResultIcon('arts_centre'), PhosphorIconsRegular.palette);
+      expect(
+        placeResultIcon('community_centre'),
+        PhosphorIconsRegular.usersThree,
+      );
+      expect(placeResultIcon('music_venue'), PhosphorIconsRegular.musicNote);
+      expect(placeResultIcon('public_bookcase'), PhosphorIconsRegular.books);
+      expect(placeResultIcon('photo_booth'), PhosphorIconsRegular.camera);
+    });
+
+    test('every browse category resolves like its provider values', () {
+      // One source of truth: the chip for a category (keyed by id) must show the
+      // same glyph as the search results it browses (keyed by the OSM value).
+      for (final PlaceCategory category in placeCategories) {
+        final IconData chip = placeResultIcon(category.id);
+        for (final String value in category.osmValueList) {
+          expect(
+            placeResultIcon(value),
+            chip,
+            reason: '"${category.id}" chip should match the glyph for "$value"',
+          );
+        }
+      }
     });
   });
 }

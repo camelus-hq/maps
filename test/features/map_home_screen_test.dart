@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openmaps/app/app.dart';
 import 'package:openmaps/data/fakes/fake_map_service.dart';
+import 'package:openmaps/features/common/place_result_icon.dart';
 import 'package:openmaps/features/map_home/widgets/map_surface_placeholder.dart';
 import 'package:openmaps/features/social/widgets/friend_avatar.dart';
 import 'package:openmaps/state/home.dart';
@@ -32,8 +33,9 @@ void main() {
     expect(find.byIcon(Icons.mic_none), findsOneWidget);
     expect(find.byType(FriendAvatar), findsOneWidget);
     expect(find.byIcon(Icons.person), findsNothing);
-    expect(find.byIcon(Icons.park), findsOneWidget);
-    expect(find.byIcon(Icons.local_cafe), findsOneWidget);
+    // Chips paint the shared place-result glyph (one source of truth).
+    expect(find.byIcon(placeResultIcon('park')), findsOneWidget);
+    expect(find.byIcon(placeResultIcon('cafe')), findsOneWidget);
   });
 
   testWidgets('the soft keyboard does not resize the map', (
