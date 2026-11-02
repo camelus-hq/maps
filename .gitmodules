@@ -1,0 +1,3 @@
+[submodule "plan"]
+	path = plan
+	url = git@github.com:camelus-hq/maps_private.git
