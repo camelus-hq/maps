@@ -59,7 +59,14 @@ class PlaceHoursLine extends StatelessWidget {
                 ' · ',
                 style: base?.copyWith(color: scheme.onSurfaceVariant),
               ),
-              Text(change, style: base),
+              Flexible(
+                child: Text(
+                  change,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: base,
+                ),
+              ),
             ],
           ],
         ),
