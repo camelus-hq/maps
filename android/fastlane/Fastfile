@@ -1,0 +1,303 @@
+require "digest"
+require "json"
+require "yaml"
+
+# fastlane/Fastfile — OpenMaps Android release pipeline.
+#
+# Builds the arm64-v8a release APK, generates the self-update manifest the app
+# checks at startup, and uploads both to a server over SSH:
+#
+#   cd android && bundle exec fastlane release
+#
+# Server / URL details come from the environment and are never committed:
+#   OPENMAPS_DEPLOY_HOST      ssh host, e.g. my.server.example
+#   OPENMAPS_DEPLOY_USER      ssh user (default: $USER)
+#   OPENMAPS_DEPLOY_PORT      ssh port (default: 22)
+#   OPENMAPS_DEPLOY_PATH      remote directory to upload into
+#   OPENMAPS_SSH_KEY          private key file for ssh/scp (optional)
+#   OPENMAPS_PUBLIC_BASE_URL  public URL the files are served from,
+#                             e.g. https://example.com/app
+#   OPENMAPS_MANIFEST_NAME    manifest filename (default: version.json)
+#   OPENMAPS_RELEASE_NOTES    explicit release notes, overriding the changelog
+#   OPENMAPS_MANDATORY        "true" to force the update (optional)
+#   OPENMAPS_CHANGELOG_BASE   git ref to list commits after (default: last tag,
+#                             else the previous `version:` bump in pubspec.yaml,
+#                             else the most recent commits)
+#   OPENMAPS_CHANGELOG_COUNT  max commits to list (default 50, capped at 200)
+#
+# Release notes are generated from the git commit subjects since the previous
+# release, so the app's update prompt shows what changed. An explicit
+# `release_notes:` / OPENMAPS_RELEASE_NOTES wins; `fastlane/release_notes.txt`
+# is only the fallback when there is no git history to read.
+#
+# With no OPENMAPS_DEPLOY_HOST / OPENMAPS_DEPLOY_PATH the build and manifest
+# still happen and the upload is skipped, so the lane is usable locally.
+#
+# Lane options override the environment:
+#   bundle exec fastlane release release_notes:"…" mandatory:true \
+#     upload_dir:/srv/openmaps public_base_url:https://example.com/app
+#
+# The manifest is exactly what the app's HttpReleaseSource parses:
+#   {"versionCode":2001,"versionName":"1.4.0",
+#    "apkUrl":"https://example.com/app/app-arm64-v8a-release.apk",
+#    "sha256":"…","mandatory":false,"releaseNotes":"…"}
+
+# fastlane runs with the working directory set to this file's directory.
+FASTLANE_DIR = Dir.pwd
+ANDROID_DIR = File.expand_path("..", FASTLANE_DIR)
+PROJECT_ROOT = File.expand_path("..", ANDROID_DIR)
+
+APK_DIR = File.join(PROJECT_ROOT, "build", "app", "outputs", "flutter-apk")
+APK_NAME = "app-arm64-v8a-release.apk"
+
+# Flutter overrides the version code of each split APK with
+# `ABI_VERSION * 1000 + versionCode` (FlutterPluginConstants.ABI_VERSION, where
+# arm64-v8a = 2), so the installed APK's effective code is the pubspec code plus
+# 2000. The manifest must advertise that effective code — it is what the OS and
+# the app compare.
+ABI_VERSION_CODE = 2
+
+# A hard cap on the generated changelog so the manifest (and the app's parser)
+# stay bounded even after a very long stretch between releases.
+MAX_NOTES_CHARS = 7000
+DEFAULT_CHANGELOG_COUNT = 50
+MAX_CHANGELOG_COUNT = 200
+
+default_platform(:android)
+
+platform :android do
+  desc "Build the arm64-v8a release APK, write version.json and upload both over SSH"
+  lane :release do |options|
+    version_name, version_code = read_pubspec_version
+    effective_code = version_code + ABI_VERSION_CODE * 1000
+
+    UI.message("Building OpenMaps #{version_name} (#{effective_code})…")
+    build_apk
+
+    apk_path = File.join(APK_DIR, APK_NAME)
+    unless File.exist?(apk_path)
+      UI.user_error!("Expected APK not found after the build: #{apk_path}")
+    end
+
+    sha256 = Digest::SHA256.file(apk_path).hexdigest
+    manifest_path = write_manifest(options, version_name, effective_code, sha256)
+    UI.success("Wrote #{manifest_path}")
+
+    upload(apk_path, manifest_path, options)
+  end
+
+  desc "Write version.json from pubspec.yaml (no build, no upload) — for previewing"
+  lane :manifest do |options|
+    version_name, version_code = read_pubspec_version
+    effective_code = version_code + ABI_VERSION_CODE * 1000
+    apk_path = File.join(APK_DIR, APK_NAME)
+    sha256 = File.exist?(apk_path) ? Digest::SHA256.file(apk_path).hexdigest : nil
+    UI.important("No built APK — writing the manifest without a sha256.") if sha256.nil?
+    manifest_path = write_manifest(options, version_name, effective_code, sha256)
+    UI.success("Wrote #{manifest_path}")
+    puts File.read(manifest_path)
+  end
+end
+
+def read_pubspec_version
+  path = File.join(PROJECT_ROOT, "pubspec.yaml")
+  pubspec = YAML.safe_load_file(path)
+  raw = pubspec["version"].to_s.strip
+  name, _plus, code = raw.partition("+")
+  if name.empty?
+    UI.user_error!("pubspec.yaml is missing a version (found #{raw.inspect})")
+  end
+  [name, code.empty? ? 1 : code.to_i]
+end
+
+def build_apk
+  Dir.chdir(PROJECT_ROOT) do
+    sh(
+      "flutter", "build", "apk",
+      "--release",
+      "--dart-define-from-file=.dart-define.json",
+      "--split-per-abi",
+      "--obfuscate",
+      "--split-debug-info=./myBuilds/obfuscate"
+    )
+  end
+end
+
+def write_manifest(options, version_name, version_code, sha256)
+  manifest = {
+    "versionCode" => version_code,
+    "versionName" => version_name,
+    "apkUrl" => "#{public_base_url(options)}/#{APK_NAME}",
+    "mandatory" => truthy(options[:mandatory] || ENV["OPENMAPS_MANDATORY"]),
+    "releaseNotes" => release_notes(options)
+  }
+  manifest["sha256"] = sha256 unless sha256.nil?
+
+  name = options[:manifest_name] || ENV["OPENMAPS_MANIFEST_NAME"] || "version.json"
+  path = File.join(APK_DIR, name)
+  File.write(path, "#{JSON.pretty_generate(manifest)}\n")
+  path
+end
+
+def public_base_url(options)
+  raw = options[:public_base_url] || ENV["OPENMAPS_PUBLIC_BASE_URL"] || ""
+  raw.to_s.strip.sub(%r{/+\z}, "")
+end
+
+def release_notes(options)
+  inline = options[:release_notes] || ENV["OPENMAPS_RELEASE_NOTES"]
+  return inline.to_s.strip unless inline.nil? || inline.to_s.strip.empty?
+
+  generated = changelog_notes(options)
+  return generated unless generated.empty?
+
+  file = File.join(FASTLANE_DIR, "release_notes.txt")
+  if File.exist?(file)
+    text = File.read(file).strip
+    return text unless text.empty?
+  end
+
+  "Bug fixes and performance improvements"
+end
+
+# Bulleted release notes from the commit subjects in the current release's
+# range (see changelog_base). Empty when there is nothing to list.
+def changelog_notes(options)
+  limit = changelog_limit(options)
+  subjects = changelog_commits(options).first(limit).map { |_sha, subject| subject }
+  return "" if subjects.empty?
+
+  text = subjects.map { |subject| "- #{subject}" }.join("\n")
+  if text.length > MAX_NOTES_CHARS
+    text = "#{text[0, MAX_NOTES_CHARS].rstrip}\n- …"
+  end
+  text
+end
+
+# The `[sha, subject]` pairs of the commits in range, newest first, with the
+# version-bump commit itself dropped so it does not appear as a "change".
+def changelog_commits(options)
+  base = changelog_base(options)
+  args = ["git", "-C", PROJECT_ROOT, "log", "--no-merges", "--pretty=format:%H%x09%s"]
+  args << "#{base}..HEAD" unless base.empty?
+  args += ["-n", (changelog_limit(options) * 3).to_s]
+  raw = IO.popen(args, err: File::NULL, &:read).to_s
+
+  commits = raw.split("\n").filter_map do |line|
+    sha, subject = line.split("\t", 2)
+    next if sha.nil? || subject.nil? || subject.strip.empty?
+
+    [sha.strip, subject.strip]
+  end
+  bump = current_version_commit
+  commits.reject { |(sha, _subject)| sha == bump }
+end
+
+# The ref the changelog starts after: an explicit `from:`/OPENMAPS_CHANGELOG_BASE,
+# else the last git tag, else the commit that set the previous version.
+def changelog_base(options)
+  explicit = (options[:from] || ENV["OPENMAPS_CHANGELOG_BASE"]).to_s.strip
+  return explicit unless explicit.empty?
+
+  tag = last_release_tag
+  return tag unless tag.empty?
+
+  previous_version_commit
+end
+
+def changelog_limit(options)
+  count = (options[:changelog_count] || ENV["OPENMAPS_CHANGELOG_COUNT"]).to_i
+  count = DEFAULT_CHANGELOG_COUNT if count <= 0
+  count > MAX_CHANGELOG_COUNT ? MAX_CHANGELOG_COUNT : count
+end
+
+def last_release_tag
+  IO.popen(
+    ["git", "-C", PROJECT_ROOT, "describe", "--tags", "--abbrev=0"],
+    err: File::NULL, &:read
+  ).to_s.strip
+end
+
+# The newest commit that set a version other than the current one — i.e. the
+# previous release. "" when the version has never changed (or is unknown).
+def previous_version_commit
+  current = pubspec_version_string
+  return "" if current.empty?
+
+  version_change_commits.each do |sha|
+    version = pubspec_version_at(sha)
+    return sha unless version.empty? || version == current
+  end
+  ""
+end
+
+# The commit that set the current version, so its "bump" subject can be dropped.
+def current_version_commit
+  current = pubspec_version_string
+  return nil if current.empty?
+
+  version_change_commits.find { |sha| pubspec_version_at(sha) == current }
+end
+
+def version_change_commits
+  raw = IO.popen(
+    [
+      "git", "-C", PROJECT_ROOT, "log", "-G", "^version:",
+      "--pretty=format:%H", "--", "pubspec.yaml"
+    ],
+    err: File::NULL, &:read
+  ).to_s
+  raw.split("\n").map(&:strip).reject(&:empty?)
+end
+
+def pubspec_version_string
+  File.read(File.join(PROJECT_ROOT, "pubspec.yaml"))[/^version:\s*(\S+)/, 1].to_s.strip
+end
+
+def pubspec_version_at(sha)
+  text = IO.popen(
+    ["git", "-C", PROJECT_ROOT, "show", "#{sha}:pubspec.yaml"],
+    err: File::NULL, &:read
+  ).to_s
+  text[/^version:\s*(\S+)/, 1].to_s.strip
+end
+
+def truthy(value)
+  case value
+  when nil, false then false
+  when true then true
+  else %w[1 true yes on].include?(value.to_s.strip.downcase)
+  end
+end
+
+def upload(apk_path, manifest_path, options)
+  host = (options[:deploy_host] || ENV["OPENMAPS_DEPLOY_HOST"]).to_s.strip
+  dir = (options[:upload_dir] || ENV["OPENMAPS_DEPLOY_PATH"]).to_s.strip
+
+  if host.empty? || dir.empty?
+    UI.important("OPENMAPS_DEPLOY_HOST / OPENMAPS_DEPLOY_PATH not set — skipping the upload.")
+    UI.important("Artifacts are in #{APK_DIR}")
+    return
+  end
+
+  user = (options[:deploy_user] || ENV["OPENMAPS_DEPLOY_USER"] || ENV["USER"] || "root").to_s
+  port = (options[:deploy_port] || ENV["OPENMAPS_DEPLOY_PORT"] || "22").to_s
+  key = (options[:ssh_key] || ENV["OPENMAPS_SSH_KEY"]).to_s
+  target = "#{user}@#{host}"
+
+  ssh_opts = ["-p", port]
+  scp_opts = ["-P", port]
+  unless key.empty?
+    ssh_opts += ["-i", key]
+    scp_opts += ["-i", key]
+  end
+
+  sh("ssh", *ssh_opts, target, "mkdir -p #{shell_quote(dir)}")
+  sh("scp", *scp_opts, apk_path, "#{target}:#{dir}/#{File.basename(apk_path)}")
+  sh("scp", *scp_opts, manifest_path, "#{target}:#{dir}/#{File.basename(manifest_path)}")
+  UI.success("Uploaded #{File.basename(apk_path)} and #{File.basename(manifest_path)} to #{target}:#{dir}")
+end
+
+def shell_quote(value)
+  "'#{value.to_s.gsub("'", "'\\''")}'"
+end

@@ -1,0 +1,30 @@
+
+
+/myBuilds
+
+# Flutter / Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+*.iml
+.idea/
+/test/features/failures
+.metadata
+
+# Secrets
+*.env
+.dart-define.json
+
+# Emulator / screenshots artefacts
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# OS
+*~
+.DS_Store
+# Widget Preview related
+.widget_preview/

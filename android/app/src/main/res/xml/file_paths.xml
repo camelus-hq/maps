@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Paths FileProvider may hand to the system installer. The self-updater
+     downloads an APK to <cache>/updates (see AndroidAppInstaller). -->
+<paths>
+    <cache-path name="updates" path="updates/" />
+</paths>

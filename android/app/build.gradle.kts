@@ -1,0 +1,76 @@
+import org.gradle.authentication.http.BasicAuthentication
+
+plugins {
+    id("com.android.application")
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id("dev.flutter.flutter-gradle-plugin")
+}
+
+// The Mapbox Android SDK is hosted on Mapbox's Maven repository and needs a
+// secret downloads token (Mapbox account → tokens → Downloads:Read). Never
+// commit the token: set MAPBOX_DOWNLOADS_TOKEN in ~/.gradle/gradle.properties
+// or android/gradle.properties (gitignored).
+repositories {
+    maven {
+        url = uri("https://api.mapbox.com/downloads/v2/releases/maven")
+        authentication { create<BasicAuthentication>("basic") }
+        credentials {
+            username = "mapbox"
+            password = providers.gradleProperty("MAPBOX_DOWNLOADS_TOKEN").orNull ?: ""
+        }
+    }
+}
+
+android {
+    namespace = "app.camelus.maps"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications needs Java 8+ library desugaring.
+        isCoreLibraryDesugaringEnabled = true
+    }
+
+    defaultConfig {
+        applicationId = "app.camelus.maps"
+        // You can update the following values to match your application needs.
+        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        minSdk = flutter.minSdkVersion
+        targetSdk = flutter.targetSdkVersion
+        multiDexEnabled = true
+        // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
+        // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
+        // You can force using the value of versionCode by specifying the `-P force-version-code-ignoring-abi=true`
+        // flag during build.
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+    }
+
+    buildTypes {
+        release {
+            // TODO: Add your own signing config for the release build.
+            // Signing with the debug keys for now, so `flutter run --release` works.
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
+}
+
+flutter {
+    source = "../.."
+}
+
+dependencies {
+    // Required by flutter_local_notifications (Java 8+ API desugaring).
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // FileProvider, used to hand the downloaded self-update APK to the system
+    // package installer (see MainActivity.installApk).
+    implementation("androidx.core:core-ktx:1.16.0")
+}
