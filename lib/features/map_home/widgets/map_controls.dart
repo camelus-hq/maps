@@ -8,17 +8,18 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/follow.dart';
 import '../../../state/map_camera.dart';
+import '../../../state/sheet_anchor.dart';
 import 'layers_sheet.dart';
 
 /// My-location and compass controls floating above the map.
 ///
 /// Buttons dispatch the same command ids the control channel uses, so the UI
-/// and agents share one code path. [bottom] positions the column above the
-/// active bottom sheet so it never overlaps the sheet content.
+/// and agents share one code path. The column is attached to the visible bottom
+/// sheet ([sheetAnchorProvider]) so it tracks the sheet's top edge as it is
+/// dragged, and fades out once the sheet grows past the point where it would
+/// crowd the sheet's content (see [SheetAnchor.hidesChrome]).
 class MapControls extends ConsumerWidget {
-  const MapControls({super.key, required this.bottom});
-
-  final double bottom;
+  const MapControls({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -34,52 +35,70 @@ class MapControls extends ConsumerWidget {
     final bool northLocked = orientation == MapOrientation.north;
     final double needle = northLocked ? 0 : -bearing * math.pi / 180;
     final bool showCompass = following || bearing.abs() > 0.5;
+    final SheetAnchor? anchor = ref.watch(sheetAnchorProvider);
+    final bool hidden = anchor == null || anchor.hidesChrome;
     return Positioned(
       right: AppSpacing.md,
-      bottom: bottom,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          _MapButton(
-            icon: Icons.layers_outlined,
-            tooltip: 'Layers',
-            onPressed: () => unawaited(showLayersSheet(context)),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          if (showCompass) ...<Widget>[
-            _MapButton(
-              icon: Icons.navigation_outlined,
-              tooltip: following
-                  ? (northLocked
-                        ? 'North up — tap to follow the direction you face'
-                        : 'Direction up — tap to keep north up')
-                  : 'Reset bearing',
-              // The needle points north, so the map orientation is readable.
-              rotation: needle,
-              onPressed: () => unawaited(
-                ref
-                    .read(commandRegistryProvider)
-                    .dispatch(
-                      // While following, the compass toggles the orientation;
-                      // otherwise it just snaps the map back to north.
-                      following ? 'map.orientation' : 'map.resetBearing',
-                      const <String, Object?>{},
-                    ),
+      // `none` is only reached before the first measurement; the chrome is
+      // hidden then, so the resting position does not matter.
+      bottom: (anchor ?? SheetAnchor.none).topInset + AppSpacing.md,
+      child: IgnorePointer(
+        ignoring: hidden,
+        child: AnimatedOpacity(
+          opacity: hidden ? 0 : 1,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              _MapButton(
+                icon: Icons.layers_outlined,
+                tooltip: 'Layers',
+                onPressed: () => unawaited(showLayersSheet(context)),
               ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-          ],
-          _MapButton(
-            icon: following ? Icons.my_location : Icons.location_searching,
-            tooltip: following ? 'Following your location' : 'Show my location',
-            active: following,
-            onPressed: () => unawaited(
-              ref
-                  .read(commandRegistryProvider)
-                  .dispatch('map.followMyLocation', const <String, Object?>{}),
-            ),
+              const SizedBox(height: AppSpacing.sm),
+              if (showCompass) ...<Widget>[
+                _MapButton(
+                  icon: Icons.navigation_outlined,
+                  tooltip: following
+                      ? (northLocked
+                            ? 'North up — tap to follow the direction you face'
+                            : 'Direction up — tap to keep north up')
+                      : 'Reset bearing',
+                  // The needle points north, so the map orientation is readable.
+                  rotation: needle,
+                  onPressed: () => unawaited(
+                    ref
+                        .read(commandRegistryProvider)
+                        .dispatch(
+                          // While following, the compass toggles the
+                          // orientation; otherwise it just snaps the map back
+                          // to north.
+                          following ? 'map.orientation' : 'map.resetBearing',
+                          const <String, Object?>{},
+                        ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+              ],
+              _MapButton(
+                icon: following ? Icons.my_location : Icons.location_searching,
+                tooltip: following
+                    ? 'Following your location'
+                    : 'Show my location',
+                active: following,
+                onPressed: () => unawaited(
+                  ref
+                      .read(commandRegistryProvider)
+                      .dispatch(
+                        'map.followMyLocation',
+                        const <String, Object?>{},
+                      ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

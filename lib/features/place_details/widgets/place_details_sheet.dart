@@ -18,6 +18,7 @@ import '../../../state/route.dart';
 import '../../../state/search.dart';
 import '../../../state/settings.dart';
 import '../../../state/usecases.dart';
+import '../../common/map_sheet.dart';
 import '../../reviews/widgets/place_reviews_section.dart';
 import '../../reviews/widgets/star_rating.dart';
 import 'place_hours_line.dart';
@@ -137,7 +138,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     final double peek = (_peekFraction ?? _peekFallback).clamp(0.1, 0.45);
     WidgetsBinding.instance.addPostFrameCallback((_) => _measurePeek(viewport));
 
-    return DraggableScrollableSheet(
+    return MapSheet(
       initialChildSize: _half,
       minChildSize: peek,
       maxChildSize: _full,

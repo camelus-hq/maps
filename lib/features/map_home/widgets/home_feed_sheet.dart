@@ -9,6 +9,7 @@ import '../../../domain/entities/place.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/home.dart';
 import '../../../state/place.dart';
+import '../../common/map_sheet.dart';
 import '../../social/widgets/live_share_card.dart';
 
 /// The draggable map-home sheet. Its content follows the active bottom-nav tab
@@ -20,7 +21,7 @@ class HomeFeedSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final HomeTab tab = ref.watch(homeTabProvider);
     final ColorScheme scheme = Theme.of(context).colorScheme;
-    return DraggableScrollableSheet(
+    return MapSheet(
       initialChildSize: 0.16,
       minChildSize: 0.16,
       maxChildSize: 0.92,

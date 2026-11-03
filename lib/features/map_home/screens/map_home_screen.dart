@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_spacing.dart';
 import '../../../domain/entities/place.dart';
+import '../../../state/config.dart';
 import '../../../state/home.dart';
 import '../../../state/map_taps.dart';
 import '../../../state/navigation.dart';
@@ -24,6 +25,7 @@ import '../widgets/category_chips.dart';
 import '../widgets/category_results_sheet.dart';
 import '../widgets/friend_review_chip.dart';
 import '../widgets/home_shell.dart';
+import '../widgets/map_attribution.dart';
 import '../widgets/map_controls.dart';
 import '../widgets/map_surface.dart';
 import '../widgets/map_viewport_layer.dart';
@@ -120,33 +122,23 @@ class MapHomeScreen extends ConsumerWidget {
                         ],
                       ),
               ),
+            // The sheet is measured by [MapSheet] (each sheet wraps its
+            // `DraggableScrollableSheet` in it) so the floating chrome below can
+            // attach to its top edge. Transition with a fade only — a slide
+            // would translate the sheet's measured region while it animates, and
+            // the chrome would briefly (and, after settling, incorrectly) anchor
+            // to the offset position.
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 220),
               transitionBuilder: (Widget child, Animation<double> animation) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 0.06),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
-                  ),
-                );
+                return FadeTransition(opacity: animation, child: child);
               },
               child: _sheet(composing, selected, routeState, category, friend),
             ),
             if (!(routeState.isTransit && routeState.transitDetailOpen))
-              MapControls(
-                bottom: _controlsBottom(
-                  context,
-                  composing,
-                  selected,
-                  routeState,
-                  category,
-                  friend,
-                ),
-              ),
+              const MapControls(),
+            if (ref.watch(appConfigProvider).hasMapboxToken)
+              const MapAttribution(),
           ],
           if (navigating) const NavigationOverlay(),
         ],
@@ -185,38 +177,5 @@ class MapHomeScreen extends ConsumerWidget {
       return CategoryResultsSheet(key: ValueKey<String>('category-$category'));
     }
     return const HomeShell(key: ValueKey<String>('home'));
-  }
-
-  /// Keeps the floating controls just above the active sheet's collapsed height.
-  double _controlsBottom(
-    BuildContext context,
-    bool composing,
-    Place? selected,
-    RouteState routeState,
-    String? category,
-    String? friend,
-  ) {
-    final double height = MediaQuery.sizeOf(context).height;
-    if (composing) {
-      return height * 0.9 + AppSpacing.md;
-    }
-    if (routeState.status != RouteStatus.idle) {
-      return height * 0.45 + AppSpacing.md;
-    }
-    if (selected != null) {
-      return height * 0.5 + AppSpacing.md;
-    }
-    if (friend != null) {
-      return height * 0.42 + AppSpacing.md;
-    }
-    if (category != null) {
-      return height * 0.45 + AppSpacing.md;
-    }
-    // On the home shell the sheet sits above the live-share card and the bottom
-    // navigation bar.
-    final double navBarHeight = 80 + MediaQuery.viewPaddingOf(context).bottom;
-    const double liveCardHeight = 76;
-    final double sheetRegion = height - navBarHeight - liveCardHeight;
-    return navBarHeight + liveCardHeight + sheetRegion * 0.16 + AppSpacing.md;
   }
 }

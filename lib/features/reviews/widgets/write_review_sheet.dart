@@ -10,6 +10,7 @@ import '../../../domain/entities/place.dart';
 import '../../../domain/entities/review.dart';
 import '../../../domain/entities/review_draft.dart';
 import '../../../state/reviews.dart';
+import '../../common/map_sheet.dart';
 import '../widgets/star_rating.dart';
 
 /// The "Write a review" sheet (reference: the review composer).
@@ -68,7 +69,7 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
     // reduced height keeps the focused field and the Publish button reachable.
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: DraggableScrollableSheet(
+      child: MapSheet(
         initialChildSize: 0.9,
         minChildSize: 0.9,
         maxChildSize: 0.95,

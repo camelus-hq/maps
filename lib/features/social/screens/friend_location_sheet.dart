@@ -15,6 +15,7 @@ import '../../../state/route.dart';
 import '../../../state/search.dart';
 import '../../../state/settings.dart';
 import '../../../state/social.dart';
+import '../../common/map_sheet.dart';
 import '../widgets/friend_avatar.dart';
 
 /// Bottom sheet for a friend's live location.
@@ -33,7 +34,7 @@ class FriendLocationSheet extends ConsumerWidget {
     final Friend? friend = ref.watch(friendsByPubkeyProvider)[pubkey];
     final String label = friend?.label ?? location?.label ?? _short(pubkey);
 
-    return DraggableScrollableSheet(
+    return MapSheet(
       initialChildSize: 0.42,
       minChildSize: 0.42,
       maxChildSize: 0.9,

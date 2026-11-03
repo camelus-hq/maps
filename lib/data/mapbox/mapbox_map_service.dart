@@ -199,14 +199,22 @@ class MapboxMapService implements MapService {
   void attach(MapboxMap map) {
     _map = map;
     _gate.attached();
-    // We render our own compass and don't show a scale bar; keep the Mapbox
-    // logo/attribution (required by the terms).
+    // We render our own compass and scale bar. The native attribution is also
+    // hidden: on Android it is glued to the bottom-left of the platform view,
+    // under the sheet, so the app draws its own credit above the sheet instead
+    // (see `MapAttribution`). The Mapbox logo stays (required by the terms).
     unawaited(
       _guard(() => map.compass.updateSettings(CompassSettings(enabled: false))),
     );
     unawaited(
       _guard(
         () => map.scaleBar.updateSettings(ScaleBarSettings(enabled: false)),
+      ),
+    );
+    unawaited(
+      _guard(
+        () =>
+            map.attribution.updateSettings(AttributionSettings(enabled: false)),
       ),
     );
     if (!_interactionsAdded) {

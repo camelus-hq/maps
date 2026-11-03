@@ -12,6 +12,7 @@ import '../../../state/home.dart';
 import '../../../state/search.dart';
 import '../../../state/settings.dart';
 import '../../common/error_text.dart';
+import '../../common/map_sheet.dart';
 import '../../common/place_result_icon.dart';
 
 /// The draggable results sheet shown while browsing a category: the map stays
@@ -24,7 +25,7 @@ class CategoryResultsSheet extends ConsumerWidget {
     final ColorScheme scheme = Theme.of(context).colorScheme;
     final String? category = ref.watch(selectedCategoryProvider);
     final SearchState search = ref.watch(searchControllerProvider);
-    return DraggableScrollableSheet(
+    return MapSheet(
       initialChildSize: 0.45,
       minChildSize: 0.35,
       maxChildSize: 0.9,

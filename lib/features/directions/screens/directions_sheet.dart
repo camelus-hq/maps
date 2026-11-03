@@ -12,6 +12,7 @@ import '../../../state/commands/commands_provider.dart';
 import '../../../state/route.dart';
 import '../../../state/settings.dart';
 import '../../common/error_text.dart';
+import '../../common/map_sheet.dart';
 import '../widgets/maneuver_glyph.dart';
 import '../widgets/transit_itineraries.dart';
 
@@ -39,7 +40,7 @@ class DirectionsSheet extends ConsumerWidget {
       final double viewport = MediaQuery.sizeOf(context).height;
       final double bottomInset = MediaQuery.viewPaddingOf(context).bottom;
       final double peek = ((136 + bottomInset) / viewport).clamp(0.1, 0.45);
-      return DraggableScrollableSheet(
+      return MapSheet(
         initialChildSize: 0.5,
         minChildSize: peek,
         maxChildSize: 0.92,
@@ -61,7 +62,7 @@ class DirectionsSheet extends ConsumerWidget {
         },
       );
     }
-    return DraggableScrollableSheet(
+    return MapSheet(
       initialChildSize: 0.45,
       minChildSize: 0.45,
       maxChildSize: 0.92,
