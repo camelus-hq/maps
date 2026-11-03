@@ -9,6 +9,7 @@ import '../../../domain/entities/place_category.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/home.dart';
 import '../../../state/settings.dart';
+import '../../common/navigation.dart';
 import '../../common/place_result_icon.dart';
 import 'category_picker_sheet.dart';
 
@@ -89,13 +90,26 @@ class _CategoryChip extends ConsumerWidget {
       label: Text(category.label),
       selected: selected,
       showCheckmark: false,
-      onSelected: (bool value) => unawaited(
-        ref.read(commandRegistryProvider).dispatch(
-          'search.category',
-          <String, Object?>{'name': value ? category.id : null},
-        ),
-      ),
+      onSelected: (bool value) => unawaited(_select(context, ref, value)),
     );
+  }
+
+  /// Selects (browsing the category over the map) or deselects (clears it).
+  ///
+  /// The browse is a pushed route so the back gesture dismisses it.
+  Future<void> _select(BuildContext context, WidgetRef ref, bool value) async {
+    await ref.read(commandRegistryProvider).dispatch(
+      'search.category',
+      <String, Object?>{'name': value ? category.id : null},
+    );
+    if (!context.mounted) {
+      return;
+    }
+    if (value) {
+      openCategory(context);
+    } else {
+      closeCategory(context);
+    }
   }
 }
 

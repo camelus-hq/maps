@@ -7,6 +7,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../domain/entities/place_category.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/settings.dart';
+import '../../common/navigation.dart';
 import '../../common/place_result_icon.dart';
 
 /// Presents the category picker: every browse category, grouped, with the
@@ -172,8 +173,8 @@ class CategoryPickerSheet extends ConsumerWidget {
   }
 
   /// Short press: browse the category (the chip-row behaviour) and open the
-  /// search screen with the results. Closes the sheet first so the picker does
-  /// not sit under the search screen.
+  /// results over the map. Closes the picker first so it does not sit under the
+  /// results route.
   void _search(BuildContext context, WidgetRef ref, PlaceCategory category) {
     final registry = ref.read(commandRegistryProvider);
     Navigator.of(context).maybePop();
@@ -182,5 +183,6 @@ class CategoryPickerSheet extends ConsumerWidget {
         'name': category.id,
       }),
     );
+    openCategory(context);
   }
 }

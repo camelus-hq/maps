@@ -42,7 +42,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void _submit(String value) {
     if (placeCategoryForSearch(value) != null) {
       unawaited(ref.read(searchControllerProvider.notifier).submit(value));
-      popOrHome(context);
+      // Replace the search list with the results route so back lands on the map.
+      openCategory(context, replace: true);
       return;
     }
     unawaited(ref.read(searchControllerProvider.notifier).submit(value));
@@ -202,7 +203,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       <String, Object?>{'name': category.id},
     );
     if (mounted) {
-      popOrHome(context);
+      openCategory(context, replace: true);
     }
   }
 }

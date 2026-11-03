@@ -13,6 +13,7 @@ import '../../../state/search.dart';
 import '../../../state/settings.dart';
 import '../../common/error_text.dart';
 import '../../common/map_sheet.dart';
+import '../../common/navigation.dart';
 import '../../common/place_result_icon.dart';
 
 /// The draggable results sheet shown while browsing a category: the map stays
@@ -72,14 +73,7 @@ class CategoryResultsSheet extends ConsumerWidget {
                     IconButton(
                       icon: const Icon(Icons.close),
                       tooltip: 'Close',
-                      onPressed: () => unawaited(
-                        ref
-                            .read(commandRegistryProvider)
-                            .dispatch(
-                              'search.category',
-                              const <String, Object?>{},
-                            ),
-                      ),
+                      onPressed: () => unawaited(_close(ref, context)),
                     ),
                   ],
                 ),
@@ -92,6 +86,16 @@ class CategoryResultsSheet extends ConsumerWidget {
     );
   }
 
+  /// Clears the browse and, when it is showing as a pushed route, pops it.
+  Future<void> _close(WidgetRef ref, BuildContext context) async {
+    await ref
+        .read(commandRegistryProvider)
+        .dispatch('search.category', const <String, Object?>{});
+    if (context.mounted) {
+      popOrHome(context);
+    }
+  }
+
   Widget _body(
     BuildContext context,
     WidgetRef ref,
@@ -100,14 +104,15 @@ class CategoryResultsSheet extends ConsumerWidget {
   ) {
     switch (search.status) {
       case SearchStatus.loading:
-        return const Center(child: CircularProgressIndicator());
+        return _message(scrollController, const CircularProgressIndicator());
       case SearchStatus.error:
         final ({IconData icon, String text}) presentation = errorPresentation(
           search.error,
           fallback: 'Could not load places',
         );
-        return Center(
-          child: Padding(
+        return _message(
+          scrollController,
+          Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -124,11 +129,12 @@ class CategoryResultsSheet extends ConsumerWidget {
           ),
         );
       case SearchStatus.idle:
-        return const SizedBox.shrink();
+        return _message(scrollController, const SizedBox.shrink());
       case SearchStatus.data:
         if (search.results.isEmpty) {
-          return const Center(
-            child: Padding(
+          return _message(
+            scrollController,
+            const Padding(
               padding: EdgeInsets.all(AppSpacing.md),
               child: Text('No places found nearby'),
             ),
@@ -136,6 +142,22 @@ class CategoryResultsSheet extends ConsumerWidget {
         }
         return _results(context, ref, search.results, scrollController);
     }
+  }
+
+  /// A centred [child] that still drives [scrollController].
+  ///
+  /// [MapSheet] can only measure the sheet — and so attach the floating chrome
+  /// — once its scroll controller is attached, which only happens when the
+  /// builder hands it to a scrollable. The loading/error/empty states are not
+  /// lists, so without this the chrome would stay anchored to the previous
+  /// sheet until the results appeared.
+  Widget _message(ScrollController scrollController, Widget child) {
+    return CustomScrollView(
+      controller: scrollController,
+      slivers: <Widget>[
+        SliverFillRemaining(hasScrollBody: false, child: Center(child: child)),
+      ],
+    );
   }
 
   Widget _results(
@@ -170,12 +192,20 @@ class CategoryResultsSheet extends ConsumerWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => unawaited(
-            ref.read(commandRegistryProvider).dispatch(
+          onTap: () async {
+            await ref.read(commandRegistryProvider).dispatch(
               'place.select',
               <String, Object?>{'id': place.id},
-            ),
-          ),
+            );
+            // The place sheet takes over: drop the category highlight (the pins
+            // stay, exactly as when a search result is selected).
+            ref.read(selectedCategoryProvider.notifier).select(null);
+            // Leave the results route so the place sheet can appear on the map
+            // (a no-op when the sheet is showing on the map home itself).
+            if (context.mounted) {
+              popOrHome(context);
+            }
+          },
         );
       },
     );

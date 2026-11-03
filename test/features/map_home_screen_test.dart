@@ -115,4 +115,34 @@ void main() {
     expect(tester.widget<FilterChip>(chip).selected, isFalse);
     expect(map.markers, isEmpty);
   });
+
+  testWidgets('the back gesture closes the category results route', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const OpenMapsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilterChip, 'Cafes'));
+    await tester.pumpAndSettle();
+    expect(container.read(selectedCategoryProvider), 'Cafes');
+    final FakeMapService map =
+        container.read(mapServiceProvider) as FakeMapService;
+    expect(map.markers, isNotEmpty);
+
+    // The system back gesture pops the results route (not the app) and clears
+    // the browse — the same path as `ui.back`.
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(container.read(selectedCategoryProvider), isNull);
+    expect(map.markers, isEmpty);
+    expect(find.text('Search here'), findsOneWidget);
+  });
 }

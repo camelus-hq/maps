@@ -47,6 +47,8 @@ class MapHomeScreen extends ConsumerWidget {
     final Place? selected = ref.watch(selectedPlaceProvider);
     final RouteState routeState = ref.watch(routeControllerProvider);
     final String? category = ref.watch(selectedCategoryProvider);
+    // While the pushed results route is open, that route owns the sheet.
+    final bool categoryRouteOpen = ref.watch(categoryRouteOpenProvider);
     final String? friend = ref.watch(selectedFriendProvider);
     final ReviewComposerState composer = ref.watch(reviewComposerProvider);
     final bool composing = composer.isOpen;
@@ -133,7 +135,12 @@ class MapHomeScreen extends ConsumerWidget {
               transitionBuilder: (Widget child, Animation<double> animation) {
                 return FadeTransition(opacity: animation, child: child);
               },
-              child: _sheet(composing, selected, routeState, category, friend),
+              child: categoryRouteOpen
+                  // The results route is showing the sheet; the map home holds
+                  // nothing so exactly one sheet reports the chrome anchor and
+                  // the chrome re-anchors when the route pops.
+                  ? const SizedBox.shrink()
+                  : _sheet(composing, selected, routeState, category, friend),
             ),
             if (!(routeState.isTransit && routeState.transitDetailOpen))
               const MapControls(),

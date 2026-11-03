@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
@@ -5,10 +7,36 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:openmaps/app/app.dart';
 import 'package:openmaps/core/theme/app_spacing.dart';
 import 'package:openmaps/data/fakes/fake_external_actions.dart';
+import 'package:openmaps/domain/entities/lat_lon.dart';
+import 'package:openmaps/domain/entities/lat_lon_bounds.dart';
+import 'package:openmaps/domain/entities/place.dart';
+import 'package:openmaps/domain/ports/search_service.dart';
 import 'package:openmaps/features/map_home/widgets/map_attribution.dart';
 import 'package:openmaps/features/map_home/widgets/map_controls.dart';
 import 'package:openmaps/state/ports.dart';
+import 'package:openmaps/state/search.dart';
 import 'package:openmaps/state/sheet_anchor.dart';
+
+/// A browse that never completes, so the category sheet stays in its loading
+/// state while the test inspects the chrome.
+class _SlowSearch implements SearchService {
+  final Completer<List<Place>> _completer = Completer<List<Place>>();
+
+  @override
+  Future<List<Place>> search(
+    String query, {
+    LatLon? proximity,
+    LatLonBounds? bounds,
+  }) async => const <Place>[];
+
+  @override
+  Future<List<Place>> nearbyCategory(
+    String categoryId, {
+    required LatLon proximity,
+    LatLonBounds? bounds,
+    int limit = 10,
+  }) => _completer.future;
+}
 
 /// A controller that starts on a fixed anchor, so the floating chrome can be
 /// tested without driving a real sheet.
@@ -245,5 +273,77 @@ void main() {
     final SheetAnchor back = container.read(sheetAnchorProvider)!;
     expect(back.fraction, closeTo(home.fraction, 0.001));
     expect(back.topInset, closeTo(home.topInset, 0.5));
+  });
+
+  testWidgets('opening the category results attaches the chrome at once', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const OpenMapsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilterChip, 'Cafes'));
+    await tester.pumpAndSettle();
+
+    // The chrome must attach to the category sheet's real top edge immediately —
+    // not a value measured mid-transition (the entry slide used to shift the
+    // measured top edge, leaving the buttons low until the next sheet drag).
+    final SheetAnchor anchor = container.read(sheetAnchorProvider)!;
+    final Finder controls = find.byType(MapControls);
+    expect(
+      _positionedOf(tester, controls).bottom,
+      closeTo(anchor.topInset + AppSpacing.md, 0.01),
+    );
+    // A 0.45 sheet on an 800px screen is 360px tall (the anchor is measured from
+    // the bottom), so the chrome sits at 360 + 16.
+    expect(anchor.topInset, closeTo(360, 1.5));
+  });
+
+  testWidgets('the chrome attaches while the category sheet is still loading', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final ProviderContainer container = ProviderContainer(
+      overrides: <Override>[
+        searchServiceProvider.overrideWithValue(_SlowSearch()),
+      ],
+    );
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const OpenMapsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilterChip, 'Cafes'));
+    // The sheet switcher fades the home sheet out and the loading category
+    // sheet in; the browse never completes.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(
+      container.read(searchControllerProvider).status,
+      SearchStatus.loading,
+    );
+    final SheetAnchor? anchor = container.read(sheetAnchorProvider);
+    expect(anchor, isNotNull, reason: 'the chrome has nothing to attach to');
+    expect(anchor!.topInset, closeTo(360, 1.5));
   });
 }

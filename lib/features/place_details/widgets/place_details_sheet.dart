@@ -19,6 +19,7 @@ import '../../../state/search.dart';
 import '../../../state/settings.dart';
 import '../../../state/usecases.dart';
 import '../../common/map_sheet.dart';
+import '../../common/navigation.dart';
 import '../../reviews/widgets/place_reviews_section.dart';
 import '../../reviews/widgets/star_rating.dart';
 import 'place_hours_line.dart';
@@ -574,6 +575,10 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
       'place.nearby',
       <String, Object?>{'id': place.id},
     );
+    if (mounted) {
+      // Show the nearby results over the map, as a route so back returns here.
+      openCategory(context);
+    }
   }
 }
 

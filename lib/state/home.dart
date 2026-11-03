@@ -33,3 +33,21 @@ selectedCategoryProvider =
     NotifierProvider<SelectedCategoryController, String?>(
       SelectedCategoryController.new,
     );
+
+/// True while the pushed category-results route (`/category`) is open.
+///
+/// The results sheet lives on that route, so the map home hands its own bottom
+/// sheet over while the route is up: exactly one sheet reports to
+/// [SheetAnchor], and when the route pops the map home's sheet remounts and
+/// re-anchors the floating chrome. Set by [CategoryResultsScreen].
+class CategoryRouteOpenController extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void set(bool open) => state = open;
+}
+
+final NotifierProvider<CategoryRouteOpenController, bool>
+categoryRouteOpenProvider = NotifierProvider<CategoryRouteOpenController, bool>(
+  CategoryRouteOpenController.new,
+);
