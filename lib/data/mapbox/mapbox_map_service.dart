@@ -120,6 +120,7 @@ class MapboxMapService implements MapService {
   List<TransitStopMarker> _transitStops = const <TransitStopMarker>[];
   List<LatLon>? _pendingFit;
   BaseMapStyle _baseStyle = BaseMapStyle.standard;
+  bool _darkMode = false;
   bool _traffic = false;
   PointAnnotationManager? _pointManager;
   PointAnnotationManager? _savedPointManager;
@@ -147,6 +148,9 @@ class MapboxMapService implements MapService {
 
   /// The style currently selected (the widget reads this when re-created).
   BaseMapStyle get baseStyle => _baseStyle;
+
+  /// Whether the app currently uses its dark theme.
+  bool get isDarkMode => _darkMode;
 
   @override
   Camera get camera => _camera;
@@ -281,7 +285,31 @@ class MapboxMapService implements MapService {
       return;
     }
     _gate.styleLoaded();
+    unawaited(_syncTheme());
     _syncContent();
+  }
+
+  /// Updates the Standard style's light preset without reloading the map.
+  Future<void> setDarkMode(bool enabled) async {
+    if (_darkMode == enabled) {
+      return;
+    }
+    _darkMode = enabled;
+    await _syncTheme();
+  }
+
+  Future<void> _syncTheme() async {
+    final MapboxMap? map = _map;
+    if (map == null || !_gate.isOpen || _baseStyle != BaseMapStyle.standard) {
+      return;
+    }
+    await _guard(
+      () => map.setStyleImportConfigProperty(
+        'basemap',
+        'lightPreset',
+        _darkMode ? 'night' : 'day',
+      ),
+    );
   }
 
   /// Applies every layer/annotation held in the domain fields to the live map.

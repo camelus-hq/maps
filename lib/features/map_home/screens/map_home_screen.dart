@@ -117,8 +117,6 @@ class MapHomeScreen extends ConsumerWidget {
                           const SizedBox(height: AppSpacing.sm),
                           const CategoryChips(),
                           const SizedBox(height: AppSpacing.xs),
-                          const FriendsChip(),
-                          const SizedBox(height: AppSpacing.xs),
                           const FriendReviewChip(),
                           const SearchAreaChip(),
                         ],

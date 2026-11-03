@@ -1,4 +1,6 @@
-import 'package:flutter/widgets.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import 'mapbox_map_service.dart';
@@ -21,6 +23,19 @@ class MapboxMapView extends StatefulWidget {
 }
 
 class _MapboxMapViewState extends State<MapboxMapView> {
+  bool? _lastDarkMode;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final bool darkMode = Theme.of(context).brightness == Brightness.dark;
+    if (_lastDarkMode == darkMode) {
+      return;
+    }
+    _lastDarkMode = darkMode;
+    unawaited(widget.service.setDarkMode(darkMode));
+  }
+
   @override
   void dispose() {
     widget.service.detach();
