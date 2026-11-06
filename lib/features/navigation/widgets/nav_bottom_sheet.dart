@@ -220,7 +220,7 @@ class NavEtaHeader extends ConsumerWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              'Searching for GPS…',
+                              'Location unavailable',
                               style: TextStyle(
                                 color: const Color(0xFFDD8500),
                                 fontSize: 12,

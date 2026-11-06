@@ -19,4 +19,7 @@ class FakeLocationService implements LocationService {
   @override
   Stream<LocationSample> positionStream() =>
       Stream<LocationSample>.value(_sample);
+
+  @override
+  Stream<bool> availabilityStream() => Stream<bool>.value(true);
 }

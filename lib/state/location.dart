@@ -3,14 +3,15 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/entities/location_sample.dart';
+import '../domain/ports/location_service.dart';
 import 'ports.dart';
 
 /// Live device-location presence for the map.
 ///
 /// One subscription shared by every consumer (follow, guidance, the location
-/// puck) so the GNSS stream is opened once, and one place that answers "do we
-/// currently have a signal?" — which the follow button and the (greyed) last
-/// known location puck reflect.
+/// puck) so the GNSS stream is opened once, and one place that answers "can we
+/// locate the device?" — which the follow button and the (greyed) last known
+/// location puck reflect.
 class LocationState {
   const LocationState({
     this.fix,
@@ -26,11 +27,17 @@ class LocationState {
   /// When [fix] was received.
   final DateTime? fixAt;
 
-  /// True while fixes are arriving (or were seeded) recently.
+  /// True about a fix we can show: one has arrived (or was seeded) and location
+  /// is currently available.
   final bool streaming;
 
-  /// True when we have a fix but fixes stopped arriving (GPS lost) or the
-  /// stream errored — the last fix is retained so it can be shown greyed out.
+  /// True when the device cannot be located — the OS location service is off,
+  /// permission was denied, or the position stream errored. The last fix is
+  /// retained so it can be shown greyed out.
+  ///
+  /// This is deliberately **not** derived from how long ago a fix arrived:
+  /// geolocator exposes no satellite-fix signal, and a stationary device emits
+  /// no updates, so an idle timer would wrongly report "lost".
   final bool lost;
 
   bool get hasFix => fix != null;
@@ -50,33 +57,34 @@ class LocationState {
 
 /// Tracks the device location stream app-wide.
 ///
-/// A fix marks us live; if no fix arrives for [staleAfter] the signal is
-/// considered lost (the last fix is kept). Errors mark it lost immediately.
-///
-/// Staleness is evaluated by [checkStale], which the map home drives from a
-/// widget-owned timer — the tracker itself owns no timer, so a test that does
-/// not dispose its `ProviderContainer` never leaves one pending.
+/// A fix marks us live. Location is flagged [LocationState.lost] only on a real
+/// signal: the [LocationService.availabilityStream] reports the OS location
+/// service disabled or permission denied, or the position stream errors; a new
+/// fix (or the service coming back) clears it. No timers live here, so a test
+/// that does not dispose its `ProviderContainer` never leaves one pending.
 class LocationTracker extends Notifier<LocationState> {
-  /// A fix older than this means the GPS signal was lost.
-  static const Duration staleAfter = Duration(seconds: 8);
+  StreamSubscription<LocationSample>? _positionSub;
+  StreamSubscription<bool>? _availabilitySub;
 
-  StreamSubscription<LocationSample>? _sub;
-
-  /// When tracking started, used to flag "no signal at all" after the grace.
-  late final DateTime _startedAt = DateTime.now();
+  /// The last availability reported by the service. Optimistic until told
+  /// otherwise, so a missing availability signal never greys out a usable fix.
+  bool _available = true;
 
   @override
   LocationState build() {
-    _sub = ref
-        .read(locationServiceProvider)
-        .positionStream()
-        .listen(
-          _onSample,
-          onError: (Object _) => _markLost(),
-          cancelOnError: false,
-        );
+    final LocationService service = ref.read(locationServiceProvider);
+    _positionSub = service.positionStream().listen(
+      _onSample,
+      onError: (Object _) => _markLost(),
+      cancelOnError: false,
+    );
+    _availabilitySub = service.availabilityStream().listen(
+      _onAvailability,
+      onError: (Object _) {},
+    );
     ref.onDispose(() {
-      unawaited(_sub?.cancel());
+      unawaited(_positionSub?.cancel());
+      unawaited(_availabilitySub?.cancel());
     });
     unawaited(_seed());
     return const LocationState();
@@ -96,31 +104,29 @@ class LocationTracker extends Notifier<LocationState> {
     if (known == null || state.hasFix) {
       return;
     }
-    state = LocationState(fix: known, fixAt: DateTime.now(), streaming: true);
+    state = LocationState(
+      fix: known,
+      fixAt: DateTime.now(),
+      streaming: true,
+      lost: !_available,
+    );
   }
 
   void _onSample(LocationSample sample) {
+    // A fix is proof we can be located, so it clears any lost/errored state.
+    _available = true;
     state = LocationState(fix: sample, fixAt: DateTime.now(), streaming: true);
   }
 
-  /// Marks the signal lost when the last fix is older than [staleAfter] — or,
-  /// when no fix has ever arrived, once the tracking grace period has passed.
-  ///
-  /// [now] is injectable for tests. Idempotent: a no-op once already lost.
-  void checkStale([DateTime? now]) {
-    if (state.lost) {
-      return;
-    }
-    final DateTime reference = now ?? DateTime.now();
-    final DateTime? at = state.fixAt;
-    if (at == null) {
-      if (reference.difference(_startedAt) > staleAfter) {
-        state = state.copyWith(streaming: false, lost: true);
-      }
-      return;
-    }
-    if (reference.difference(at) > staleAfter) {
-      state = state.copyWith(streaming: false, lost: true);
+  /// Reacts to the device's real location availability: disabled services or
+  /// denied permission mean "lost" (the last fix stays, greyed out); recovery
+  /// clears it so the alert does not outlive the outage.
+  void _onAvailability(bool available) {
+    _available = available;
+    if (!available) {
+      _markLost();
+    } else if (state.lost) {
+      state = state.copyWith(lost: false, streaming: state.hasFix);
     }
   }
 

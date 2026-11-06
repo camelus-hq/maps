@@ -24,7 +24,6 @@ import '../widgets/category_chips.dart';
 import '../widgets/category_results_sheet.dart';
 import '../widgets/friend_review_chip.dart';
 import '../widgets/home_shell.dart';
-import '../widgets/location_status_layer.dart';
 import '../widgets/map_attribution.dart';
 import '../widgets/map_controls.dart';
 import '../widgets/map_surface.dart';
@@ -80,8 +79,6 @@ class MapHomeScreen extends ConsumerWidget {
           // camera (queries only what is on screen). Invisible.
           const ReviewMapLayer(),
 
-          // Ages the location state (marks the GPS signal lost after a gap).
-          const LocationStatusLayer(),
           if (!navigating) ...<Widget>[
             if (!composing)
               SafeArea(

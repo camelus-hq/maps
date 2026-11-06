@@ -10,10 +10,12 @@ import 'package:openmaps/state/commands/commands_provider.dart';
 import 'package:openmaps/state/location.dart';
 import 'package:openmaps/state/ports.dart';
 
-/// A [LocationService] whose stream a test drives directly.
+/// A [LocationService] whose position and availability streams a test drives.
 class _ControllableLocationService implements LocationService {
   final StreamController<LocationSample> _controller =
       StreamController<LocationSample>.broadcast();
+  final StreamController<bool> _availability =
+      StreamController<bool>.broadcast();
   LocationSample? _last;
 
   @override
@@ -22,14 +24,22 @@ class _ControllableLocationService implements LocationService {
   @override
   Stream<LocationSample> positionStream() => _controller.stream;
 
+  @override
+  Stream<bool> availabilityStream() => _availability.stream;
+
   void emit(LocationSample sample) {
     _last = sample;
     _controller.add(sample);
   }
 
+  void setAvailability(bool available) => _availability.add(available);
+
   void fail() => _controller.addError(StateError('gps'));
 
-  Future<void> dispose() => _controller.close();
+  Future<void> dispose() async {
+    await _controller.close();
+    await _availability.close();
+  }
 }
 
 void main() {
@@ -48,7 +58,7 @@ void main() {
   });
 
   test(
-    'a fix is live; a stale gap marks the signal lost; a fix recovers it',
+    'a fix stays live without further updates (no GPS-lock signal is inferred)',
     () async {
       final _ControllableLocationService location =
           _ControllableLocationService();
@@ -60,29 +70,53 @@ void main() {
         await location.dispose();
       });
 
-      final LocationTracker tracker = container.read(
-        locationTrackerProvider.notifier,
-      );
+      container.read(locationTrackerProvider);
       location.emit(
         const LocationSample(position: LatLon(52.52, 13.405), bearing: 90),
       );
       await Future<void>.delayed(Duration.zero);
+
+      // A stationary device emits nothing; that must never read as "lost".
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      final LocationState state = container.read(locationTrackerProvider);
+      expect(state.lost, isFalse);
+      expect(state.streaming, isTrue);
+      expect(state.fix, isNotNull);
+    },
+  );
+
+  test(
+    'location services off marks the signal lost; recovery clears it',
+    () async {
+      final _ControllableLocationService location =
+          _ControllableLocationService();
+      final ProviderContainer container = ProviderContainer(
+        overrides: [locationServiceProvider.overrideWithValue(location)],
+      );
+      addTearDown(() async {
+        container.dispose();
+        await location.dispose();
+      });
+
+      container.read(locationTrackerProvider);
+      location.emit(const LocationSample(position: LatLon(52.52, 13.405)));
+      await Future<void>.delayed(Duration.zero);
       expect(container.read(locationTrackerProvider).lost, isFalse);
 
-      // No fix for longer than the stale window → lost, but the fix is kept.
-      tracker.checkStale(DateTime.now().add(const Duration(seconds: 9)));
+      // The OS reports location services unavailable → lost, fix kept.
+      location.setAvailability(false);
+      await Future<void>.delayed(Duration.zero);
       final LocationState lost = container.read(locationTrackerProvider);
       expect(lost.lost, isTrue);
       expect(lost.streaming, isFalse);
       expect(lost.fix, isNotNull);
 
-      // A fresh fix recovers the signal.
-      location.emit(const LocationSample(position: LatLon(52.53, 13.41)));
+      // Services come back → the alert clears without waiting for a new fix.
+      location.setAvailability(true);
       await Future<void>.delayed(Duration.zero);
       final LocationState recovered = container.read(locationTrackerProvider);
       expect(recovered.lost, isFalse);
-      expect(recovered.streaming, isTrue);
-      expect(recovered.fix!.position, const LatLon(52.53, 13.41));
+      expect(recovered.hasFix, isTrue);
     },
   );
 
@@ -109,7 +143,7 @@ void main() {
     expect(state.fix, isNotNull);
   });
 
-  test('no fix within the grace period marks the signal lost', () async {
+  test('unavailable services with no fix ever marks the signal lost', () async {
     final _ControllableLocationService location =
         _ControllableLocationService();
     final ProviderContainer container = ProviderContainer(
@@ -120,14 +154,10 @@ void main() {
       await location.dispose();
     });
 
-    final LocationTracker tracker = container.read(
-      locationTrackerProvider.notifier,
-    );
-    // Nothing has arrived yet, but we are still inside the grace period.
-    tracker.checkStale();
-    expect(container.read(locationTrackerProvider).lost, isFalse);
-
-    tracker.checkStale(DateTime.now().add(const Duration(days: 1)));
+    container.read(locationTrackerProvider);
+    // Nothing has arrived; the service reports it cannot locate us.
+    location.setAvailability(false);
+    await Future<void>.delayed(Duration.zero);
     final LocationState state = container.read(locationTrackerProvider);
     expect(state.lost, isTrue);
     expect(state.hasFix, isFalse);

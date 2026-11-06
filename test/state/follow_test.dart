@@ -22,6 +22,9 @@ class _ControllableLocationService implements LocationService {
   @override
   Stream<LocationSample> positionStream() => _controller.stream;
 
+  @override
+  Stream<bool> availabilityStream() => const Stream<bool>.empty();
+
   void emit(LocationSample sample) {
     _last = sample;
     _controller.add(sample);

@@ -28,6 +28,9 @@ class _ControllableLocationService implements LocationService {
   @override
   Stream<LocationSample> positionStream() => _controller.stream;
 
+  @override
+  Stream<bool> availabilityStream() => const Stream<bool>.empty();
+
   void emit(LocationSample sample) {
     _last = sample;
     _controller.add(sample);
@@ -171,7 +174,7 @@ void main() {
     expect(container.read(locationTrackerProvider).lost, isTrue);
     expect(container.read(locationTrackerProvider).hasFix, isTrue);
     expect(find.byType(NavBottomSheet), findsOneWidget);
-    expect(find.text('Searching for GPS…'), findsOneWidget);
+    expect(find.text('Location unavailable'), findsOneWidget);
   });
 
   testWidgets('the navigation sheet expands to reveal the trip options', (

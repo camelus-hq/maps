@@ -33,6 +33,9 @@ class _TestLocationService implements LocationService {
   @override
   Stream<LocationSample> positionStream() => _controller.stream;
 
+  @override
+  Stream<bool> availabilityStream() => const Stream<bool>.empty();
+
   void emit(LocationSample next) {
     sample = next;
     _controller.add(next);

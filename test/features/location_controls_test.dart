@@ -13,6 +13,8 @@ import 'package:openmaps/state/ports.dart';
 class _ControllableLocationService implements LocationService {
   final StreamController<LocationSample> _controller =
       StreamController<LocationSample>.broadcast();
+  final StreamController<bool> _availability =
+      StreamController<bool>.broadcast();
   LocationSample? _last;
 
   @override
@@ -21,18 +23,24 @@ class _ControllableLocationService implements LocationService {
   @override
   Stream<LocationSample> positionStream() => _controller.stream;
 
+  @override
+  Stream<bool> availabilityStream() => _availability.stream;
+
   void emit(LocationSample sample) {
     _last = sample;
     _controller.add(sample);
   }
 
-  void fail() => _controller.addError(StateError('gps'));
+  void setAvailability(bool available) => _availability.add(available);
 
-  Future<void> dispose() => _controller.close();
+  Future<void> dispose() async {
+    await _controller.close();
+    await _availability.close();
+  }
 }
 
 void main() {
-  testWidgets('the location button reflects a lost GPS signal', (
+  testWidgets('the location button reflects unavailable location services', (
     WidgetTester tester,
   ) async {
     final _ControllableLocationService location =
@@ -62,12 +70,19 @@ void main() {
     await tester.pump();
     expect(find.byIcon(Icons.my_location), findsOneWidget);
 
-    // The signal drops → the button shows the lost state but follow stays on,
-    // so the last known location is still shown greyed out by the puck overlay.
-    location.fail();
+    // Location services turn off → the button shows the alert state but follow
+    // stays on, so the last known location is still shown greyed out.
+    location.setAvailability(false);
     await tester.pump();
     expect(find.byIcon(Icons.gps_off), findsOneWidget);
     expect(find.byIcon(Icons.my_location), findsNothing);
     expect(container.read(followModeProvider), isTrue);
+
+    // Services come back → the control returns to normal.
+    location.setAvailability(true);
+    await tester.pump();
+    await tester.pump();
+    expect(find.byIcon(Icons.gps_off), findsNothing);
+    expect(find.byIcon(Icons.my_location), findsOneWidget);
   });
 }

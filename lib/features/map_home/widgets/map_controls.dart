@@ -31,8 +31,8 @@ class MapControls extends ConsumerWidget {
         0;
     final bool following = ref.watch(followModeProvider);
     final LocationState location = ref.watch(locationTrackerProvider);
-    // No usable signal: either a fix stopped arriving, or none ever has. The
-    // last known location (if any) stays on the map, greyed out.
+    // Location unavailable: OS services off / permission denied / stream error.
+    // The last known location (if any) stays on the map, greyed out.
     final bool gpsLost = location.lost;
     final MapOrientation orientation = ref.watch(mapOrientationProvider);
     // In north mode the needle is upright even if a stale bearing lingers; in
@@ -93,7 +93,7 @@ class MapControls extends ConsumerWidget {
                     ? Icons.my_location
                     : Icons.location_searching,
                 tooltip: gpsLost
-                    ? 'GPS signal lost — showing your last known location'
+                    ? 'Location unavailable — showing your last known location'
                     : following
                     ? 'Following your location'
                     : 'Show my location',
@@ -167,7 +167,7 @@ class _MapButton extends StatelessWidget {
     );
   }
 
-  /// The amber used for the "GPS lost" location button (readable on the light
+  /// The amber used for the "location unavailable" state (readable on the light
   /// and dark surfaces).
   static const Color _alertColor = Color(0xFFDD8500);
 }

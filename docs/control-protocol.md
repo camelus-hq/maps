@@ -41,7 +41,7 @@ adb forward tcp:7981 tcp:7981
 | `map.resetBearing` | — | the camera with `bearing: 0` (locks north-up while following) |
 | `map.orientation` | `{mode?: north\|heading}` (omit to toggle) | the mode name — direction-up vs north-up while following |
 | `map.myLocation` | — | the camera moved to the last known fix |
-| `map.location` | — | `{hasFix, streaming, lost, lat, lon, bearing, accuracy, speed}` — the live device-location state |
+| `map.location` | — | `{hasFix, streaming, lost, lat, lon, bearing, accuracy, speed}` — the live device-location state; `lost` means location services are off or permission was denied (never inferred from a quiet stream) |
 | `map.followMyLocation` | — | the new follow state (boolean) |
 | `map.follow` | `{on}` | the new follow state (boolean) |
 | `map.style.set` | `{style: standard\|satellite\|terrain}` | the style name |
@@ -135,7 +135,7 @@ sync test fails if it drifts from the registry.
 | `map.follow` | Enable/disable location follow (params: {on}). |
 | `map.followMyLocation` | Toggle following the device location (return the new state). |
 | `map.friendMarkers` | List the live friend badges currently drawn on the map. |
-| `map.location` | Return the live device-location state (last fix, whether fixes are arriving, and whether the GPS signal is lost). |
+| `map.location` | Return the live device-location state (last fix, whether a fix is being shown, and whether the device cannot be located — location services off or permission denied). |
 | `map.markers.clear` | Remove all map markers. |
 | `map.markers.get` | List the current map markers. |
 | `map.markers.set` | Replace the map markers (params: {markers: [{id, lat, lon, selected?}]}). |

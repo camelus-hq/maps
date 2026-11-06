@@ -446,8 +446,9 @@ List<Command> buildCommands(Ref ref) {
     Command(
       id: 'map.location',
       description:
-          'Return the live device-location state (last fix, whether fixes are '
-          'arriving, and whether the GPS signal is lost).',
+          'Return the live device-location state (last fix, whether a fix is '
+          'being shown, and whether the device cannot be located — location '
+          'services off or permission denied).',
       handler: (CommandRequest request) async {
         final LocationState location = ref.read(locationTrackerProvider);
         final LocationSample? fix = location.fix;
