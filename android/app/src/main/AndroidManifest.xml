@@ -4,6 +4,9 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <!-- The ongoing "sharing your live location" notice (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Android 16 Live Updates: promote the ongoing navigation notice to a
+         status-bar chip showing the upcoming direction. -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"/>
     <!-- Network access in release builds (search, routing, the update check).
          The Flutter tool only injects this into the debug/profile manifests. -->
     <uses-permission android:name="android.permission.INTERNET"/>

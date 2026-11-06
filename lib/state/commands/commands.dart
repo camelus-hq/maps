@@ -49,6 +49,7 @@ import '../location.dart';
 import '../map_layers.dart';
 import '../navigation.dart';
 import '../navigation_keys.dart';
+import '../navigation_notifications.dart';
 import '../place.dart';
 import '../ports.dart';
 import '../reviews.dart';
@@ -1244,6 +1245,24 @@ List<Command> buildCommands(Ref ref) {
       description: 'Return the current guidance state.',
       handler: (CommandRequest request) async =>
           _navJson(ref.read(navigationControllerProvider)),
+    ),
+    Command(
+      id: 'nav.notification',
+      description:
+          'Return the ongoing trip notification (visible, title, body, '
+          'progress 0–100, statusChip, mode) shown in the shade while '
+          'navigating.',
+      handler: (CommandRequest request) async {
+        final NavigationNotice notice = ref.read(navigationNoticeProvider);
+        return <String, Object?>{
+          'visible': notice.visible,
+          'title': notice.title,
+          'body': notice.body,
+          'progress': notice.progress,
+          'statusChip': notice.statusChip,
+          'mode': notice.mode.name,
+        };
+      },
     ),
     Command(
       id: 'nav.stop',

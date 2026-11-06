@@ -72,5 +72,8 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     // FileProvider, used to hand the downloaded self-update APK to the system
     // package installer (see MainActivity.installApk).
-    implementation("androidx.core:core-ktx:1.16.0")
+    // 1.17.0 adds NotificationCompat's Android 16 Live Update APIs
+    // (`setRequestPromotedOngoing`, `setShortCriticalText`) used for the
+    // status-bar chip (see MainActivity.showNavigationNotification).
+    implementation("androidx.core:core-ktx:1.17.0")
 }

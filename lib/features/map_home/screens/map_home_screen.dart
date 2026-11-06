@@ -15,6 +15,7 @@ import '../../../state/settings.dart';
 import '../../../state/social.dart';
 import '../../directions/screens/directions_sheet.dart';
 import '../../directions/widgets/directions_endpoint_card.dart';
+import '../../navigation/widgets/navigation_notification_layer.dart';
 import '../../navigation/widgets/navigation_overlay.dart';
 import '../../onboarding/screens/onboarding_screen.dart';
 import '../../place_details/widgets/place_details_sheet.dart';
@@ -146,6 +147,9 @@ class MapHomeScreen extends ConsumerWidget {
               const MapAttribution(),
           ],
           if (navigating) const NavigationOverlay(),
+          // Drives the ongoing OS notification of the running trip (and routes
+          // its "Exit navigation" action back into guidance). Invisible.
+          const NavigationNotificationLayer(),
         ],
       ),
     );

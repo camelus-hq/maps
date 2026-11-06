@@ -7,6 +7,7 @@ import '../data/fakes/fake_live_share_notifications.dart';
 import '../data/fakes/fake_live_share_store.dart';
 import '../data/fakes/fake_location_service.dart';
 import '../data/fakes/fake_map_service.dart';
+import '../data/fakes/fake_navigation_notifications.dart';
 import '../data/fakes/fake_osm_place_source.dart';
 import '../data/fakes/fake_places_repository.dart';
 import '../data/fakes/fake_release_source.dart';
@@ -25,6 +26,7 @@ import '../domain/ports/live_share_notifications.dart';
 import '../domain/ports/live_share_store.dart';
 import '../domain/ports/location_service.dart';
 import '../domain/ports/map_service.dart';
+import '../domain/ports/navigation_notifications.dart';
 import '../domain/ports/osm_place_source.dart';
 import '../domain/ports/places_repository.dart';
 import '../domain/ports/release_source.dart';
@@ -111,6 +113,14 @@ final Provider<OsmPlaceSource> osmPlaceSourceProvider =
 
 final Provider<LiveShareNotifications> liveShareNotificationsProvider =
     Provider<LiveShareNotifications>((Ref ref) => FakeLiveShareNotifications());
+
+/// The ongoing notification shown while turn-by-turn guidance runs. The keyless
+/// default records calls instead of drawing anything; `lib/app/di.dart` wires
+/// the `flutter_local_notifications` adapter.
+final Provider<NavigationNotifications> navigationNotificationsProvider =
+    Provider<NavigationNotifications>(
+      (Ref ref) => FakeNavigationNotifications(),
+    );
 
 /// Opens the device's own apps for a place's contact details (dial, e-mail,
 /// website). The keyless/test default records the request instead of leaving

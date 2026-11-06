@@ -19,6 +19,7 @@ import '../data/mapbox/mapbox_search_service.dart';
 import '../data/nostr/ndk_review_service.dart';
 import '../data/nostr/ndk_social_service.dart';
 import '../data/notifications/local_live_share_notifications.dart';
+import '../data/notifications/local_navigation_notifications.dart';
 import '../data/osm/nominatim_place_source.dart';
 import '../data/osm/osm_search_service.dart';
 import '../data/platform/url_launcher_external_actions.dart';
@@ -74,6 +75,11 @@ List<Override> buildAppOverrides(
     liveShareStoreProvider.overrideWith((Ref ref) => PrefsLiveShareStore()),
     liveShareNotificationsProvider.overrideWith(
       (Ref ref) => LocalLiveShareNotifications(),
+    ),
+    // Turn-by-turn guidance's ongoing notice with a progress bar + "Exit"
+    // action. Shares one plugin host with the live-share notice.
+    navigationNotificationsProvider.overrideWith(
+      (Ref ref) => LocalNavigationNotifications(),
     ),
     // Device location (GNSS) behind the port; degrades gracefully without
     // permission, so keyless/test runs still use the fake default.

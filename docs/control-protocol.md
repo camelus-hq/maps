@@ -88,6 +88,7 @@ adb forward tcp:7981 tcp:7981
 | `nav.stop` | — | `true` |
 | `nav.overview` | — | the guidance state (fit whole route vs tracking) |
 | `nav.mode` | `{mode: drive\|walk\|cycle\|transit}` | the guidance state — re-skins the navigation UI |
+| `nav.notification` | — | the ongoing trip notification `{visible, title, body, progress, statusChip, mode}` |
 | `ui.tap` | `{x, y}` | `true` — synthetic tap at logical coordinates |
 | `ui.swipe` | `{fromX, fromY, toX, toY}` | `true` — synthetic drag |
 | `ui.scroll` | `{x, y, dx, dy}` | `true` — synthetic scroll by (dx, dy) |
@@ -150,6 +151,7 @@ sync test fails if it drifts from the registry.
 | `map.traffic` | Toggle the traffic overlay (params: {on?}); returns the new state. |
 | `map.transitStops` | List the transit stop circles drawn for the selected journey (small pass-through stops and larger boarding/alighting circles). |
 | `nav.mode` | Change the travel mode of the running guidance session, re-skinning the navigation UI without touching the map (params: {mode: drive\|walk\|cycle\|transit}). |
+| `nav.notification` | Return the ongoing trip notification (visible, title, body, progress 0–100, statusChip, mode) shown in the shade while navigating. |
 | `nav.overview` | Toggle the navigation overview (fit the whole route) vs tracking. |
 | `nav.pause` | Stop the camera tracking the position (guidance keeps running). |
 | `nav.position` | Inject a position sample (params: {lat, lon, heading?}). |
