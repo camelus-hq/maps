@@ -41,6 +41,7 @@ adb forward tcp:7981 tcp:7981
 | `map.resetBearing` | — | the camera with `bearing: 0` (locks north-up while following) |
 | `map.orientation` | `{mode?: north\|heading}` (omit to toggle) | the mode name — direction-up vs north-up while following |
 | `map.myLocation` | — | the camera moved to the last known fix |
+| `map.location` | — | `{hasFix, streaming, lost, lat, lon, bearing, accuracy, speed}` — the live device-location state |
 | `map.followMyLocation` | — | the new follow state (boolean) |
 | `map.follow` | `{on}` | the new follow state (boolean) |
 | `map.style.set` | `{style: standard\|satellite\|terrain}` | the style name |
@@ -85,6 +86,8 @@ adb forward tcp:7981 tcp:7981
 | `nav.step` | `{meters?}` | the guidance state |
 | `nav.state` | — | the guidance state |
 | `nav.stop` | — | `true` |
+| `nav.overview` | — | the guidance state (fit whole route vs tracking) |
+| `nav.mode` | `{mode: drive\|walk\|cycle\|transit}` | the guidance state — re-skins the navigation UI |
 | `ui.tap` | `{x, y}` | `true` — synthetic tap at logical coordinates |
 | `ui.swipe` | `{fromX, fromY, toX, toY}` | `true` — synthetic drag |
 | `ui.scroll` | `{x, y, dx, dy}` | `true` — synthetic scroll by (dx, dy) |
@@ -132,18 +135,21 @@ sync test fails if it drifts from the registry.
 | `map.follow` | Enable/disable location follow (params: {on}). |
 | `map.followMyLocation` | Toggle following the device location (return the new state). |
 | `map.friendMarkers` | List the live friend badges currently drawn on the map. |
+| `map.location` | Return the live device-location state (last fix, whether fixes are arriving, and whether the GPS signal is lost). |
 | `map.markers.clear` | Remove all map markers. |
 | `map.markers.get` | List the current map markers. |
 | `map.markers.set` | Replace the map markers (params: {markers: [{id, lat, lon, selected?}]}). |
-| `map.myLocation` | Move the camera to the last known location. |
+| `map.myLocation` | Move the camera to the last known location (zooms in), using the already-tracked fix when available so it is instant. |
 | `map.orientation` | Set the map orientation while following the location (params: {mode: north\|heading}); omit "mode" to toggle between them. Returns the mode. |
 | `map.resetBearing` | Reset the map bearing to north and lock north-up (keeping position and zoom), so a fix while following does not rotate it away. |
 | `map.reviews` | List the review badges currently drawn on the map (one per reviewed place on screen). |
 | `map.reviews.friendOnly` | Show only places a friend has reviewed on the map (params: {on?}); returns the new state. |
+| `map.routeLines` | List the route polylines currently drawn on the map (colour, dashed, width and a bounded sample of points). |
 | `map.style.get` | Return the current base map style name. |
 | `map.style.set` | Switch the base map style (params: {style: standard\|satellite\|terrain}). |
 | `map.traffic` | Toggle the traffic overlay (params: {on?}); returns the new state. |
 | `map.transitStops` | List the transit stop circles drawn for the selected journey (small pass-through stops and larger boarding/alighting circles). |
+| `nav.mode` | Change the travel mode of the running guidance session, re-skinning the navigation UI without touching the map (params: {mode: drive\|walk\|cycle\|transit}). |
 | `nav.overview` | Toggle the navigation overview (fit the whole route) vs tracking. |
 | `nav.pause` | Stop the camera tracking the position (guidance keeps running). |
 | `nav.position` | Inject a position sample (params: {lat, lon, heading?}). |

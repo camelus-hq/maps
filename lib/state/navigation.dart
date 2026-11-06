@@ -12,7 +12,9 @@ import '../domain/entities/route.dart';
 import '../domain/entities/travel_mode.dart';
 import '../domain/ports/map_service.dart';
 import 'follow.dart';
+import 'location.dart';
 import 'ports.dart';
+import 'route.dart';
 import 'usecases.dart';
 
 enum NavStatus { idle, navigating, rerouting, arrived }
@@ -104,8 +106,14 @@ class NavigationController extends Notifier<NavState> {
   static const double _arrivalMeters = 20;
 
   Timer? _timer;
-  StreamSubscription<LocationSample>? _liveSub;
   StreamSubscription<void>? _gestureSub;
+
+  /// True while guidance follows the live GNSS stream (via the tracker).
+  bool _live = false;
+
+  /// When the tracking camera was last asked to move (for smooth-follow speed).
+  DateTime? _lastCameraMoveAt;
+
   List<LatLon> _geometry = const <LatLon>[];
   List<double> _cumulative = const <double>[];
   List<double> _maneuverEnds = const <double>[];
@@ -118,9 +126,23 @@ class NavigationController extends Notifier<NavState> {
         .read(mapServiceProvider)
         .userGestureStream
         .listen((_) => _onUserGesture());
+    // Live GNSS positions (shared with follow through the tracker) drive
+    // guidance while a live session is running.
+    ref.listen<LocationState>(locationTrackerProvider, (
+      LocationState? previous,
+      LocationState next,
+    ) {
+      if (!_live) {
+        return;
+      }
+      final LocationSample? fix = next.fix;
+      if (fix == null || identical(previous?.fix, fix)) {
+        return;
+      }
+      unawaited(handlePosition(fix));
+    });
     ref.onDispose(() {
       _timer?.cancel();
-      unawaited(_liveSub?.cancel());
       unawaited(_gestureSub?.cancel());
     });
     return const NavState();
@@ -145,15 +167,10 @@ class NavigationController extends Notifier<NavState> {
       cameraFollows: true,
       clearNotice: true,
     );
-    _moveCamera();
     _timer?.cancel();
-    unawaited(_liveSub?.cancel());
-    if (live) {
-      _liveSub = ref
-          .read(locationServiceProvider)
-          .positionStream()
-          .listen((LocationSample sample) => unawaited(handlePosition(sample)));
-    }
+    _timer = null;
+    _live = live;
+    unawaited(_flyToCamera());
     if (auto) {
       _timer = Timer.periodic(
         const Duration(milliseconds: 700),
@@ -211,9 +228,18 @@ class NavigationController extends Notifier<NavState> {
   void stop() {
     _timer?.cancel();
     _timer = null;
-    unawaited(_liveSub?.cancel());
-    _liveSub = null;
+    _live = false;
     state = const NavState();
+  }
+
+  /// Switches the travel mode of the running guidance session without touching
+  /// the route or the map (the UI re-skins per mode; a future mixed-mode
+  /// journey changes mode mid-route the same way).
+  void setMode(TravelMode mode) {
+    if (state.status == NavStatus.idle || state.mode == mode) {
+      return;
+    }
+    state = state.copyWith(mode: mode);
   }
 
   /// Toggles between tracking the position and showing the whole route. While
@@ -229,7 +255,7 @@ class NavigationController extends Notifier<NavState> {
     if (next) {
       unawaited(ref.read(mapServiceProvider).fitCoordinates(route.geometry));
     } else {
-      _moveCamera();
+      unawaited(_flyToCamera());
     }
   }
 
@@ -248,7 +274,7 @@ class NavigationController extends Notifier<NavState> {
       return;
     }
     state = state.copyWith(overview: false, cameraFollows: true);
-    _moveCamera();
+    unawaited(_flyToCamera());
   }
 
   void _onUserGesture() {
@@ -334,8 +360,12 @@ class NavigationController extends Notifier<NavState> {
           );
           return;
         }
-        _loadRoute(routes.first);
+        final Route rerouted = routes.first;
+        _loadRoute(rerouted);
         state = state.copyWith(status: NavStatus.navigating, clearNotice: true);
+        // Redraw the polyline on the map (and keep the route preview in sync) so
+        // the drawn path matches the new route after a reroute.
+        ref.read(routeControllerProvider.notifier).replaceRoute(rerouted);
         _moveCamera();
       },
       err: (AppException error) => state = state.copyWith(
@@ -360,7 +390,26 @@ class NavigationController extends Notifier<NavState> {
       remaining: route.duration,
       position: _geometry.isEmpty ? null : _geometry.first,
       nextManeuver: maneuvers.isEmpty ? null : maneuvers.first,
+      distanceToNextManeuver: _maneuverEnds.isEmpty ? 0 : _maneuverEnds.first,
       maneuverIndex: 0,
+    );
+  }
+
+  /// The initial fly to the navigation camera pose (a short animated zoom into
+  /// the tilted tracking view).
+  Future<void> _flyToCamera() async {
+    if (state.overview || !state.cameraFollows) {
+      return;
+    }
+    final LatLon? position = state.position;
+    if (position == null) {
+      return;
+    }
+    final MapService map = ref.read(mapServiceProvider);
+    await map.moveCamera(
+      Camera(target: position, zoom: 17, bearing: state.bearing ?? 0, tilt: 45),
+      animated: true,
+      duration: const Duration(milliseconds: 900),
     );
   }
 
@@ -383,8 +432,23 @@ class NavigationController extends Notifier<NavState> {
           tilt: 45,
         ),
         animated: true,
+        duration: _glideDuration(),
       ),
     );
+  }
+
+  /// The animation length that keeps the tracking camera gliding between fixes
+  /// (roughly the time since the last one), so guidance moves smoothly instead
+  /// of stepping each update.
+  Duration _glideDuration() {
+    final DateTime now = DateTime.now();
+    final DateTime? previous = _lastCameraMoveAt;
+    _lastCameraMoveAt = now;
+    if (previous == null) {
+      return const Duration(milliseconds: 300);
+    }
+    final int millis = now.difference(previous).inMilliseconds;
+    return Duration(milliseconds: millis.clamp(200, 2000));
   }
 
   (int, double) _nearestVertex(LatLon point) {

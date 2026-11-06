@@ -17,7 +17,7 @@ void main() {
 
     final FakeMapService map =
         container.read(mapServiceProvider) as FakeMapService;
-    expect(map.camera.zoom, 16); // follow zoom
+    expect(map.camera.zoom, 17); // follow zoom
 
     await container
         .read(routeControllerProvider.notifier)

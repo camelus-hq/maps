@@ -31,8 +31,14 @@ abstract interface class MapService {
   Stream<void> get userGestureStream;
 
   /// Moves the camera (programmatic navigation, follow mode, animations).
-  /// [animated] eases to the target instead of jumping.
-  Future<void> moveCamera(Camera camera, {bool animated = false});
+  /// [animated] eases to the target instead of jumping; [duration] overrides
+  /// the default animation length (used by location follow to glide between
+  /// fixes at the fix cadence instead of stepping).
+  Future<void> moveCamera(
+    Camera camera, {
+    bool animated = false,
+    Duration? duration,
+  });
 
   /// Fits the camera to the given points (search results, route, …).
   Future<void> fitCoordinates(List<LatLon> points);
@@ -40,6 +46,9 @@ abstract interface class MapService {
   /// Draws styled route polylines (street routes or public-transport legs).
   /// An empty list clears them.
   Future<void> setRouteLines(List<RouteLine> lines);
+
+  /// The route polylines currently drawn.
+  List<RouteLine> get routeLines;
 
   /// Replaces the visible markers.
   Future<void> setMarkers(List<Marker> markers);

@@ -82,6 +82,8 @@ abstract final class ValhallaRouteDto {
             instruction: instruction is String ? instruction : '',
             type: maneuverTypeFrom(rawManeuver['type']),
             distanceMeters: (lengthKm ?? 0) * 1000,
+            streetName: _streetName(rawManeuver),
+            lanes: _lanes(rawManeuver),
           ),
         );
       }
@@ -92,6 +94,70 @@ abstract final class ValhallaRouteDto {
       distanceMeters: (_lengthKm(summary) ?? 0) * 1000,
       duration: Duration(seconds: (_timeSeconds(summary) ?? 0).round()),
     );
+  }
+
+  /// Bounds: a lane sign never realistically has more than these, so hostile
+  /// payloads cannot allocate unbounded lists.
+  static const int _maxLanes = 12;
+  static const int _maxIndicationsPerLane = 4;
+
+  /// The first of Valhalla's `street_names` (the street the maneuver acts on).
+  static String? _streetName(Map<String, Object?> maneuver) {
+    final Object? names = maneuver['street_names'];
+    if (names is! List<Object?>) {
+      return null;
+    }
+    for (final Object? name in names.take(3)) {
+      if (name is String && name.trim().isNotEmpty) {
+        return name.trim();
+      }
+    }
+    return null;
+  }
+
+  /// Parses the lane guidance attached to the maneuver's intersections (the
+  /// last intersection that carries lanes wins).
+  static List<LaneGuidance> _lanes(Map<String, Object?> maneuver) {
+    final Object? intersections = maneuver['intersections'];
+    if (intersections is! List<Object?>) {
+      return const <LaneGuidance>[];
+    }
+    for (final Object? intersection in intersections.reversed) {
+      if (intersection is! Map<String, Object?>) {
+        continue;
+      }
+      final Object? rawLanes = intersection['lanes'];
+      if (rawLanes is! List<Object?>) {
+        continue;
+      }
+      final List<LaneGuidance> lanes = <LaneGuidance>[];
+      for (final Object? rawLane in rawLanes.take(_maxLanes)) {
+        if (rawLane is! Map<String, Object?>) {
+          continue;
+        }
+        final List<LaneIndication> indications = <LaneIndication>[];
+        final Object? rawIndications = rawLane['indications'];
+        if (rawIndications is List<Object?>) {
+          for (final Object? indication in rawIndications.take(
+            _maxIndicationsPerLane,
+          )) {
+            indications.add(LaneIndication.parse(indication));
+          }
+        }
+        lanes.add(
+          LaneGuidance(
+            // Valhalla marks the lanes that continue the route as `valid`
+            // (older responses use `active`).
+            active: rawLane['valid'] == true || rawLane['active'] == true,
+            indications: indications,
+          ),
+        );
+      }
+      if (lanes.isNotEmpty) {
+        return lanes;
+      }
+    }
+    return const <LaneGuidance>[];
   }
 
   static Map<String, Object?> _summary(Map<String, Object?> node) {

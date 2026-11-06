@@ -99,6 +99,10 @@ class MapboxMapService implements MapService {
   Camera? _pending;
   Camera? _lastEmitted;
 
+  /// Default animation length for an animated [moveCamera] (the platform's
+  /// own default); callers may override it (see [moveCamera]).
+  static const int _defaultAnimationMs = 600;
+
   /// Ensures native map mutations (annotations, style layers, the location
   /// puck) only run once the map is attached **and** its style is loaded.
   ///
@@ -172,6 +176,9 @@ class MapboxMapService implements MapService {
 
   @override
   List<TransitStopMarker> get transitStopMarkers => _transitStops;
+
+  @override
+  List<RouteLine> get routeLines => _routeLines;
 
   @override
   Stream<String> get friendMarkerTapStream => _friendMarkerTapController.stream;
@@ -381,6 +388,9 @@ class MapboxMapService implements MapService {
           // like Google Maps' heading beam.
           puckBearingEnabled: true,
           puckBearing: PuckBearing.HEADING,
+          // Keep the puck in the top slot so it draws over the route line and
+          // other in-between layers.
+          slot: 'top',
           locationPuck: LocationPuck(
             locationPuck2D: DefaultLocationPuck2D(bearingImage: _bearingImage),
           ),
@@ -418,14 +428,18 @@ class MapboxMapService implements MapService {
   }
 
   @override
-  Future<void> moveCamera(Camera camera, {bool animated = false}) async {
+  Future<void> moveCamera(
+    Camera camera, {
+    bool animated = false,
+    Duration? duration,
+  }) async {
     _camera = camera;
     _emitCamera(camera);
     if (_map == null) {
       _pending = camera;
       return;
     }
-    await _apply(camera, animated: animated);
+    await _apply(camera, animated: animated, duration: duration);
   }
 
   @override
@@ -878,7 +892,11 @@ class MapboxMapService implements MapService {
     _emitCamera(_camera);
   }
 
-  Future<void> _apply(Camera camera, {bool animated = false}) async {
+  Future<void> _apply(
+    Camera camera, {
+    bool animated = false,
+    Duration? duration,
+  }) async {
     final MapboxMap? map = _map;
     if (map == null) {
       return;
@@ -892,8 +910,11 @@ class MapboxMapService implements MapService {
       pitch: camera.tilt,
     );
     if (animated) {
+      final int millis =
+          (duration == null ? _defaultAnimationMs : duration.inMilliseconds)
+              .clamp(1, 10000);
       await _guard(
-        () => map.easeTo(options, MapAnimationOptions(duration: 600)),
+        () => map.easeTo(options, MapAnimationOptions(duration: millis)),
       );
     } else {
       await _guard(() => map.setCamera(options));

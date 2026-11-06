@@ -93,7 +93,11 @@ class FakeMapService implements MapService {
   Future<void> initialize() async {}
 
   @override
-  Future<void> moveCamera(Camera camera, {bool animated = false}) async {
+  Future<void> moveCamera(
+    Camera camera, {
+    bool animated = false,
+    Duration? duration,
+  }) async {
     _camera = camera;
     if (!_cameraController.isClosed) {
       _cameraController.add(camera);
@@ -143,6 +147,7 @@ class FakeMapService implements MapService {
     ];
   }
 
+  @override
   List<RouteLine> get routeLines => _routeLines;
 
   @override

@@ -35,6 +35,7 @@ import '../../domain/entities/review_marker.dart';
 import '../../domain/entities/review_place.dart';
 import '../../domain/entities/review_summary.dart';
 import '../../domain/entities/route.dart';
+import '../../domain/entities/route_line.dart';
 import '../../domain/entities/transit.dart';
 import '../../domain/entities/transit_stop_marker.dart';
 import '../../domain/entities/travel_mode.dart';
@@ -44,6 +45,7 @@ import '../../domain/ports/settings_repository.dart';
 import '../config.dart';
 import '../follow.dart';
 import '../home.dart';
+import '../location.dart';
 import '../map_layers.dart';
 import '../navigation.dart';
 import '../navigation_keys.dart';
@@ -419,11 +421,13 @@ List<Command> buildCommands(Ref ref) {
     ),
     Command(
       id: 'map.myLocation',
-      description: 'Move the camera to the last known location.',
+      description:
+          'Move the camera to the last known location (zooms in), using the '
+          'already-tracked fix when available so it is instant.',
       handler: (CommandRequest request) async {
-        final LocationSample? sample = await ref
-            .read(locationServiceProvider)
-            .lastKnown();
+        final LocationState tracked = ref.read(locationTrackerProvider);
+        final LocationSample? sample =
+            tracked.fix ?? await ref.read(locationServiceProvider).lastKnown();
         if (sample == null) {
           throw const CommandException('no_location', 'No last known location');
         }
@@ -432,10 +436,31 @@ List<Command> buildCommands(Ref ref) {
         await service.moveCamera(
           current.copyWith(
             target: sample.position,
-            zoom: current.zoom < 15 ? 15 : current.zoom,
+            zoom: FollowController.locationZoom,
           ),
+          animated: true,
         );
         return _cameraJson(service.camera);
+      },
+    ),
+    Command(
+      id: 'map.location',
+      description:
+          'Return the live device-location state (last fix, whether fixes are '
+          'arriving, and whether the GPS signal is lost).',
+      handler: (CommandRequest request) async {
+        final LocationState location = ref.read(locationTrackerProvider);
+        final LocationSample? fix = location.fix;
+        return <String, Object?>{
+          'hasFix': location.hasFix,
+          'streaming': location.streaming,
+          'lost': location.lost,
+          'lat': fix?.position.latitude,
+          'lon': fix?.position.longitude,
+          'bearing': fix?.bearing,
+          'accuracy': fix?.accuracyMeters,
+          'speed': fix?.speedMetersPerSecond,
+        };
       },
     ),
     Command(
@@ -499,6 +524,17 @@ List<Command> buildCommands(Ref ref) {
           .read(mapServiceProvider)
           .transitStopMarkers
           .map(_transitStopMarkerJson)
+          .toList(growable: false),
+    ),
+    Command(
+      id: 'map.routeLines',
+      description:
+          'List the route polylines currently drawn on the map (colour, dashed, '
+          'width and a bounded sample of points).',
+      handler: (CommandRequest request) async => ref
+          .read(mapServiceProvider)
+          .routeLines
+          .map(_routeLineJson)
           .toList(growable: false),
     ),
     Command(
@@ -1222,6 +1258,18 @@ List<Command> buildCommands(Ref ref) {
           'Toggle the navigation overview (fit the whole route) vs tracking.',
       handler: (CommandRequest request) async {
         ref.read(navigationControllerProvider.notifier).toggleOverview();
+        return _navJson(ref.read(navigationControllerProvider));
+      },
+    ),
+    Command(
+      id: 'nav.mode',
+      description:
+          'Change the travel mode of the running guidance session, re-skinning '
+          'the navigation UI without touching the map (params: {mode: '
+          'drive|walk|cycle|transit}).',
+      handler: (CommandRequest request) async {
+        final TravelMode mode = _travelMode(request.params['mode']);
+        ref.read(navigationControllerProvider.notifier).setMode(mode);
         return _navJson(ref.read(navigationControllerProvider));
       },
     ),
@@ -2205,6 +2253,26 @@ Map<String, Object?> _transitStopMarkerJson(TransitStopMarker marker) =>
       'board': marker.isBoard,
     };
 
+/// A bounded summary of a drawn [RouteLine] (a full polyline can be thousands
+/// of points; the first/last plus the count is enough to verify a redraw).
+Map<String, Object?> _routeLineJson(RouteLine line) {
+  final List<LatLon> points = line.points;
+  final LatLon? first = points.isEmpty ? null : points.first;
+  final LatLon? last = points.isEmpty ? null : points.last;
+  return <String, Object?>{
+    'color': line.color,
+    'dashed': line.dashed,
+    'width': line.width,
+    'pointCount': points.length,
+    'first': first == null
+        ? null
+        : <String, Object?>{'lat': first.latitude, 'lon': first.longitude},
+    'last': last == null
+        ? null
+        : <String, Object?>{'lat': last.latitude, 'lon': last.longitude},
+  };
+}
+
 /// Flags [place] as the selected marker in [current], keeping every other pin.
 /// Adds the place when it is not already on the map.
 List<Marker> _withSelected(List<Marker> current, Place place) {
@@ -2823,6 +2891,7 @@ Map<String, Object?> _navJson(NavState nav) {
   final LatLon? position = nav.position;
   return <String, Object?>{
     'status': nav.status.name,
+    'mode': nav.mode.name,
     'traveledMeters': nav.traveledMeters,
     'totalMeters': nav.totalMeters,
     'remainingSeconds': nav.remaining.inSeconds,

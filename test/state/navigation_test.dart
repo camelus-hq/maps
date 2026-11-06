@@ -9,6 +9,7 @@ import 'package:openmaps/domain/entities/route.dart';
 import 'package:openmaps/domain/entities/travel_mode.dart';
 import 'package:openmaps/state/navigation.dart';
 import 'package:openmaps/state/ports.dart';
+import 'package:openmaps/state/route.dart';
 import 'package:openmaps/state/usecases.dart';
 
 void main() {
@@ -175,5 +176,74 @@ void main() {
     controller.resumeTracking();
     expect(container.read(navigationControllerProvider).cameraFollows, isTrue);
     expect(map.camera.target, isNot(browsed));
+  });
+
+  test('setMode re-skins the session without touching the route', () async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final List<Route> routes =
+        (await container.read(requestRouteProvider)(
+          waypoints: <LatLon>[
+            const LatLon(52.5200, 13.4050),
+            const LatLon(52.5300, 13.4200),
+          ],
+          mode: TravelMode.drive,
+        )).valueOrNull ??
+        const <Route>[];
+    final NavigationController controller = container.read(
+      navigationControllerProvider.notifier,
+    );
+    controller.start(routes.first, mode: TravelMode.drive);
+
+    final NavState before = container.read(navigationControllerProvider);
+    controller.setMode(TravelMode.walk);
+    final NavState after = container.read(navigationControllerProvider);
+    expect(after.mode, TravelMode.walk);
+    expect(identical(after.route, before.route), isTrue);
+    expect(after.totalMeters, before.totalMeters);
+    expect(after.status, NavStatus.navigating);
+
+    // Idle sessions keep their (default) mode.
+    controller.stop();
+    controller.setMode(TravelMode.cycle);
+    expect(container.read(navigationControllerProvider).mode, TravelMode.drive);
+  });
+
+  test('a reroute redraws the route polyline on the map', () async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final List<Route> routes =
+        (await container.read(requestRouteProvider)(
+          waypoints: <LatLon>[
+            const LatLon(52.5200, 13.4050),
+            const LatLon(52.5300, 13.4200),
+          ],
+          mode: TravelMode.drive,
+        )).valueOrNull ??
+        const <Route>[];
+    final NavigationController controller = container.read(
+      navigationControllerProvider.notifier,
+    );
+    controller.start(routes.first);
+    final FakeMapService map =
+        container.read(mapServiceProvider) as FakeMapService;
+
+    // A far-off position triggers a reroute from there.
+    const LatLon pushed = LatLon(52.6000, 13.6000);
+    await controller.handlePosition(const LocationSample(position: pushed));
+
+    // The drawn line now starts at the reroute origin, not the old start.
+    expect(map.routeLines, isNotEmpty);
+    expect(
+      map.routeLines.first.points.first.latitude,
+      closeTo(pushed.latitude, 1e-6),
+    );
+    // The route preview was kept in sync too.
+    expect(
+      container.read(routeControllerProvider).routes.first.geometry.first,
+      pushed,
+    );
   });
 }

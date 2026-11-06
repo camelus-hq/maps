@@ -331,6 +331,19 @@ class RouteController extends Notifier<RouteState> {
     _draw(state.routes, index);
   }
 
+  /// Replaces the selected route without changing the camera — used after a
+  /// navigation reroute so the drawn polyline matches the new route while
+  /// guidance keeps the tracking camera.
+  void replaceRoute(Route route) {
+    state = state.copyWith(
+      status: RouteStatus.data,
+      routes: <Route>[route],
+      selectedIndex: 0,
+      clearError: true,
+    );
+    _draw(<Route>[route], 0, fit: false);
+  }
+
   Future<void> setMode(TravelMode mode) async {
     if (mode == state.mode) {
       return;
@@ -732,7 +745,7 @@ class RouteController extends Notifier<RouteState> {
     );
   }
 
-  void _draw(List<Route> routes, int selectedIndex) {
+  void _draw(List<Route> routes, int selectedIndex, {bool fit = true}) {
     // A route overview / preview takes camera ownership away from follow mode.
     ref.read(followModeProvider.notifier).disable();
     final MapService map = ref.read(mapServiceProvider);
@@ -750,7 +763,7 @@ class RouteController extends Notifier<RouteState> {
     final Route? selected = selectedIndex >= 0 && selectedIndex < routes.length
         ? routes[selectedIndex]
         : null;
-    if (selected != null && selected.geometry.isNotEmpty) {
+    if (fit && selected != null && selected.geometry.isNotEmpty) {
       unawaited(map.fitCoordinates(selected.geometry));
     }
   }

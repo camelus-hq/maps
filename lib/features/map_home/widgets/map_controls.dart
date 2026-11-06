@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/follow.dart';
+import '../../../state/location.dart';
 import '../../../state/map_camera.dart';
 import '../../../state/sheet_anchor.dart';
 import 'layers_sheet.dart';
@@ -29,6 +30,10 @@ class MapControls extends ConsumerWidget {
         ) ??
         0;
     final bool following = ref.watch(followModeProvider);
+    final LocationState location = ref.watch(locationTrackerProvider);
+    // No usable signal: either a fix stopped arriving, or none ever has. The
+    // last known location (if any) stays on the map, greyed out.
+    final bool gpsLost = location.lost;
     final MapOrientation orientation = ref.watch(mapOrientationProvider);
     // In north mode the needle is upright even if a stale bearing lingers; in
     // heading mode it rotates so it keeps pointing north.
@@ -82,11 +87,18 @@ class MapControls extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.sm),
               ],
               _MapButton(
-                icon: following ? Icons.my_location : Icons.location_searching,
-                tooltip: following
+                icon: gpsLost
+                    ? Icons.gps_off
+                    : following
+                    ? Icons.my_location
+                    : Icons.location_searching,
+                tooltip: gpsLost
+                    ? 'GPS signal lost — showing your last known location'
+                    : following
                     ? 'Following your location'
                     : 'Show my location',
-                active: following,
+                active: following && !gpsLost,
+                alert: gpsLost,
                 onPressed: () => unawaited(
                   ref
                       .read(commandRegistryProvider)
@@ -111,6 +123,7 @@ class _MapButton extends StatelessWidget {
     required this.onPressed,
     this.rotation = 0,
     this.active = false,
+    this.alert = false,
   });
 
   final IconData icon;
@@ -122,14 +135,23 @@ class _MapButton extends StatelessWidget {
   /// "locked on" reads clearly against the neutral idle state.
   final bool active;
 
+  /// Warning treatment (amber) for a problem state, e.g. a lost GPS signal.
+  final bool alert;
+
   @override
   Widget build(BuildContext context) {
     final ColorScheme scheme = Theme.of(context).colorScheme;
     final Color foreground = active
         ? scheme.onPrimary
+        : alert
+        ? _alertColor
         : scheme.onSurfaceVariant;
     return Material(
-      color: active ? scheme.primary : scheme.surface,
+      color: active
+          ? scheme.primary
+          : alert
+          ? _alertColor.withValues(alpha: 0.14)
+          : scheme.surface,
       elevation: 3,
       shape: const CircleBorder(),
       child: IconButton(
@@ -144,4 +166,8 @@ class _MapButton extends StatelessWidget {
       ),
     );
   }
+
+  /// The amber used for the "GPS lost" location button (readable on the light
+  /// and dark surfaces).
+  static const Color _alertColor = Color(0xFFDD8500);
 }

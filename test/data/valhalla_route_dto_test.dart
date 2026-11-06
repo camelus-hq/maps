@@ -54,6 +54,96 @@ void main() {
     expect(routes[1].distanceMeters, closeTo(7000, 1e-6));
   });
 
+  test('parses street names and lane guidance', () {
+    final List<Route> routes = ValhallaRouteDto.routesFromResponse(
+      <String, Object?>{
+        'trip': <String, Object?>{
+          'summary': <String, Object?>{'length': 1.0, 'time': 120},
+          'legs': <Object?>[
+            <String, Object?>{
+              'maneuvers': <Object?>[
+                <String, Object?>{
+                  'instruction': 'Turn left onto Bebelplatz',
+                  'type': 15,
+                  'length': 1.0,
+                  'street_names': <Object?>['Bebelplatz', 'Unter den Linden'],
+                  'intersections': <Object?>[
+                    <String, Object?>{
+                      'lanes': <Object?>[
+                        <String, Object?>{
+                          'valid': true,
+                          'indications': <Object?>['left'],
+                        },
+                        <String, Object?>{
+                          'valid': false,
+                          'indications': <Object?>['straight', 'right'],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    );
+
+    final Maneuver maneuver = routes.first.legs.first.maneuvers.first;
+    expect(maneuver.streetName, 'Bebelplatz');
+    expect(maneuver.lanes, hasLength(2));
+    expect(maneuver.lanes.first.active, isTrue);
+    expect(maneuver.lanes.first.primary, LaneIndication.left);
+    expect(maneuver.lanes[1].active, isFalse);
+    expect(maneuver.lanes[1].primary, LaneIndication.straight);
+    expect(maneuver.lanes[1].indications, <LaneIndication>[
+      LaneIndication.straight,
+      LaneIndication.right,
+    ]);
+  });
+
+  test('hostile lane/street data is bounded and never throws', () {
+    final List<Route> routes = ValhallaRouteDto.routesFromResponse(
+      <String, Object?>{
+        'trip': <String, Object?>{
+          'summary': <String, Object?>{'length': 1.0, 'time': 120},
+          'legs': <Object?>[
+            <String, Object?>{
+              'maneuvers': <Object?>[
+                <String, Object?>{
+                  'instruction': 'x',
+                  'street_names': 'not-a-list',
+                  'intersections': <Object?>[
+                    'x',
+                    <String, Object?>{'lanes': 'x'},
+                    <String, Object?>{
+                      'lanes': <Object?>[
+                        'x',
+                        <String, Object?>{
+                          'indications': List<Object?>.generate(
+                            50,
+                            (int i) => i.isEven ? 'left' : 42,
+                          ),
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      },
+    );
+
+    final Maneuver maneuver = routes.first.legs.first.maneuvers.first;
+    expect(maneuver.streetName, isNull);
+    // The string entry is dropped; the hostile indication list is bounded.
+    expect(maneuver.lanes, hasLength(1));
+    expect(maneuver.lanes[0].indications.length, lessThanOrEqualTo(4));
+    expect(maneuver.lanes[0].primary, LaneIndication.left);
+  });
+
   test('never throws on hostile responses', () {
     for (final Object? raw in <Object?>[
       null,

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/entities/location_sample.dart';
 import '../domain/ports/map_service.dart';
+import 'location.dart';
 import 'ports.dart';
 
 /// How the map is oriented while following the device location.
@@ -39,13 +40,25 @@ mapOrientationProvider =
 
 /// Whether the camera is following the device location.
 ///
-/// While enabled it subscribes to the [LocationService] stream and recenters
-/// the camera on each fix. The user taking over the map with a gesture (drag,
-/// pinch, rotate or tilt) turns it off — so a pan isn't undone by the next fix
-/// — and the controls show the difference between "locked on" and "free".
+/// While enabled it subscribes to the [LocationTracker]'s fixes and recenters
+/// the camera on each one, animating over roughly the fix interval so the map
+/// glides instead of stepping. Enabling "flies" to the location with a short
+/// animated zoom. The user taking over the map with a gesture (drag, pinch,
+/// rotate or tilt) turns it off — so a pan isn't undone by the next fix.
 class FollowController extends Notifier<bool> {
-  StreamSubscription<LocationSample>? _sub;
+  /// The zoom "show my location" snaps to.
+  static const double locationZoom = 17;
+
+  /// The initial fly-to-location animation length.
+  static const Duration flyDuration = Duration(milliseconds: 900);
+
+  /// Bounds for the inferred smooth-follow animation length.
+  static const Duration _minGlide = Duration(milliseconds: 250);
+  static const Duration _maxGlide = Duration(milliseconds: 2000);
+
   StreamSubscription<void>? _gestureSub;
+  double _zoom = locationZoom;
+  DateTime? _lastFixAt;
 
   @override
   bool build() {
@@ -55,42 +68,50 @@ class FollowController extends Notifier<bool> {
         .read(mapServiceProvider)
         .userGestureStream
         .listen((_) => disable());
+    // Follow every new fix that arrives while locked on.
+    ref.listen<LocationState>(locationTrackerProvider, (
+      LocationState? previous,
+      LocationState next,
+    ) {
+      if (!state) {
+        return;
+      }
+      final LocationSample? fix = next.fix;
+      if (fix == null || identical(previous?.fix, fix)) {
+        return;
+      }
+      _glide(fix);
+    });
     ref.onDispose(() {
-      unawaited(_sub?.cancel());
       unawaited(_gestureSub?.cancel());
     });
     return false;
   }
 
-  Future<void> enable({double zoom = 16}) async {
-    await _sub?.cancel();
-    _sub = null;
+  /// Enables follow and flies to (and zooms in on) the location.
+  Future<void> enable({double zoom = locationZoom}) async {
+    _zoom = zoom;
+    _lastFixAt = null;
     // Mark following immediately so the controls react without waiting for a
-    // fix; the subscription is live and cancellable from this point on.
+    // fix.
     state = true;
-    _sub = ref
-        .read(locationServiceProvider)
-        .positionStream()
-        .listen((LocationSample sample) => _move(sample, zoom));
-    // Recenter now on the last known fix (unless a gesture turned follow off
-    // while it was resolving).
-    final LocationSample? known = await ref
-        .read(locationServiceProvider)
-        .lastKnown();
-    if (state && known != null) {
-      _move(known, zoom);
+    final LocationSample? known =
+        ref.read(locationTrackerProvider).fix ??
+        await ref.read(locationServiceProvider).lastKnown();
+    // A gesture may have turned follow off while the fix was resolving.
+    if (!state || known == null) {
+      return;
     }
+    _fly(known, zoom);
   }
 
   void disable() {
-    unawaited(_sub?.cancel());
-    _sub = null;
     if (state) {
       state = false;
     }
   }
 
-  Future<void> toggle({double zoom = 16}) async {
+  Future<void> toggle({double zoom = locationZoom}) async {
     if (state) {
       disable();
     } else {
@@ -98,23 +119,60 @@ class FollowController extends Notifier<bool> {
     }
   }
 
-  void _move(LocationSample sample, double zoom) {
+  /// The one-shot animated zoom into the location.
+  void _fly(LocationSample sample, double zoom) {
     final MapService map = ref.read(mapServiceProvider);
-    // A north lock survives fixes: only rotate with the device in heading mode.
-    final MapOrientation orientation = ref.read(mapOrientationProvider);
-    final double bearing = orientation == MapOrientation.north
-        ? 0
-        : (sample.bearing ?? 0);
     unawaited(
       map.moveCamera(
         map.camera.copyWith(
           target: sample.position,
           zoom: zoom,
-          bearing: bearing,
+          bearing: _bearingFor(sample.bearing),
         ),
         animated: true,
+        duration: flyDuration,
       ),
     );
+  }
+
+  /// A continuous follow step: glide to [sample] over the fix interval.
+  void _glide(LocationSample sample) {
+    final MapService map = ref.read(mapServiceProvider);
+    unawaited(
+      map.moveCamera(
+        map.camera.copyWith(
+          target: sample.position,
+          zoom: _zoom,
+          bearing: _bearingFor(sample.bearing),
+        ),
+        animated: true,
+        duration: _glideDuration(),
+      ),
+    );
+  }
+
+  double _bearingFor(double? bearing) =>
+      ref.read(mapOrientationProvider) == MapOrientation.north
+      ? 0
+      : (bearing ?? 0);
+
+  /// The animation length that keeps the camera gliding between fixes: roughly
+  /// the time since the previous fix, so the next fix lands as the glide ends.
+  Duration _glideDuration() {
+    final DateTime now = DateTime.now();
+    final DateTime? previous = _lastFixAt;
+    _lastFixAt = now;
+    if (previous == null) {
+      return _minGlide;
+    }
+    final int millis = now.difference(previous).inMilliseconds;
+    if (millis <= _minGlide.inMilliseconds) {
+      return _minGlide;
+    }
+    if (millis >= _maxGlide.inMilliseconds) {
+      return _maxGlide;
+    }
+    return Duration(milliseconds: millis);
   }
 }
 
