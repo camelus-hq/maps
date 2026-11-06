@@ -14,6 +14,7 @@ import '../../../state/map_layers.dart';
 import '../../../state/navigation.dart';
 import '../../../state/settings.dart';
 import '../../common/map_sheet.dart';
+import '../../directions/widgets/maneuver_glyph.dart';
 
 /// The navigation bottom sheet: a draggable card whose header is the ETA row
 /// and whose body carries the trip options (search along route, directions,
@@ -112,7 +113,7 @@ class NavBottomSheet extends ConsumerWidget {
           children: <Widget>[
             for (final Maneuver maneuver in maneuvers)
               ListTile(
-                leading: const Icon(Icons.turn_slight_right),
+                leading: ManeuverGlyph(type: maneuver.type),
                 title: Text(maneuver.instruction),
                 trailing: maneuver.distanceMeters > 0
                     ? Text(formatDistance(maneuver.distanceMeters))

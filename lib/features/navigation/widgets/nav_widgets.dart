@@ -242,12 +242,23 @@ class NavLaneStrip extends StatelessWidget {
         children: <Widget>[
           for (final LaneGuidance lane in lanes)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: LaneGlyph(
-                indication: lane.primary,
-                size: 30,
-                color: style.bannerAccent.withValues(
-                  alpha: lane.active ? 1 : 0.38,
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                // The preferred lane (Valhalla `active`) is highlighted; lanes
+                // that lead through are shown normal, the rest are dimmed.
+                decoration: lane.active
+                    ? BoxDecoration(
+                        color: style.bannerAccent.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(8),
+                      )
+                    : null,
+                child: LaneGlyph(
+                  indication: lane.primary,
+                  size: 30,
+                  color: style.bannerAccent.withValues(
+                    alpha: lane.active ? 1 : (lane.valid ? 0.6 : 0.32),
+                  ),
                 ),
               ),
             ),

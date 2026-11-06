@@ -246,4 +246,65 @@ void main() {
       pushed,
     );
   });
+
+  test('guidance announces the upcoming maneuver, not the one just passed', () {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    const double metersPerDegree = 111320;
+    const double startLat = 52.5200;
+    final Route route = Route(
+      legs: <Leg>[
+        Leg(
+          maneuvers: const <Maneuver>[
+            Maneuver(
+              instruction: 'Drive north on Main Street',
+              type: ManeuverType.depart,
+              distanceMeters: 300,
+              streetName: 'Main Street',
+            ),
+            Maneuver(
+              instruction: 'Turn left onto Bebelplatz',
+              type: ManeuverType.turnLeft,
+              distanceMeters: 400,
+              streetName: 'Bebelplatz',
+            ),
+            Maneuver(
+              instruction: 'Arrive at your destination',
+              type: ManeuverType.arrive,
+            ),
+          ],
+          distanceMeters: 700,
+          duration: Duration(minutes: 5),
+        ),
+      ],
+      distanceMeters: 700,
+      duration: const Duration(minutes: 5),
+      geometry: const <LatLon>[
+        LatLon(startLat, 13.4050),
+        LatLon(startLat + 900 / metersPerDegree, 13.4050),
+      ],
+    );
+
+    final NavigationController controller = container.read(
+      navigationControllerProvider.notifier,
+    );
+    controller.start(route);
+
+    // At the start we are on the departure segment, so the banner announces the
+    // left turn ahead (300 m away) rather than the departure we just began.
+    NavState state = container.read(navigationControllerProvider);
+    expect(state.nextManeuver?.type, ManeuverType.turnLeft);
+    expect(state.distanceToNextManeuver, closeTo(300, 5));
+
+    controller.step(meters: 100);
+    state = container.read(navigationControllerProvider);
+    expect(state.nextManeuver?.type, ManeuverType.turnLeft);
+    expect(state.distanceToNextManeuver, closeTo(200, 5));
+
+    // Past the turn, the next thing announced is the arrival.
+    controller.step(meters: 300);
+    state = container.read(navigationControllerProvider);
+    expect(state.nextManeuver?.type, ManeuverType.arrive);
+  });
 }

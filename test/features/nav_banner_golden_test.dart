@@ -31,11 +31,18 @@ void main() {
         type: ManeuverType.turnLeft,
         streetName: 'Bebelplatz',
         lanes: <LaneGuidance>[
+          // Preferred lane for the left turn.
           LaneGuidance(
             active: true,
+            valid: true,
             indications: <LaneIndication>[LaneIndication.left],
           ),
-          LaneGuidance(indications: <LaneIndication>[LaneIndication.straight]),
+          // Usable lane (valid), not preferred.
+          LaneGuidance(
+            valid: true,
+            indications: <LaneIndication>[LaneIndication.straight],
+          ),
+          // A lane that does not lead through (dimmed).
           LaneGuidance(
             indications: <LaneIndication>[
               LaneIndication.straight,

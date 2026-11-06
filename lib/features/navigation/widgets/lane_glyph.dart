@@ -98,7 +98,10 @@ class _LaneGlyphPainter extends CustomPainter {
       case LaneIndication.reverse:
         _uTurn(canvas, stroke);
       case LaneIndication.merge:
-        _merge(canvas, stroke);
+      case LaneIndication.mergeRight:
+        _merge(canvas, stroke, left: false);
+      case LaneIndication.mergeLeft:
+        _merge(canvas, stroke, left: true);
       case LaneIndication.forkLeft:
         _arrow(canvas, stroke, const <Offset>[
           Offset(15, 20),
@@ -162,15 +165,17 @@ class _LaneGlyphPainter extends CustomPainter {
     _head(canvas, stroke, const Offset(9, 14), const Offset(9, 21));
   }
 
-  void _merge(Canvas canvas, Paint stroke) {
+  void _merge(Canvas canvas, Paint stroke, {required bool left}) {
+    final double from = left ? 8 : 16;
+    final double startX = left ? 13 : 11;
     canvas.drawPath(
       Path()
-        ..moveTo(16, 20)
+        ..moveTo(from, 20)
         ..lineTo(12, 13),
       stroke,
     );
-    _arrow(canvas, stroke, const <Offset>[
-      Offset(11, 20),
+    _arrow(canvas, stroke, <Offset>[
+      Offset(startX, 20),
       Offset(12, 12),
       Offset(12, 5),
     ]);

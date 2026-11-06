@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart' hide Route;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openmaps/app/app.dart';
@@ -8,6 +9,7 @@ import 'package:openmaps/domain/entities/location_sample.dart';
 import 'package:openmaps/domain/entities/route.dart';
 import 'package:openmaps/domain/entities/travel_mode.dart';
 import 'package:openmaps/domain/ports/location_service.dart';
+import 'package:openmaps/features/directions/widgets/maneuver_glyph.dart';
 import 'package:openmaps/features/navigation/nav_style.dart';
 import 'package:openmaps/features/navigation/widgets/drive_navigation_view.dart';
 import 'package:openmaps/features/navigation/widgets/nav_bottom_sheet.dart';
@@ -200,6 +202,38 @@ void main() {
     expect(tester.getTopLeft(handle).dy, lessThan(before));
     expect(find.text('Show traffic on map'), findsOneWidget);
     expect(find.text('Show satellite map'), findsOneWidget);
+  });
+
+  testWidgets('the in-navigation directions list uses maneuver glyphs', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+    await _pumpApp(tester, container);
+
+    container
+        .read(navigationControllerProvider.notifier)
+        .start(_turnRoute(), mode: TravelMode.drive);
+    await tester.pump();
+
+    // Reveal the trip options, then open the step list.
+    await tester.drag(
+      find.byType(NavEtaHeader),
+      const Offset(0, -300),
+      warnIfMissed: false,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Directions'));
+    await tester.pumpAndSettle();
+
+    // Each step carries its own maneuver glyph (it used to be a single
+    // hardcoded right-turn icon for every row).
+    final Finder glyphs = find.descendant(
+      of: find.byType(ListTile),
+      matching: find.byType(ManeuverGlyph),
+    );
+    expect(glyphs, findsOneWidget);
+    expect(tester.widget<ManeuverGlyph>(glyphs).type, ManeuverType.turnLeft);
   });
 
   test('NavStyle urgency thresholds differ per mode', () {

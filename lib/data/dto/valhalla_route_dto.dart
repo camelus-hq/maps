@@ -135,21 +135,14 @@ abstract final class ValhallaRouteDto {
         if (rawLane is! Map<String, Object?>) {
           continue;
         }
-        final List<LaneIndication> indications = <LaneIndication>[];
-        final Object? rawIndications = rawLane['indications'];
-        if (rawIndications is List<Object?>) {
-          for (final Object? indication in rawIndications.take(
-            _maxIndicationsPerLane,
-          )) {
-            indications.add(LaneIndication.parse(indication));
-          }
-        }
         lanes.add(
           LaneGuidance(
-            // Valhalla marks the lanes that continue the route as `valid`
-            // (older responses use `active`).
-            active: rawLane['valid'] == true || rawLane['active'] == true,
-            indications: indications,
+            // The preferred lane for the maneuver (`active`) and the lanes
+            // that lead through it (`valid`) are bitmasks in the current
+            // format and booleans in the legacy one.
+            active: _laneFlag(rawLane['active']),
+            valid: _laneFlag(rawLane['valid']),
+            indications: _laneIndications(rawLane),
           ),
         );
       }
@@ -159,6 +152,37 @@ abstract final class ValhallaRouteDto {
     }
     return const <LaneGuidance>[];
   }
+
+  /// The directions a lane is signed for. Valhalla's current format carries a
+  /// `directions` bitmask (see `LaneIndication.fromBitmask`); older responses
+  /// used a list of `directions`/`indications` strings.
+  static List<LaneIndication> _laneIndications(Map<String, Object?> rawLane) {
+    final Object? directions = rawLane['directions'];
+    if (directions is num) {
+      return LaneIndication.fromBitmask(directions.toInt());
+    }
+    final Object? rawIndications = directions is List<Object?>
+        ? directions
+        : rawLane['indications'];
+    if (rawIndications is List<Object?>) {
+      final List<LaneIndication> indications = <LaneIndication>[];
+      for (final Object? indication in rawIndications.take(
+        _maxIndicationsPerLane,
+      )) {
+        indications.add(LaneIndication.parse(indication));
+      }
+      return indications;
+    }
+    return const <LaneIndication>[];
+  }
+
+  /// A lane's `valid`/`active` flag: a nonzero bitmask (current format) or a
+  /// boolean (legacy format).
+  static bool _laneFlag(Object? raw) => switch (raw) {
+    final bool value => value,
+    final num value => value.toInt() != 0,
+    _ => false,
+  };
 
   static Map<String, Object?> _summary(Map<String, Object?> node) {
     final Object? summary = node['summary'];
@@ -183,6 +207,10 @@ abstract final class ValhallaRouteDto {
   );
 
   /// Maps Valhalla maneuver `type` codes to our [ManeuverType].
+  ///
+  /// Codes are from the Valhalla `DirectionsLeg.Maneuver.Type` enum; each keeps
+  /// its own sense (slight/regular/sharp, ramp/exit/stay/merge left vs right)
+  /// so the glyph can be specific rather than flattened into a plain turn.
   static ManeuverType maneuverTypeFrom(Object? raw) {
     final int? code = switch (raw) {
       final int value => value,
@@ -190,13 +218,30 @@ abstract final class ValhallaRouteDto {
       _ => null,
     };
     return switch (code) {
+      // Start (including a start that is itself a turn) and destination.
       1 || 2 || 3 => ManeuverType.depart,
       4 || 5 || 6 => ManeuverType.arrive,
-      8 || 21 => ManeuverType.straight,
-      9 || 10 || 11 || 12 || 17 || 19 || 22 || 36 => ManeuverType.turnRight,
-      13 || 14 || 15 || 16 || 18 || 20 || 23 || 37 => ManeuverType.turnLeft,
-      24 => ManeuverType.merge,
-      25 || 26 => ManeuverType.roundabout,
+      // Becomes, continue, ramp straight, stay straight.
+      7 || 8 || 17 || 22 => ManeuverType.straight,
+      9 => ManeuverType.slightRight,
+      10 => ManeuverType.turnRight,
+      11 => ManeuverType.sharpRight,
+      12 => ManeuverType.uTurnRight,
+      13 => ManeuverType.uTurnLeft,
+      14 => ManeuverType.sharpLeft,
+      15 => ManeuverType.turnLeft,
+      16 => ManeuverType.slightLeft,
+      18 => ManeuverType.rampRight,
+      19 => ManeuverType.rampLeft,
+      20 => ManeuverType.exitRight,
+      21 => ManeuverType.exitLeft,
+      23 => ManeuverType.keepRight,
+      24 => ManeuverType.keepLeft,
+      25 => ManeuverType.merge,
+      26 => ManeuverType.roundabout,
+      27 => ManeuverType.roundaboutExit,
+      37 => ManeuverType.mergeRight,
+      38 => ManeuverType.mergeLeft,
       _ => ManeuverType.unknown,
     };
   }

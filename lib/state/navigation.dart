@@ -307,13 +307,19 @@ class NavigationController extends Notifier<NavState> {
       return;
     }
     final (LatLon, double?) at = _positionAndBearing(routedTraveled);
-    final int nextIndex = _nextManeuverIndex(routedTraveled);
+    final int segment = _segmentIndex(routedTraveled);
     final List<Maneuver> maneuvers = _maneuvers(route);
-    final Maneuver? next = nextIndex >= 0 && nextIndex < maneuvers.length
-        ? maneuvers[nextIndex]
-        : null;
-    final double toNext = nextIndex >= 0 && nextIndex < _maneuverEnds.length
-        ? (_maneuverEnds[nextIndex] - routedTraveled).clamp(0, double.infinity)
+    // The banner announces the maneuver *ahead*, not the one just performed:
+    // Valhalla's `length` covers the road after a maneuver, so the segment we
+    // are on ends where the next maneuver's action happens. Without this the
+    // banner keeps the previous turn's glyph (e.g. a right arrow while a left
+    // turn is next).
+    final int nextIndex = maneuvers.isEmpty
+        ? -1
+        : math.min(segment + 1, maneuvers.length - 1);
+    final Maneuver? next = nextIndex >= 0 ? maneuvers[nextIndex] : null;
+    final double toNext = segment >= 0 && segment < _maneuverEnds.length
+        ? (_maneuverEnds[segment] - routedTraveled).clamp(0, double.infinity)
         : 0;
     final double fraction = total == 0
         ? 1
@@ -383,15 +389,20 @@ class NavigationController extends Notifier<NavState> {
     final double total = _cumulative.isEmpty ? 0 : _cumulative.last;
     _maneuverEnds = _maneuverCumulativeEnds(route, total);
     final List<Maneuver> maneuvers = _maneuvers(route);
+    // At the start we are on the first segment, so the announced maneuver is
+    // the one ahead (see `_apply`).
+    final int nextIndex = maneuvers.isEmpty
+        ? -1
+        : math.min(_segmentIndex(0) + 1, maneuvers.length - 1);
     state = state.copyWith(
       route: route,
       totalMeters: total,
       traveledMeters: 0,
       remaining: route.duration,
       position: _geometry.isEmpty ? null : _geometry.first,
-      nextManeuver: maneuvers.isEmpty ? null : maneuvers.first,
+      nextManeuver: nextIndex < 0 ? null : maneuvers[nextIndex],
       distanceToNextManeuver: _maneuverEnds.isEmpty ? 0 : _maneuverEnds.first,
-      maneuverIndex: 0,
+      maneuverIndex: nextIndex < 0 ? 0 : nextIndex,
     );
   }
 
@@ -490,7 +501,10 @@ class NavigationController extends Notifier<NavState> {
     for (final Leg leg in route.legs) ...leg.maneuvers,
   ];
 
-  int _nextManeuverIndex(double traveled) {
+  /// The index of the segment the position is on. Its end ([_maneuverEnds]) is
+  /// where the following maneuver's action happens, so the announced maneuver
+  /// is `_segmentIndex(traveled) + 1`.
+  int _segmentIndex(double traveled) {
     for (int i = 0; i < _maneuverEnds.length; i++) {
       if (traveled <= _maneuverEnds[i]) {
         return i;
