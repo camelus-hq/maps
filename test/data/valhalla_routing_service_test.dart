@@ -48,6 +48,9 @@ void main() {
         jsonDecode(captured.body) as Map<String, Object?>;
     expect(body['costing'], 'pedestrian');
     expect(body['locations'], hasLength(2));
+    // Lane-level guidance is requested (Valhalla only emits `maneuver.lanes`
+    // when `turn_lanes` is set).
+    expect(body['turn_lanes'], isTrue);
   });
 
   test('non-200 becomes a NetworkException', () async {

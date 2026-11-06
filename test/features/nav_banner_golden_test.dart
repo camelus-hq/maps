@@ -27,28 +27,21 @@ void main() {
       remaining: Duration(minutes: 6),
       distanceToNextManeuver: 220,
       nextManeuver: Maneuver(
-        instruction: 'Turn left onto Bebelplatz',
+        instruction: 'Turn left onto Messedamm',
         type: ManeuverType.turnLeft,
-        streetName: 'Bebelplatz',
+        streetName: 'Messedamm',
+        // Real Messedamm lane guidance (left|left|through|through|right) with
+        // the second (left) lane preferred for the turn.
         lanes: <LaneGuidance>[
-          // Preferred lane for the left turn.
+          LaneGuidance(indications: <LaneIndication>[LaneIndication.left]),
           LaneGuidance(
             active: true,
             valid: true,
             indications: <LaneIndication>[LaneIndication.left],
           ),
-          // Usable lane (valid), not preferred.
-          LaneGuidance(
-            valid: true,
-            indications: <LaneIndication>[LaneIndication.straight],
-          ),
-          // A lane that does not lead through (dimmed).
-          LaneGuidance(
-            indications: <LaneIndication>[
-              LaneIndication.straight,
-              LaneIndication.right,
-            ],
-          ),
+          LaneGuidance(indications: <LaneIndication>[LaneIndication.straight]),
+          LaneGuidance(indications: <LaneIndication>[LaneIndication.straight]),
+          LaneGuidance(indications: <LaneIndication>[LaneIndication.right]),
         ],
       ),
     );

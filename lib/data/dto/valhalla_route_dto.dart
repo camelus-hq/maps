@@ -115,9 +115,19 @@ abstract final class ValhallaRouteDto {
     return null;
   }
 
-  /// Parses the lane guidance attached to the maneuver's intersections (the
+  /// Parses the lane guidance for a maneuver.
+  ///
+  /// With `turn_lanes: true`, Valhalla puts a flat `lanes` array on the
+  /// maneuver; older responses nested it in the maneuver's intersections (the
   /// last intersection that carries lanes wins).
   static List<LaneGuidance> _lanes(Map<String, Object?> maneuver) {
+    final Object? direct = maneuver['lanes'];
+    if (direct is List<Object?>) {
+      final List<LaneGuidance> lanes = _laneList(direct);
+      if (lanes.isNotEmpty) {
+        return lanes;
+      }
+    }
     final Object? intersections = maneuver['intersections'];
     if (intersections is! List<Object?>) {
       return const <LaneGuidance>[];
@@ -130,27 +140,32 @@ abstract final class ValhallaRouteDto {
       if (rawLanes is! List<Object?>) {
         continue;
       }
-      final List<LaneGuidance> lanes = <LaneGuidance>[];
-      for (final Object? rawLane in rawLanes.take(_maxLanes)) {
-        if (rawLane is! Map<String, Object?>) {
-          continue;
-        }
-        lanes.add(
-          LaneGuidance(
-            // The preferred lane for the maneuver (`active`) and the lanes
-            // that lead through it (`valid`) are bitmasks in the current
-            // format and booleans in the legacy one.
-            active: _laneFlag(rawLane['active']),
-            valid: _laneFlag(rawLane['valid']),
-            indications: _laneIndications(rawLane),
-          ),
-        );
-      }
+      final List<LaneGuidance> lanes = _laneList(rawLanes);
       if (lanes.isNotEmpty) {
         return lanes;
       }
     }
     return const <LaneGuidance>[];
+  }
+
+  static List<LaneGuidance> _laneList(List<Object?> rawLanes) {
+    final List<LaneGuidance> lanes = <LaneGuidance>[];
+    for (final Object? rawLane in rawLanes.take(_maxLanes)) {
+      if (rawLane is! Map<String, Object?>) {
+        continue;
+      }
+      lanes.add(
+        LaneGuidance(
+          // The preferred lane for the maneuver (`active`) and the lanes that
+          // lead through it (`valid`) are bitmasks in the current format and
+          // booleans in the legacy one.
+          active: _laneFlag(rawLane['active']),
+          valid: _laneFlag(rawLane['valid']),
+          indications: _laneIndications(rawLane),
+        ),
+      );
+    }
+    return lanes;
   }
 
   /// The directions a lane is signed for. Valhalla's current format carries a

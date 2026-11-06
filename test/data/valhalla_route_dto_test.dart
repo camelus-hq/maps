@@ -114,16 +114,14 @@ void main() {
                   'instruction': 'Turn left onto Bebelplatz',
                   'type': 15,
                   'length': 1.0,
-                  'intersections': <Object?>[
-                    <String, Object?>{
-                      'lanes': <Object?>[
-                        // directions Left(8), active Left(8): the preferred
-                        // lane for the left turn.
-                        <String, Object?>{'directions': 8, 'active': 8},
-                        // directions Left(8) + Through(2), valid Left(8).
-                        <String, Object?>{'directions': 10, 'valid': 8},
-                      ],
-                    },
+                  // With `turn_lanes: true` the lanes are a flat array on the
+                  // maneuver.
+                  'lanes': <Object?>[
+                    // directions Left(8), active Left(8): the preferred lane
+                    // for the left turn.
+                    <String, Object?>{'directions': 8, 'active': 8},
+                    // directions Left(8) + Through(2), valid Left(8).
+                    <String, Object?>{'directions': 10, 'valid': 8},
                   ],
                 },
               ],
@@ -148,6 +146,50 @@ void main() {
     expect(lanes[1].valid, isTrue);
     expect(lanes[1].primary, LaneIndication.left);
   });
+
+  test(
+    'parses real Messedamm lane guidance (left|left|through|through|right)',
+    () {
+      final List<Route> routes = ValhallaRouteDto.routesFromResponse(
+        <String, Object?>{
+          'trip': <String, Object?>{
+            'summary': <String, Object?>{'length': 0.3, 'time': 60},
+            'legs': <Object?>[
+              <String, Object?>{
+                'maneuvers': <Object?>[
+                  <String, Object?>{
+                    'instruction': 'Turn left to stay on Messedamm.',
+                    'type': 15,
+                    'length': 0.3,
+                    'lanes': <Object?>[
+                      <String, Object?>{'directions': 8},
+                      <String, Object?>{'directions': 8, 'active': 8},
+                      <String, Object?>{'directions': 2},
+                      <String, Object?>{'directions': 66},
+                      <String, Object?>{'directions': 64},
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      );
+
+      final List<LaneGuidance> lanes =
+          routes.first.legs.first.maneuvers.first.lanes;
+      expect(lanes, hasLength(5));
+      expect(lanes.map((LaneGuidance lane) => lane.primary), <LaneIndication>[
+        LaneIndication.left,
+        LaneIndication.left,
+        LaneIndication.straight,
+        LaneIndication.right, // directions 66 = Right(64) + Through(2)
+        LaneIndication.right,
+      ]);
+      expect(lanes[1].active, isTrue);
+      expect(lanes.where((LaneGuidance lane) => lane.active), hasLength(1));
+    },
+  );
 
   test('expands every lane direction bit', () {
     expect(LaneIndication.fromBitmask(0), isEmpty);

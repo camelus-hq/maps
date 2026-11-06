@@ -38,6 +38,8 @@ class ValhallaRoutingService implements RoutingService {
       ],
       'costing': _costing(mode),
       'directions_options': <String, Object?>{'units': 'kilometers'},
+      // Ask Valhalla for lane-level guidance (`maneuver.lanes`).
+      'turn_lanes': true,
       'alternates': _alternates,
     };
 

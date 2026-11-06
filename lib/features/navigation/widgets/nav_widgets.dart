@@ -239,29 +239,31 @@ class NavLaneStrip extends StatelessWidget {
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: <Widget>[
-          for (final LaneGuidance lane in lanes)
+          for (int i = 0; i < lanes.length; i++) ...<Widget>[
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                // The preferred lane (Valhalla `active`) is highlighted; lanes
-                // that lead through are shown normal, the rest are dimmed.
-                decoration: lane.active
-                    ? BoxDecoration(
-                        color: style.bannerAccent.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(8),
-                      )
-                    : null,
-                child: LaneGlyph(
-                  indication: lane.primary,
-                  size: 30,
-                  color: style.bannerAccent.withValues(
-                    alpha: lane.active ? 1 : (lane.valid ? 0.6 : 0.32),
-                  ),
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: LaneGlyph(
+                indication: lanes[i].primary,
+                size: 30,
+                // The lane to take (Valhalla `active`) is drawn bright; the
+                // others are dimmed, with a slightly stronger tone for lanes
+                // that still lead through the maneuver (`valid`).
+                color: style.bannerAccent.withValues(
+                  alpha: lanes[i].active ? 1 : (lanes[i].valid ? 0.55 : 0.35),
                 ),
               ),
             ),
+            // A short divider between lanes, like the markings on the road.
+            if (i < lanes.length - 1)
+              Container(
+                width: 2,
+                height: 10,
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                color: style.bannerAccent.withValues(alpha: 0.32),
+              ),
+          ],
         ],
       ),
     );
