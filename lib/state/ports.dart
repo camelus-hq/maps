@@ -16,6 +16,8 @@ import '../data/fakes/fake_search_service.dart';
 import '../data/fakes/fake_settings_repository.dart';
 import '../data/fakes/fake_social_service.dart';
 import '../data/fakes/fake_transit_routing_service.dart';
+import '../data/fakes/in_memory_app_database.dart';
+import '../domain/ports/app_database.dart';
 import '../domain/ports/app_installer.dart';
 import '../domain/ports/app_version_source.dart';
 import '../domain/ports/external_actions.dart';
@@ -66,6 +68,19 @@ final Provider<PlacesRepository> placesRepositoryProvider =
 
 final Provider<SettingsRepository> settingsRepositoryProvider =
     Provider<SettingsRepository>((Ref ref) => FakeSettingsRepository());
+
+/// The local app database (metrics + settings) behind the [AppDatabase] port.
+///
+/// The keyless/test default is an in-memory store; `lib/app/di.dart` swaps in
+/// the platform adapter (ObjectBox on native, drift on the web) once opened at
+/// bootstrap.
+final Provider<AppDatabase> appDatabaseProvider = Provider<AppDatabase>((
+  Ref ref,
+) {
+  final InMemoryAppDatabase database = InMemoryAppDatabase();
+  ref.onDispose(database.close);
+  return database;
+});
 
 final Provider<SocialService> socialServiceProvider = Provider<SocialService>((
   Ref ref,

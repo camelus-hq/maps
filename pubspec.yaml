@@ -16,8 +16,8 @@ dependencies:
   go_router: ^18.0.2
   http: ^1.6.0
   image_picker: ^1.2.1
-  mapbox_maps_flutter: ^3.0.0
-  mobile_scanner: 7.4.2
+  mapbox_maps_flutter: ^3.34.2
+  mobile_scanner: 7.5.0
   phosphor_icons: ^3.0.1
   # QR *encoding* for the "My code" screen. Note: qr ^4.0.0 cannot be used —
   # ndk_flutter (>=0.8.4) → pretty_qr_code 3.6.0 calls the qr 3 API
@@ -30,6 +30,20 @@ dependencies:
   crypto: ^3.0.7
   # The app's cache directory, where an update APK is downloaded before install.
   path_provider: ^2.1.6
+  # Local app database behind the AppDatabase port (docs/database.md):
+  # ObjectBox on native platforms, drift (SQLite compiled to WebAssembly) on
+  # the web. The two adapters are selected by a conditional import, so only the
+  # matching one is compiled into a given build.
+  #
+  # drift is capped below 2.35 because `drift_dev` 2.34.0 (the newest that
+  # shares an `analyzer` with `objectbox_generator`) only supports drift
+  # `<2.35`. It is held at `>=2.34.3` because that line ships the *matching*
+  # `drift_worker.js` + `sqlite3.wasm` pair for the web (see docs/database.md):
+  # a newer sqlite3 wasm with an older worker fails to instantiate on the web.
+  drift: ">=2.34.3 <2.35.0"
+  objectbox: ^6.0.0-preview.6
+  objectbox_flutter_libs: ^6.0.0-preview.6
+  path: ^1.9.1
   shared_preferences: ^2.5.6
   flutter_launcher_icons: ^0.14.4
   url_launcher: ^6.3.3
@@ -39,6 +53,20 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  # Code generation: `objectbox_generator` writes the ObjectBox model/binding,
+  # `drift_dev` writes the drift tables/binding. Run them together with
+  # `dart run build_runner build` (see docs/database.md).
+  # build_runner is held below 2.17: `objectbox_generator` still needs
+  # `build ^4`, while 2.17 needs `build ^5`. Raise when objectbox catches up.
+  build_runner: ^2.15.1
+  drift_dev: ">=2.32.0 <2.34.1"
+  objectbox_generator: ^6.0.0-preview.6 
+
+# ObjectBox writes its generated binding + schema bookkeeping (`objectbox.g.dart`
+# and `objectbox-model.json`) next to the adapter instead of the package root.
+# The schema file's stable UIDs are what make schema upgrades safe — commit it.
+objectbox:
+  output_dir: data/local/database/objectbox
 
 flutter:
   uses-material-design: true

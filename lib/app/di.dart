@@ -9,9 +9,9 @@ import 'package:ndk_flutter/ndk_flutter.dart';
 
 import '../core/config/app_config.dart';
 import '../data/http/api_key_client.dart';
+import '../data/local/local_settings_repository.dart';
 import '../data/local/prefs_live_share_store.dart';
 import '../data/local/prefs_places_repository.dart';
-import '../data/local/prefs_settings_repository.dart';
 import '../data/location/geolocator_location_service.dart';
 import '../data/mapbox/mapbox_map_service.dart';
 import '../data/mapbox/mapbox_map_view.dart';
@@ -30,6 +30,7 @@ import '../data/valhalla/valhalla_routing_service.dart';
 import '../domain/entities/app_settings.dart';
 import '../domain/entities/camera.dart';
 import '../domain/entities/lat_lon.dart';
+import '../domain/ports/app_database.dart';
 import '../domain/ports/search_service.dart';
 import '../state/config.dart';
 import '../state/map_view.dart';
@@ -51,13 +52,23 @@ List<Override> buildAppOverrides(
   AppConfig config, {
   Ndk? ndk,
   NdkFlutter? ndkFlutter,
+  AppDatabase? database,
 }) {
   final List<Override> overrides = <Override>[
     appConfigProvider.overrideWithValue(config),
+    // The local database (metrics + most settings) opened by
+    // `openAppDatabaseSafely()` at bootstrap. When absent (tests, or a fallback
+    // run) the keyless in-memory default in `lib/state/ports.dart` is used.
+    if (database != null)
+      appDatabaseProvider.overrideWith((Ref ref) {
+        ref.onDispose(database.close);
+        return database;
+      }),
     // Local persistence is always available (recent searches, bookmarks).
     placesRepositoryProvider.overrideWith((Ref ref) => PrefsPlacesRepository()),
     settingsRepositoryProvider.overrideWith(
-      (Ref ref) => PrefsSettingsRepository(),
+      (Ref ref) =>
+          LocalSettingsRepository(database: ref.watch(appDatabaseProvider)),
     ),
     // Live location: the outgoing-session store and the ongoing notification.
     liveShareStoreProvider.overrideWith((Ref ref) => PrefsLiveShareStore()),

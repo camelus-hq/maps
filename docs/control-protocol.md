@@ -115,6 +115,7 @@ sync test fails if it drifts from the registry.
 <!-- BEGIN GENERATED COMMANDS -->
 | id | description |
 |---|---|
+| `app.db` | Report the local database (schema version, open state, metric count, setting keys); optionally record a metric or clear the log (params: {record: {name, value?, labels?}, clearMetrics?}). |
 | `app.onboarding` | Get or set the onboarding-seen flag (params: {seen?}); returns it. |
 | `app.ready` | Return true once the app is running. |
 | `app.settings` | Return app settings (distance unit, theme, search provider, developer options). |

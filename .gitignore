@@ -23,6 +23,12 @@ build/
 *.keystore
 *.jks
 
+# ObjectBox native library for local Dart-native tests (downloaded by hand,
+# never shipped; the app gets it from objectbox_flutter_libs). See docs/database.md.
+/lib/libobjectbox.so
+/lib/libobjectbox.dylib
+/lib/objectbox.dll
+
 # OS
 *~
 .DS_Store

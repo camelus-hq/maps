@@ -20,7 +20,6 @@ import '../../onboarding/screens/onboarding_screen.dart';
 import '../../place_details/widgets/place_details_sheet.dart';
 import '../../reviews/widgets/write_review_sheet.dart';
 import '../../social/screens/friend_location_sheet.dart';
-import '../../social/widgets/friends_chip.dart';
 import '../widgets/category_chips.dart';
 import '../widgets/category_results_sheet.dart';
 import '../widgets/friend_review_chip.dart';

@@ -11,6 +11,11 @@ analyzer:
     - build/**
     - android/**
     - .dart_tool/**
+    - web/**
+    # Generated bindings (ObjectBox, drift) are produced by build_runner and
+    # are not held to the project's lints.
+    - "**/*.g.dart"
+    - "**/*.drift.dart"
 
 linter:
   rules:

@@ -26,6 +26,7 @@ import '../../domain/entities/live_share.dart';
 import '../../domain/entities/location_sample.dart';
 import '../../domain/entities/map_style.dart';
 import '../../domain/entities/marker.dart';
+import '../../domain/entities/metric_event.dart';
 import '../../domain/entities/place.dart';
 import '../../domain/entities/place_category.dart';
 import '../../domain/entities/review.dart';
@@ -37,6 +38,7 @@ import '../../domain/entities/route.dart';
 import '../../domain/entities/transit.dart';
 import '../../domain/entities/transit_stop_marker.dart';
 import '../../domain/entities/travel_mode.dart';
+import '../../domain/ports/app_database.dart';
 import '../../domain/ports/map_service.dart';
 import '../../domain/ports/settings_repository.dart';
 import '../config.dart';
@@ -85,6 +87,78 @@ List<Command> buildCommands(Ref ref) {
           'traffic': ref.read(trafficProvider),
           'followingLocation': ref.read(followModeProvider),
           'orientation': ref.read(mapOrientationProvider).name,
+        };
+      },
+    ),
+    Command(
+      id: 'app.db',
+      description:
+          'Report the local database (schema version, open state, metric '
+          'count, setting keys); optionally record a metric or clear the log '
+          '(params: {record: {name, value?, labels?}, clearMetrics?}).',
+      handler: (CommandRequest request) async {
+        final AppDatabase database = ref.read(appDatabaseProvider);
+
+        final Object? rawRecord = request.params['record'];
+        if (rawRecord != null) {
+          if (rawRecord is! Map<Object?, Object?>) {
+            throw const CommandException(
+              'bad_params',
+              '"record" must be an object',
+            );
+          }
+          final Object? name = rawRecord['name'];
+          if (name is! String || name.trim().isEmpty) {
+            throw const CommandException(
+              'bad_params',
+              '"record.name" must be a non-empty string',
+            );
+          }
+          double? value;
+          final Object? rawValue = rawRecord['value'];
+          if (rawValue != null) {
+            if (rawValue is! num) {
+              throw const CommandException(
+                'bad_params',
+                '"record.value" must be a number',
+              );
+            }
+            value = rawValue.toDouble();
+          }
+          final Map<String, String> labels = <String, String>{};
+          final Object? rawLabels = rawRecord['labels'];
+          if (rawLabels is Map<Object?, Object?>) {
+            for (final MapEntry<Object?, Object?> entry in rawLabels.entries) {
+              if (labels.length >= MetricEvent.maxLabels) {
+                break;
+              }
+              final Object? key = entry.key;
+              final Object? labelValue = entry.value;
+              if (key is String && labelValue is String) {
+                labels[key] = labelValue;
+              }
+            }
+          }
+          await database.recordMetric(
+            MetricEvent.create(name, value: value, labels: labels),
+          );
+        }
+
+        if (request.params['clearMetrics'] == true) {
+          await database.clearMetrics();
+        }
+
+        final List<String> settingsKeys =
+            (await database.readSettings()).keys
+                .where((String key) => !key.startsWith('_'))
+                .toList()
+              ..sort();
+        return <String, Object?>{
+          'schemaVersion': database.schemaVersion,
+          'storedSchemaVersion': await database.readStoredSchemaVersion(),
+          'opened': database.isOpen,
+          'metrics': await database.countMetrics(),
+          'settingsKeys': settingsKeys,
         };
       },
     ),

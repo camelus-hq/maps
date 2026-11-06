@@ -22,11 +22,13 @@ import 'package:ndk/ndk.dart';
 import 'package:ndk_flutter/ndk_flutter.dart';
 
 import 'app/app.dart';
+import 'app/database_bootstrap.dart';
 import 'app/di.dart';
 import 'control/control_args.dart';
 import 'control/control_server.dart';
 import 'core/config/app_config.dart';
 import 'data/nostr/nostr_bootstrap.dart';
+import 'domain/ports/app_database.dart';
 import 'state/commands/commands_provider.dart';
 import 'state/ports.dart';
 
@@ -44,8 +46,18 @@ Future<void> main(List<String> args) async {
     debugPrint('Could not restore the Nostr session: $error');
   }
 
+  // The local database (metrics + most settings). Opened before the first frame
+  // so its migrations run once at startup; a failure falls back to an in-memory
+  // store rather than blocking the app.
+  final AppDatabase database = await openAppDatabaseSafely();
+
   final ProviderContainer container = ProviderContainer(
-    overrides: buildAppOverrides(config, ndk: ndk, ndkFlutter: ndkFlutter),
+    overrides: buildAppOverrides(
+      config,
+      ndk: ndk,
+      ndkFlutter: ndkFlutter,
+      database: database,
+    ),
   );
 
   // Development key from `--dart-define=NOSTR_NSEC=…` (never committed): sign
