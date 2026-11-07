@@ -1,3 +1,4 @@
+import 'elevation.dart';
 import 'lat_lon.dart';
 
 /// How a [Maneuver] is announced and iconified.
@@ -180,6 +181,7 @@ class Route {
     required this.distanceMeters,
     required this.duration,
     required this.geometry,
+    this.elevation = ElevationProfile.empty,
   });
 
   final List<Leg> legs;
@@ -188,4 +190,22 @@ class Route {
 
   /// Ordered polyline vertices.
   final List<LatLon> geometry;
+
+  /// The elevation profile along [geometry], when the provider supplies it
+  /// (empty otherwise — e.g. the Camelus Valhalla has no elevation tiles).
+  final ElevationProfile elevation;
+
+  Route copyWith({
+    List<Leg>? legs,
+    double? distanceMeters,
+    Duration? duration,
+    List<LatLon>? geometry,
+    ElevationProfile? elevation,
+  }) => Route(
+    legs: legs ?? this.legs,
+    distanceMeters: distanceMeters ?? this.distanceMeters,
+    duration: duration ?? this.duration,
+    geometry: geometry ?? this.geometry,
+    elevation: elevation ?? this.elevation,
+  );
 }

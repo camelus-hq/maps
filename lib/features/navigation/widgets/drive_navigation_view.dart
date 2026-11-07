@@ -10,7 +10,7 @@ import 'nav_widgets.dart';
 
 /// The car guidance chrome: the two-tier instruction banner (with lane
 /// guidance), a speed chip and the right-hand map controls. The ETA card and
-/// trip options live in the shared [NavBottomSheet].
+/// trip options live in the shared [CarNavBottomSheet].
 class DriveNavigationView extends ConsumerWidget {
   const DriveNavigationView({super.key, required this.nav});
 

@@ -27,4 +27,22 @@ void main() {
       expect(() => decodePolyline(encoded), returnsNormally);
     }
   });
+
+  test('encode → decode round-trips coordinates', () {
+    const List<LatLon> points = <LatLon>[
+      LatLon(52.5190, 13.4040),
+      LatLon(52.5210, 13.4070),
+      LatLon(52.5230, 13.4100),
+    ];
+    final List<LatLon> decoded = decodePolyline(encodePolyline(points));
+    expect(decoded, hasLength(points.length));
+    for (int i = 0; i < points.length; i++) {
+      expect(decoded[i].latitude, closeTo(points[i].latitude, 1e-6));
+      expect(decoded[i].longitude, closeTo(points[i].longitude, 1e-6));
+    }
+  });
+
+  test('encodes a known two-point polyline', () {
+    expect(encodePolyline(decodePolyline('??o}@_|B')), '??o}@_|B');
+  });
 }

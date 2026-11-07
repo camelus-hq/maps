@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+
+import '../../domain/entities/elevation.dart';
 import '../../domain/entities/lat_lon.dart';
 import '../../domain/entities/route.dart';
 import '../../domain/entities/travel_mode.dart';
@@ -63,8 +66,36 @@ class FakeRoutingService implements RoutingService {
         distanceMeters: totalDistance,
         duration: totalDuration,
         geometry: geometry,
+        // A synthetic rolling profile so the cycling gradient UI is exercisable
+        // without a keyed provider (real elevation comes from Valhalla).
+        elevation: mode == TravelMode.cycle
+            ? _fakeElevation(geometry)
+            : ElevationProfile.empty,
       ),
     ];
+  }
+
+  /// A deterministic rolling profile: climbs to +50 m and back down over the
+  /// route, so the gradient chart and the "climb ahead" auto-switch both fire.
+  ElevationProfile _fakeElevation(List<LatLon> geometry) {
+    if (geometry.length < 2) {
+      return ElevationProfile.empty;
+    }
+    final List<ElevationPoint> points = <ElevationPoint>[];
+    double distance = 0;
+    for (int i = 0; i < geometry.length; i++) {
+      if (i > 0) {
+        distance += geometry[i - 1].distanceTo(geometry[i]);
+      }
+      final double t = i / (geometry.length - 1);
+      points.add(
+        ElevationPoint(
+          distanceMeters: distance,
+          elevationMeters: 40 + 50 * math.sin(math.pi * t),
+        ),
+      );
+    }
+    return ElevationProfile(points);
   }
 
   Duration _durationFor(double meters, TravelMode mode) {

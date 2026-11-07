@@ -52,3 +52,32 @@ List<LatLon> decodePolyline(String encoded, {int precision = 6}) {
   final int delta = (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
   return (delta, index);
 }
+
+/// Encodes [points] as a Google/Valhalla polyline (precision 6 by default).
+///
+/// Used to hand a route geometry back to Valhalla's `/height` service, which
+/// expects the encoded shape rather than raw coordinates.
+String encodePolyline(List<LatLon> points, {int precision = 6}) {
+  final int factor = math.pow(10, precision).toInt();
+  final StringBuffer buffer = StringBuffer();
+  int lastLat = 0;
+  int lastLng = 0;
+  for (final LatLon point in points) {
+    final int lat = (point.latitude * factor).round();
+    final int lng = (point.longitude * factor).round();
+    _encodeValue(buffer, lat - lastLat);
+    _encodeValue(buffer, lng - lastLng);
+    lastLat = lat;
+    lastLng = lng;
+  }
+  return buffer.toString();
+}
+
+void _encodeValue(StringBuffer buffer, int value) {
+  int v = value < 0 ? ~(value << 1) : (value << 1);
+  while (v >= 0x20) {
+    buffer.writeCharCode((0x20 | (v & 0x1f)) + 63);
+    v >>= 5;
+  }
+  buffer.writeCharCode(v + 63);
+}

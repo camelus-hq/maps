@@ -8,7 +8,7 @@ import '../nav_style.dart';
 import 'nav_widgets.dart';
 
 /// The pedestrian guidance chrome: a compact top instruction card (the ETA and
-/// options live in the shared [NavBottomSheet]).
+/// options live in the shared [WalkNavBottomSheet]).
 class WalkNavigationView extends ConsumerWidget {
   const WalkNavigationView({super.key, required this.nav});
 

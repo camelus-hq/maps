@@ -85,6 +85,8 @@ class NavStyle {
           speedLimitKmh: null,
         );
       case TravelMode.cycle:
+        // A bicycle is not bound to road lanes, so cycling guidance never shows
+        // the lane strip (the car layout keeps it).
         return const NavStyle(
           banner: Color(0xFF116B5B),
           bannerNow: Color(0xFF0E8A6E),
@@ -92,7 +94,7 @@ class NavStyle {
           laneStrip: Color(0xFF0C5245),
           soonMeters: 200,
           nowMeters: 50,
-          showLanes: true,
+          showLanes: false,
           showSpeed: true,
           speedLimitKmh: null,
         );

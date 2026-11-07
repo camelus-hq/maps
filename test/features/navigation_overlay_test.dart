@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' hide Route;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openmaps/app/app.dart';
+import 'package:openmaps/domain/entities/elevation.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/location_sample.dart';
 import 'package:openmaps/domain/entities/route.dart';
@@ -11,9 +12,15 @@ import 'package:openmaps/domain/entities/travel_mode.dart';
 import 'package:openmaps/domain/ports/location_service.dart';
 import 'package:openmaps/features/directions/widgets/maneuver_glyph.dart';
 import 'package:openmaps/features/navigation/nav_style.dart';
+import 'package:openmaps/features/navigation/widgets/car_nav_bottom_sheet.dart';
+import 'package:openmaps/features/navigation/widgets/cycle_gradient_profile.dart';
+import 'package:openmaps/features/navigation/widgets/cycle_nav_bottom_sheet.dart';
+import 'package:openmaps/features/navigation/widgets/cycle_navigation_view.dart';
 import 'package:openmaps/features/navigation/widgets/drive_navigation_view.dart';
-import 'package:openmaps/features/navigation/widgets/nav_bottom_sheet.dart';
+import 'package:openmaps/features/navigation/widgets/nav_sheet.dart';
 import 'package:openmaps/features/navigation/widgets/nav_widgets.dart';
+import 'package:openmaps/features/navigation/widgets/transit_nav_bottom_sheet.dart';
+import 'package:openmaps/features/navigation/widgets/walk_nav_bottom_sheet.dart';
 import 'package:openmaps/features/navigation/widgets/walk_navigation_view.dart';
 import 'package:openmaps/state/location.dart';
 import 'package:openmaps/state/navigation.dart';
@@ -73,6 +80,38 @@ Route _turnRoute({
   );
 }
 
+/// A route whose elevation profile climbs steeply right from the start, so the
+/// cycling sheet's "climb ahead" auto-switch fires.
+Route _hillRoute() {
+  return Route(
+    legs: <Leg>[
+      Leg(
+        maneuvers: <Maneuver>[
+          Maneuver(
+            instruction: 'Climb the hill',
+            type: ManeuverType.depart,
+            distanceMeters: 1000,
+          ),
+        ],
+        distanceMeters: 1000,
+        duration: const Duration(minutes: 4),
+      ),
+    ],
+    distanceMeters: 1000,
+    duration: const Duration(minutes: 4),
+    geometry: const <LatLon>[
+      LatLon(52.4874, 13.3975),
+      LatLon(52.4880, 13.4035),
+      LatLon(52.4965, 13.4350),
+    ],
+    elevation: const ElevationProfile(<ElevationPoint>[
+      ElevationPoint(distanceMeters: 0, elevationMeters: 40),
+      ElevationPoint(distanceMeters: 200, elevationMeters: 90),
+      ElevationPoint(distanceMeters: 1000, elevationMeters: 95),
+    ]),
+  );
+}
+
 Future<ProviderContainer> _pumpApp(
   WidgetTester tester,
   ProviderContainer container,
@@ -117,7 +156,7 @@ void main() {
       expect(find.byType(NavBanner), findsOneWidget);
       expect(find.byType(NavLaneStrip), findsOneWidget);
       expect(find.byType(NavSpeedChip), findsOneWidget);
-      expect(find.byType(NavBottomSheet), findsOneWidget);
+      expect(find.byType(CarNavBottomSheet), findsOneWidget);
       // Distance + street on the banner.
       expect(find.text('Bebelplatz'), findsOneWidget);
       expect(find.text('200 m'), findsOneWidget);
@@ -175,7 +214,7 @@ void main() {
 
     expect(container.read(locationTrackerProvider).lost, isTrue);
     expect(container.read(locationTrackerProvider).hasFix, isTrue);
-    expect(find.byType(NavBottomSheet), findsOneWidget);
+    expect(find.byType(CarNavBottomSheet), findsOneWidget);
     expect(find.text('Location unavailable'), findsOneWidget);
   });
 
@@ -247,5 +286,176 @@ void main() {
     expect(walk.urgency(40), NavUrgency.soon);
     expect(walk.urgency(10), NavUrgency.now);
     expect(walk.showSpeed, isFalse);
+  });
+
+  test('cycling guidance drops lane guidance but the car keeps it', () {
+    expect(NavStyle.forMode(TravelMode.cycle).showLanes, isFalse);
+    expect(NavStyle.forMode(TravelMode.drive).showLanes, isTrue);
+  });
+
+  testWidgets('cycling drops lanes and leads with the ride stats sheet', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+    await _pumpApp(tester, container);
+
+    container
+        .read(navigationControllerProvider.notifier)
+        .start(
+          _turnRoute(
+            lanes: const <LaneGuidance>[
+              LaneGuidance(
+                active: true,
+                indications: <LaneIndication>[LaneIndication.left],
+              ),
+            ],
+          ),
+          mode: TravelMode.cycle,
+        );
+    await tester.pump();
+
+    expect(find.byType(CycleNavigationView), findsOneWidget);
+    // A bicycle is not bound to road lanes.
+    expect(find.byType(NavLaneStrip), findsNothing);
+    // The rider's speed lives in the sheet, not a floating chip.
+    expect(find.byType(NavSpeedChip), findsNothing);
+    expect(find.byType(CycleNavBottomSheet), findsOneWidget);
+    // The first stats page.
+    expect(find.text('Distance'), findsOneWidget);
+    expect(find.text('Speed'), findsOneWidget);
+    expect(find.text('To end'), findsOneWidget);
+    expect(find.text('Average speed'), findsOneWidget);
+  });
+
+  testWidgets('the cycling ride stats swipe horizontally through pages', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+    await _pumpApp(tester, container);
+
+    container
+        .read(navigationControllerProvider.notifier)
+        .start(_turnRoute(), mode: TravelMode.cycle);
+    await tester.pump();
+
+    expect(find.text('Average speed'), findsOneWidget);
+    expect(find.text('Time left'), findsNothing);
+
+    await tester.fling(find.byType(PageView), const Offset(-300, 0), 1000);
+    await tester.pumpAndSettle();
+
+    // The second stats page.
+    expect(find.text('Elapsed'), findsOneWidget);
+    expect(find.text('Time left'), findsOneWidget);
+  });
+
+  testWidgets(
+    'the cycling sheet expands to the trip options and shrinks back',
+    (WidgetTester tester) async {
+      final ProviderContainer container = ProviderContainer();
+      addTearDown(container.dispose);
+      await _pumpApp(tester, container);
+
+      container
+          .read(navigationControllerProvider.notifier)
+          .start(_turnRoute(), mode: TravelMode.cycle);
+      await tester.pump();
+
+      final Finder handle = find.byType(NavEtaHeader);
+      final double resting = tester.getTopLeft(handle).dy;
+
+      // Expanding reveals the shared trip options.
+      await tester.drag(handle, const Offset(0, -350), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(handle).dy, lessThan(resting));
+      expect(find.text('Show traffic on map'), findsOneWidget);
+
+      // Shrinking past the default snaps to the bare ETA header.
+      await tester.drag(
+        find.byType(NavEtaHeader),
+        const Offset(0, 700),
+        warnIfMissed: false,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.getTopLeft(find.byType(NavEtaHeader)).dy,
+        greaterThan(resting),
+      );
+    },
+  );
+
+  testWidgets('walking and transit each have their own sheet', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+    await _pumpApp(tester, container);
+
+    final NavigationController controller = container.read(
+      navigationControllerProvider.notifier,
+    );
+    controller.start(_turnRoute(), mode: TravelMode.walk);
+    await tester.pump();
+    expect(find.byType(WalkNavBottomSheet), findsOneWidget);
+    expect(find.text('Time left'), findsOneWidget);
+
+    controller.setMode(TravelMode.transit);
+    await tester.pumpAndSettle();
+    expect(find.byType(TransitNavBottomSheet), findsOneWidget);
+    expect(find.textContaining('Public transport'), findsOneWidget);
+  });
+
+  testWidgets('the cycling gradient page shows only when the route has '
+      'elevation', (WidgetTester tester) async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+    await _pumpApp(tester, container);
+
+    // No elevation → no gradient page; the board has just the two stat pages.
+    container
+        .read(navigationControllerProvider.notifier)
+        .start(_turnRoute(), mode: TravelMode.cycle);
+    await tester.pump();
+    expect(find.byType(CycleGradientProfile), findsNothing);
+    expect(find.byType(NavPageDots), findsOneWidget);
+
+    // With elevation the gradient page exists (last page).
+    container.read(navigationControllerProvider.notifier).stop();
+    container
+        .read(navigationControllerProvider.notifier)
+        .start(_hillRoute(), mode: TravelMode.cycle);
+    await tester.pump();
+    await tester.fling(find.byType(PageView), const Offset(-320, 0), 1000);
+    await tester.pumpAndSettle();
+    await tester.fling(find.byType(PageView), const Offset(-320, 0), 1000);
+    await tester.pumpAndSettle();
+    expect(find.byType(CycleGradientProfile), findsOneWidget);
+  });
+
+  testWidgets('the cycling sheet slides to the gradient page on a climb', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+    await _pumpApp(tester, container);
+
+    final NavigationController controller = container.read(
+      navigationControllerProvider.notifier,
+    );
+    controller.start(_hillRoute(), mode: TravelMode.cycle);
+    await tester.pumpAndSettle();
+
+    // The first page is the ride stats, not the gradient.
+    expect(find.text('Average speed'), findsOneWidget);
+    expect(find.byType(CycleGradientProfile), findsNothing);
+
+    // A position update (a steep climb is ahead) auto-switches to it.
+    controller.step(meters: 5);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CycleGradientProfile), findsOneWidget);
+    expect(find.text('Average speed'), findsNothing);
   });
 }

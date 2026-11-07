@@ -9,7 +9,7 @@ import 'nav_widgets.dart';
 
 /// The public-transport guidance chrome: an indigo instruction card while the
 /// same itinerary is followed on the shared map (the ETA and options live in
-/// the shared [NavBottomSheet]).
+/// the shared [TransitNavBottomSheet]).
 class TransitNavigationView extends ConsumerWidget {
   const TransitNavigationView({super.key, required this.nav});
 

@@ -5,10 +5,13 @@ import '../../../domain/entities/travel_mode.dart';
 import '../../../state/config.dart';
 import '../../../state/navigation.dart';
 import '../../map_home/widgets/map_attribution.dart';
+import 'car_nav_bottom_sheet.dart';
+import 'cycle_nav_bottom_sheet.dart';
 import 'cycle_navigation_view.dart';
 import 'drive_navigation_view.dart';
-import 'nav_bottom_sheet.dart';
+import 'transit_nav_bottom_sheet.dart';
 import 'transit_navigation_view.dart';
+import 'walk_nav_bottom_sheet.dart';
 import 'walk_navigation_view.dart';
 
 /// Active-guidance overlay.
@@ -32,6 +35,33 @@ class NavigationOverlay extends ConsumerWidget {
     );
     final bool tracking = nav.cameraFollows && !nav.overview;
     final bool hasMapboxToken = ref.watch(appConfigProvider).hasMapboxToken;
+    // Every travel mode gets its own navigation sheet over the shared chrome.
+    final Widget sheet = switch (nav.mode) {
+      TravelMode.drive => CarNavBottomSheet(
+        nav: nav,
+        tracking: tracking,
+        onExit: controller.stop,
+        onToggleOverview: controller.toggleOverview,
+      ),
+      TravelMode.cycle => CycleNavBottomSheet(
+        nav: nav,
+        tracking: tracking,
+        onExit: controller.stop,
+        onToggleOverview: controller.toggleOverview,
+      ),
+      TravelMode.walk => WalkNavBottomSheet(
+        nav: nav,
+        tracking: tracking,
+        onExit: controller.stop,
+        onToggleOverview: controller.toggleOverview,
+      ),
+      TravelMode.transit => TransitNavBottomSheet(
+        nav: nav,
+        tracking: tracking,
+        onExit: controller.stop,
+        onToggleOverview: controller.toggleOverview,
+      ),
+    };
     return Positioned.fill(
       child: Stack(
         children: <Widget>[
@@ -41,12 +71,7 @@ class NavigationOverlay extends ConsumerWidget {
             bottom: false,
             child: Stack(children: <Widget>[_viewFor(nav)]),
           ),
-          NavBottomSheet(
-            nav: nav,
-            tracking: tracking,
-            onExit: controller.stop,
-            onToggleOverview: controller.toggleOverview,
-          ),
+          sheet,
           if (hasMapboxToken) const MapAttribution(),
         ],
       ),

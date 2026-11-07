@@ -134,4 +134,115 @@ void main() {
       throwsA(isA<ValidationException>()),
     );
   });
+
+  test('cycling attaches the elevation profile from /height', () async {
+    final List<String> paths = <String>[];
+    final http.Client client = MockClient((http.Request request) async {
+      paths.add(request.url.path);
+      if (request.url.path.endsWith('/height')) {
+        return http.Response(
+          jsonEncode(<String, Object?>{
+            'range_height': <Object?>[
+              <Object?>[0, 40.0],
+              <Object?>[100, 55.0],
+            ],
+          }),
+          200,
+        );
+      }
+      return http.Response(
+        jsonEncode(<String, Object?>{
+          'trip': <String, Object?>{
+            'summary': <String, Object?>{'length': 1.0, 'time': 120},
+            'legs': <Object?>[
+              <String, Object?>{
+                'shape': '??o}@_|B',
+                'summary': <String, Object?>{'length': 1.0, 'time': 120},
+              },
+            ],
+          },
+        }),
+        200,
+      );
+    });
+    final ValhallaRoutingService service = ValhallaRoutingService(
+      client: client,
+      baseUrl: 'https://x',
+    );
+
+    final List<Route> routes = await service.route(
+      waypoints: <LatLon>[const LatLon(1, 2), const LatLon(3, 4)],
+      mode: TravelMode.cycle,
+    );
+
+    expect(paths, contains('/height'));
+    expect(routes.first.elevation.isUsable, isTrue);
+    expect(routes.first.elevation.maxElevation, 55.0);
+  });
+
+  test('a failing /height leaves the cycling route usable', () async {
+    final http.Client client = MockClient((http.Request request) async {
+      if (request.url.path.endsWith('/height')) {
+        return http.Response('boom', 500);
+      }
+      return http.Response(
+        jsonEncode(<String, Object?>{
+          'trip': <String, Object?>{
+            'summary': <String, Object?>{'length': 1.0, 'time': 120},
+            'legs': <Object?>[
+              <String, Object?>{
+                'shape': '??o}@_|B',
+                'summary': <String, Object?>{'length': 1.0, 'time': 120},
+              },
+            ],
+          },
+        }),
+        200,
+      );
+    });
+    final ValhallaRoutingService service = ValhallaRoutingService(
+      client: client,
+      baseUrl: 'https://x',
+    );
+
+    final List<Route> routes = await service.route(
+      waypoints: <LatLon>[const LatLon(1, 2), const LatLon(3, 4)],
+      mode: TravelMode.cycle,
+    );
+
+    expect(routes, hasLength(1));
+    expect(routes.first.elevation.isEmpty, isTrue);
+  });
+
+  test('driving never requests elevation', () async {
+    final List<String> paths = <String>[];
+    final http.Client client = MockClient((http.Request request) async {
+      paths.add(request.url.path);
+      return http.Response(
+        jsonEncode(<String, Object?>{
+          'trip': <String, Object?>{
+            'summary': <String, Object?>{'length': 1.0, 'time': 120},
+            'legs': <Object?>[
+              <String, Object?>{
+                'shape': '??o}@_|B',
+                'summary': <String, Object?>{'length': 1.0, 'time': 120},
+              },
+            ],
+          },
+        }),
+        200,
+      );
+    });
+    final ValhallaRoutingService service = ValhallaRoutingService(
+      client: client,
+      baseUrl: 'https://x',
+    );
+
+    await service.route(
+      waypoints: <LatLon>[const LatLon(1, 2), const LatLon(3, 4)],
+      mode: TravelMode.drive,
+    );
+
+    expect(paths, isNot(contains('/height')));
+  });
 }

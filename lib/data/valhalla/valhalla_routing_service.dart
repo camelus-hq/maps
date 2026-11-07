@@ -4,11 +4,14 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../core/errors/app_exception.dart';
+import '../../domain/entities/elevation.dart';
 import '../../domain/entities/lat_lon.dart';
 import '../../domain/entities/route.dart';
 import '../../domain/entities/travel_mode.dart';
 import '../../domain/ports/routing_service.dart';
 import '../dto/valhalla_route_dto.dart';
+import 'polyline_codec.dart';
+import 'valhalla_height_mapper.dart';
 
 /// [RoutingService] backed by a Valhalla HTTP endpoint.
 class ValhallaRoutingService implements RoutingService {
@@ -75,7 +78,51 @@ class ValhallaRoutingService implements RoutingService {
     if (routes.isEmpty) {
       throw const NotFoundException('No route found');
     }
+    // Gradient/ascent guidance is a cycling-only concern, so only fetch the
+    // elevation profile for bike routes (and never let it fail the route).
+    if (mode == TravelMode.cycle) {
+      final List<Route> withElevation = await Future.wait(
+        routes.map(_withElevation),
+      );
+      return List<Route>.unmodifiable(withElevation);
+    }
     return List<Route>.unmodifiable(routes);
+  }
+
+  /// Attaches the elevation profile from Valhalla's `/height` service to
+  /// [route]. Any failure (no elevation dataset, timeout, malformed body)
+  /// leaves the route without a profile — the gradient page is simply omitted.
+  Future<Route> _withElevation(Route route) async {
+    if (route.geometry.length < 2) {
+      return route;
+    }
+    final Uri uri = Uri.parse(
+      '${baseUrl.replaceFirst(RegExp(r'/+$'), '')}/height',
+    );
+    final Map<String, Object?> body = <String, Object?>{
+      'encoded_polyline': encodePolyline(route.geometry),
+      'range': true,
+      'resample_distance': 25,
+    };
+    try {
+      final http.Response response = await client
+          .post(
+            uri,
+            headers: const <String, String>{'Content-Type': 'application/json'},
+            body: jsonEncode(body),
+          )
+          .timeout(_timeout);
+      if (response.statusCode != 200) {
+        return route;
+      }
+      final Object? decoded = jsonDecode(response.body);
+      final ElevationProfile profile = ValhallaHeightMapper.fromResponse(
+        decoded,
+      );
+      return profile.isEmpty ? route : route.copyWith(elevation: profile);
+    } catch (_) {
+      return route;
+    }
   }
 
   String _costing(TravelMode mode) => switch (mode) {

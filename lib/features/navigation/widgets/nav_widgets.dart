@@ -221,7 +221,7 @@ class _ApproachBar extends StatelessWidget {
   }
 }
 
-/// The lane-guidance strip under the instruction (drive/cycle).
+/// The lane-guidance strip under the instruction (drive only).
 class NavLaneStrip extends StatelessWidget {
   const NavLaneStrip({super.key, required this.style, required this.lanes});
 
