@@ -20,6 +20,11 @@ abstract interface class NavigationNotifications {
   /// [statusChip] is the short text for the Android 16 status-bar chip (the
   /// upcoming direction), or `null` to leave the chip to the system. [mode]
   /// selects the notification/status-chip glyph (car, bike, train, pedestrian).
+  ///
+  /// On Android the notice *is* a location **foreground service** notification:
+  /// the first call starts the service and later calls update it, so the OS keeps
+  /// delivering live position updates (and the status chip keeps updating) with
+  /// the app backgrounded. [dismiss] stops that service.
   Future<void> show({
     required String title,
     required String body,
@@ -28,7 +33,8 @@ abstract interface class NavigationNotifications {
     TravelMode mode = TravelMode.drive,
   });
 
-  /// Removes the ongoing notification.
+  /// Removes the ongoing notification (and, on Android, stops the foreground
+  /// service it runs).
   Future<void> dismiss();
 
   /// Emits once whenever the user taps the notification's "Exit navigation"

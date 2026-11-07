@@ -1,41 +1,28 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/services.dart';
 
 import '../../domain/ports/live_share_notifications.dart';
-import 'local_notification_host.dart';
 
 /// The ongoing ("permanent") notification shown while a live share is active.
 ///
-/// Backed by `flutter_local_notifications` through the shared
-/// [LocalNotificationHost]. Every platform call is guarded: if the plugin is
-/// unavailable (desktop tests, a device with notifications disabled) sharing
-/// still works — the notice is simply not drawn.
+/// Posted **natively** (an `openmaps/live_share` platform channel handled by
+/// `MainActivity`), like the navigation notice, rather than through
+/// `flutter_local_notifications`: the notice *is* a location **foreground
+/// service** notification, so the OS keeps the process alive and the share keeps
+/// publishing with the app backgrounded — and no second, hidden notification is
+/// needed. Every platform call is guarded, so sharing still works where native
+/// support is unavailable — the notice is simply not drawn.
 class LocalLiveShareNotifications implements LiveShareNotifications {
-  LocalLiveShareNotifications({LocalNotificationHost? host})
-    : _host = host ?? LocalNotificationHost.shared;
+  LocalLiveShareNotifications({MethodChannel? channel})
+    : _channel = channel ?? const MethodChannel(channelName);
 
-  /// Stable id so updates replace the same notification instead of stacking.
-  static const int notificationId = 7101;
+  static const String channelName = 'openmaps/live_share';
 
-  static const String channelId = 'openmaps.live_share';
-  static const String channelName = 'Live location sharing';
-  static const String channelDescription =
-      'Shown while your live location is shared with friends.';
-
-  final LocalNotificationHost _host;
+  final MethodChannel _channel;
 
   @override
   Future<bool> requestPermission() async {
-    await _host.ensureInitialized();
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
-      return false;
-    }
     try {
-      final AndroidFlutterLocalNotificationsPlugin? android = _host.plugin
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >();
-      return await android?.requestNotificationsPermission() ?? false;
+      return await _channel.invokeMethod<bool>('requestPermission') ?? false;
     } catch (_) {
       return false;
     }
@@ -50,30 +37,11 @@ class LocalLiveShareNotifications implements LiveShareNotifications {
       _show(title: title, body: body);
 
   Future<void> _show({required String title, required String body}) async {
-    await _host.ensureInitialized();
     try {
-      await _host.plugin.show(
-        id: notificationId,
-        title: title,
-        body: body,
-        notificationDetails: const NotificationDetails(
-          android: AndroidNotificationDetails(
-            channelId,
-            channelName,
-            channelDescription: channelDescription,
-            // An informational, non-dismissible notice while sharing.
-            importance: Importance.low,
-            priority: Priority.low,
-            ongoing: true,
-            autoCancel: false,
-            onlyAlertOnce: true,
-            showWhen: false,
-            category: AndroidNotificationCategory.locationSharing,
-            visibility: NotificationVisibility.public,
-            icon: '@mipmap/ic_launcher',
-          ),
-        ),
-      );
+      await _channel.invokeMethod<void>('show', <String, Object?>{
+        'title': title,
+        'body': body,
+      });
     } catch (_) {
       // Notifications unavailable; sharing continues.
     }
@@ -81,9 +49,8 @@ class LocalLiveShareNotifications implements LiveShareNotifications {
 
   @override
   Future<void> dismiss() async {
-    await _host.ensureInitialized();
     try {
-      await _host.plugin.cancel(id: notificationId);
+      await _channel.invokeMethod<void>('dismiss');
     } catch (_) {
       // Nothing to dismiss.
     }

@@ -7,6 +7,12 @@
     <!-- Android 16 Live Updates: promote the ongoing navigation notice to a
          status-bar chip showing the upcoming direction. -->
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"/>
+    <!-- Turn-by-turn guidance runs a location foreground service while routing
+         (only then), so live updates — and the notice's status chip — keep
+         coming with the app backgrounded. Android 14+ needs the typed
+         permission alongside the base one. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <!-- Network access in release builds (search, routing, the update check).
          The Flutter tool only injects this into the debug/profile manifests. -->
     <uses-permission android:name="android.permission.INTERNET"/>
@@ -39,6 +45,18 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Keep the process alive (location foreground services) — and post
+             the ongoing notices as their own foreground notifications — while
+             turn-by-turn guidance or a live-location share is active. Each is
+             started only then, from Dart over its own channel. -->
+        <service
+            android:name=".NavigationForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="location"/>
+        <service
+            android:name=".LiveShareForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="location"/>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

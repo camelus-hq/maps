@@ -87,6 +87,9 @@ class NavigationNoticeController extends Notifier<NavigationNotice> {
       _permissionRequested = true;
       unawaited(notifications.requestPermission());
     }
+    // Showing the notice also keeps the process running (a location foreground
+    // service on Android), so backgrounded position updates — and the notice's
+    // status chip — keep coming.
     await notifications.show(
       title: notice.title,
       body: notice.body,

@@ -29,8 +29,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        // flutter_local_notifications needs Java 8+ library desugaring.
-        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -68,8 +66,6 @@ flutter {
 }
 
 dependencies {
-    // Required by flutter_local_notifications (Java 8+ API desugaring).
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     // FileProvider, used to hand the downloaded self-update APK to the system
     // package installer (see MainActivity.installApk).
     // 1.17.0 adds NotificationCompat's Android 16 Live Update APIs

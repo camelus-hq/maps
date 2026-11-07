@@ -26,7 +26,7 @@ public domain/CC0, OSI-open-source, or CC-with-redistribution only. Screenshots 
 | Location | `geolocator` (platform APIs) | MIT / platform |
 | Compass heading | `flutter_device_compass` | MIT / platform |
 | Live-location sharing (encrypted, NIP-59 gift wrap) | Nostr relays via `ndk` / `ndk_flutter` | MIT client · public relays, no account |
-| Ongoing "sharing your live location" notice | `flutter_local_notifications` | BSD-3-Clause / platform APIs |
+| Ongoing "sharing your live location" / trip notices (foreground-service notifications) | Android platform notification APIs (posted natively) | platform APIs |
 | Friend QR scanning (npub) | `mobile_scanner` (ML Kit barcode scanning on Android) | BSD-3-Clause / Google ML Kit terms · no Maps data |
 | Own npub QR *rendering* (drawn by our own painter from `qr`'s module matrix) | `qr` (3.0.2) | BSD-3-Clause |
 | Place reviews (public Nostr kind 31987) + photo upload | Nostr relays + Blossom servers via `ndk` / `ndk_flutter` | MIT client · public relays/servers, no account |

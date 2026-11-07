@@ -1,20 +1,16 @@
 package app.camelus.maps
 
 import android.Manifest
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.ActivityCompat
-import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import androidx.core.graphics.drawable.IconCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
@@ -33,15 +29,17 @@ import java.io.File
  * this extra has no effect in release.
  *
  * It also answers the self-updater's `openmaps/installer` channel and posts the
- * ongoing navigation notice on the `openmaps/navigation` channel. The latter is
- * built natively (rather than through `flutter_local_notifications`) so it can
- * request promotion to an Android 16 **Live Update** — the progress bar plus a
- * **status-bar chip** (`setShortCriticalText`, `setRequestPromotedOngoing`)
- * that shows the upcoming direction, with an "Exit navigation" action whose tap
- * is forwarded back to Dart as `exitNavigation`.
+ * two ongoing notices — the running trip (`openmaps/navigation`) and the live
+ * location share (`openmaps/live_share`). Both notices are **foreground
+ * service** notifications ([NavigationForegroundService],
+ * [LiveShareForegroundService]) so the process stays out of the OS's
+ * cached/frozen state and keeps receiving GNSS updates with the app
+ * backgrounded; the notice the user sees *is* the service's notification.
  */
 class MainActivity : FlutterActivity() {
     private var navigationChannel: MethodChannel? = null
+    private var navigationForegroundActive = false
+    private var liveShareForegroundActive = false
 
     override fun getDartEntrypointArgs(): MutableList<String>? {
         val port = intent?.getStringExtra(CONTROL_PORT_EXTRA)
@@ -66,17 +64,11 @@ class MainActivity : FlutterActivity() {
         navigation.setMethodCallHandler { call, result ->
             when (call.method) {
                 "show" -> {
-                    showNavigationNotification(
-                        title = call.argument<String>("title") ?: "",
-                        body = call.argument<String>("body") ?: "",
-                        progress = call.argument<Int>("progress"),
-                        chip = call.argument<String>("chip"),
-                        mode = call.argument<String>("mode"),
-                    )
+                    showNavigationNotice(call)
                     result.success(null)
                 }
                 "dismiss" -> {
-                    dismissNavigationNotification()
+                    stopNavigation()
                     result.success(null)
                 }
                 "requestPermission" -> result.success(requestNotificationPermission())
@@ -84,6 +76,23 @@ class MainActivity : FlutterActivity() {
             }
         }
         navigationChannel = navigation
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LIVE_SHARE_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "show" -> {
+                        showLiveShareNotice(call)
+                        result.success(null)
+                    }
+                    "dismiss" -> {
+                        stopLiveShare()
+                        result.success(null)
+                    }
+                    "requestPermission" -> result.success(requestNotificationPermission())
+                    else -> result.notImplemented()
+                }
+            }
+
         // The app may have been cold-started by the notification's Exit action.
         handleNavigationIntent(intent)
     }
@@ -94,9 +103,20 @@ class MainActivity : FlutterActivity() {
         handleNavigationIntent(intent)
     }
 
+    override fun onDestroy() {
+        // The Flutter engine (and its Dart state) dies with the activity, so a
+        // backgrounded foreground service would otherwise linger as a stale
+        // notice. Stopping it here removes the notice when the app is closed or
+        // swiped away. Backgrounding with Home does not destroy the activity, so
+        // guidance/sharing keep running there.
+        stopNavigation()
+        stopLiveShare()
+        super.onDestroy()
+    }
+
     /** Routes the notification's "Exit navigation" tap back to Dart. */
     private fun handleNavigationIntent(intent: Intent?) {
-        if (intent?.action == ACTION_EXIT_NAVIGATION) {
+        if (intent?.action == NavigationNotice.ACTION_EXIT_NAVIGATION) {
             // Consume it so a later recreation does not re-fire the action.
             intent.action = null
             navigationChannel?.invokeMethod("exitNavigation", null)
@@ -123,112 +143,108 @@ class MainActivity : FlutterActivity() {
     }
 
     /**
-     * Posts (or replaces) the ongoing navigation notice: a progress bar for the
-     * trip, an "Exit navigation" action, and — on Android 16 — a promoted Live
-     * Update whose status-bar chip carries the upcoming direction ([chip]).
+     * Posts (or replaces) the ongoing navigation notice and, on the first call,
+     * starts [NavigationForegroundService] so the notice is a foreground
+     * notification and the process keeps receiving position updates in the
+     * background.
      */
-    private fun showNavigationNotification(
-        title: String,
-        body: String,
-        progress: Int?,
-        chip: String?,
-        mode: String?,
-    ) {
+    private fun showNavigationNotice(call: MethodCall) {
+        val title = call.argument<String>("title") ?: ""
+        val body = call.argument<String>("body") ?: ""
+        val progress = call.argument<Int>("progress")
+        val chip = call.argument<String>("chip")
+        val mode = call.argument<String>("mode")
         try {
-            ensureNavigationChannel()
-            val icon = smallIconFor(mode)
-            val contentIntent =
-                PendingIntent.getActivity(
+            NavigationNotice.ensureChannel(this)
+            if (!navigationForegroundActive) {
+                navigationForegroundActive = true
+                // Started from the foreground (guidance is started from the
+                // visible app). The service builds the notice from these extras
+                // and posts it as its foreground notification; a later update
+                // below just replaces its content.
+                ContextCompat.startForegroundService(
                     this,
-                    0,
-                    Intent(this, MainActivity::class.java).apply {
-                        flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    Intent(this, NavigationForegroundService::class.java).apply {
+                        putExtra(NavigationNotice.EXTRA_TITLE, title)
+                        putExtra(NavigationNotice.EXTRA_BODY, body)
+                        if (progress != null) {
+                            putExtra(NavigationNotice.EXTRA_PROGRESS, progress)
+                        }
+                        putExtra(NavigationNotice.EXTRA_CHIP, chip)
+                        putExtra(NavigationNotice.EXTRA_MODE, mode)
                     },
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
                 )
-            val exitIntent =
-                Intent(this, MainActivity::class.java).apply {
-                    action = ACTION_EXIT_NAVIGATION
-                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
-                }
-            val exitPending =
-                PendingIntent.getActivity(
-                    this,
-                    1,
-                    exitIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                )
-            val builder =
-                NotificationCompat.Builder(this, NAVIGATION_CHANNEL_ID)
-                    .setContentTitle(title)
-                    .setContentText(body)
-                    .setSmallIcon(icon)
-                    .setOngoing(true)
-                    .setAutoCancel(false)
-                    .setOnlyAlertOnce(true)
-                    .setShowWhen(false)
-                    .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
-                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                    .setContentIntent(contentIntent)
-                    .setPriority(NotificationCompat.PRIORITY_LOW)
-                    .addAction(
-                        NotificationCompat.Action.Builder(
-                            IconCompat.createWithResource(this, icon),
-                            "Exit",
-                            exitPending,
-                        ).build(),
-                    )
-            if (progress != null) {
-                builder.setProgress(100, progress.coerceIn(0, 100), false)
             }
-            // Android 16 Live Update: request promotion to a status chip and set
-            // its short critical text. Both are no-ops below API 36.
-            if (!chip.isNullOrBlank()) {
-                builder.setShortCriticalText(chip)
-            }
-            builder.setRequestPromotedOngoing(true)
-            NotificationManagerCompat.from(this).notify(NAVIGATION_NOTIFICATION_ID, builder.build())
+            NotificationManagerCompat.from(this).notify(
+                NavigationNotice.NOTIFICATION_ID,
+                NavigationNotice.build(this, title, body, progress, chip, mode),
+            )
         } catch (_: SecurityException) {
             // POST_NOTIFICATIONS not granted; guidance continues without a notice.
         } catch (_: Exception) {
-            // Any platform surprise must never crash navigation.
+            // A background-start rejection / platform surprise must never crash
+            // navigation.
+            navigationForegroundActive = false
         }
     }
 
-    /** The monochrome mode glyph used as the notification / status-chip icon. */
-    private fun smallIconFor(mode: String?): Int =
-        when (mode) {
-            "cycle" -> R.drawable.ic_nav_cycle
-            "walk" -> R.drawable.ic_nav_walk
-            "transit" -> R.drawable.ic_nav_transit
-            else -> R.drawable.ic_nav_drive
-        }
-
-    private fun dismissNavigationNotification() {
+    private fun stopNavigation() {
+        navigationForegroundActive = false
         try {
-            NotificationManagerCompat.from(this).cancel(NAVIGATION_NOTIFICATION_ID)
+            stopService(Intent(this, NavigationForegroundService::class.java))
+        } catch (_: Exception) {
+            // Nothing to stop.
+        }
+        try {
+            NotificationManagerCompat.from(this).cancel(NavigationNotice.NOTIFICATION_ID)
         } catch (_: Exception) {
             // Nothing to dismiss.
         }
     }
 
-    private fun ensureNavigationChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            return
+    /**
+     * Posts (or replaces) the ongoing live-share notice and, on the first call,
+     * starts [LiveShareForegroundService] so the process keeps publishing
+     * location with the app backgrounded.
+     */
+    private fun showLiveShareNotice(call: MethodCall) {
+        val title = call.argument<String>("title") ?: ""
+        val body = call.argument<String>("body") ?: ""
+        try {
+            LiveShareNotice.ensureChannel(this)
+            if (!liveShareForegroundActive) {
+                liveShareForegroundActive = true
+                ContextCompat.startForegroundService(
+                    this,
+                    Intent(this, LiveShareForegroundService::class.java).apply {
+                        putExtra(LiveShareNotice.EXTRA_TITLE, title)
+                        putExtra(LiveShareNotice.EXTRA_BODY, body)
+                    },
+                )
+            }
+            NotificationManagerCompat.from(this).notify(
+                LiveShareNotice.NOTIFICATION_ID,
+                LiveShareNotice.build(this, title, body),
+            )
+        } catch (_: SecurityException) {
+            // POST_NOTIFICATIONS not granted; sharing continues without a notice.
+        } catch (_: Exception) {
+            liveShareForegroundActive = false
         }
-        val manager = getSystemService(NotificationManager::class.java) ?: return
-        if (manager.getNotificationChannel(NAVIGATION_CHANNEL_ID) != null) {
-            return
+    }
+
+    private fun stopLiveShare() {
+        liveShareForegroundActive = false
+        try {
+            stopService(Intent(this, LiveShareForegroundService::class.java))
+        } catch (_: Exception) {
+            // Nothing to stop.
         }
-        manager.createNotificationChannel(
-            NotificationChannel(
-                NAVIGATION_CHANNEL_ID,
-                "Navigation",
-                NotificationManager.IMPORTANCE_LOW,
-            ).apply {
-                description = "Shown while turn-by-turn guidance is running."
-            },
-        )
+        try {
+            NotificationManagerCompat.from(this).cancel(LiveShareNotice.NOTIFICATION_ID)
+        } catch (_: Exception) {
+            // Nothing to dismiss.
+        }
     }
 
     private fun installApk(path: String?, result: MethodChannel.Result) {
@@ -261,9 +277,7 @@ class MainActivity : FlutterActivity() {
         const val CONTROL_PORT_EXTRA = "openmaps.control.port"
         const val INSTALLER_CHANNEL = "openmaps/installer"
         const val NAVIGATION_CHANNEL = "openmaps/navigation"
-        const val NAVIGATION_CHANNEL_ID = "openmaps.navigation"
-        const val NAVIGATION_NOTIFICATION_ID = 7102
-        const val ACTION_EXIT_NAVIGATION = "app.camelus.maps.EXIT_NAVIGATION"
+        const val LIVE_SHARE_CHANNEL = "openmaps/live_share"
         const val REQUEST_NOTIFICATIONS = 7102
         const val APK_MIME_TYPE = "application/vnd.android.package-archive"
     }

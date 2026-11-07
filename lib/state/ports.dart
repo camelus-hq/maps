@@ -111,12 +111,15 @@ final Provider<ReviewService> reviewServiceProvider = Provider<ReviewService>(
 final Provider<OsmPlaceSource> osmPlaceSourceProvider =
     Provider<OsmPlaceSource>((Ref ref) => FakeOsmPlaceSource());
 
+/// The ongoing (foreground-service) notification shown while a live share
+/// runs. The keyless default records calls instead of drawing anything;
+/// `lib/app/di.dart` wires the native Android adapter.
 final Provider<LiveShareNotifications> liveShareNotificationsProvider =
     Provider<LiveShareNotifications>((Ref ref) => FakeLiveShareNotifications());
 
-/// The ongoing notification shown while turn-by-turn guidance runs. The keyless
-/// default records calls instead of drawing anything; `lib/app/di.dart` wires
-/// the `flutter_local_notifications` adapter.
+/// The ongoing (foreground-service) notification shown while turn-by-turn
+/// guidance runs. The keyless default records calls instead of drawing
+/// anything; `lib/app/di.dart` wires the native Android adapter.
 final Provider<NavigationNotifications> navigationNotificationsProvider =
     Provider<NavigationNotifications>(
       (Ref ref) => FakeNavigationNotifications(),

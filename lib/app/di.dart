@@ -71,13 +71,16 @@ List<Override> buildAppOverrides(
       (Ref ref) =>
           LocalSettingsRepository(database: ref.watch(appDatabaseProvider)),
     ),
-    // Live location: the outgoing-session store and the ongoing notification.
+    // Live location: the outgoing-session store and the ongoing notification
+    // (posted as a location foreground-service notification so a share keeps
+    // publishing with the app backgrounded).
     liveShareStoreProvider.overrideWith((Ref ref) => PrefsLiveShareStore()),
     liveShareNotificationsProvider.overrideWith(
       (Ref ref) => LocalLiveShareNotifications(),
     ),
     // Turn-by-turn guidance's ongoing notice with a progress bar + "Exit"
-    // action. Shares one plugin host with the live-share notice.
+    // action, posted as a location foreground-service notification so guidance
+    // keeps updating with the app backgrounded.
     navigationNotificationsProvider.overrideWith(
       (Ref ref) => LocalNavigationNotifications(),
     ),
