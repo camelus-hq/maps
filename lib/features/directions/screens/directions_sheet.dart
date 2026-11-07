@@ -111,8 +111,8 @@ class DirectionsSheet extends ConsumerWidget {
                     SegmentedButton<TravelMode>(
                       segments: const <ButtonSegment<TravelMode>>[
                         ButtonSegment<TravelMode>(
-                          value: TravelMode.drive,
-                          label: Text('Drive'),
+                          value: TravelMode.cycle,
+                          label: Text('Cycle'),
                         ),
                         ButtonSegment<TravelMode>(
                           value: TravelMode.transit,
@@ -123,8 +123,8 @@ class DirectionsSheet extends ConsumerWidget {
                           label: Text('Walk'),
                         ),
                         ButtonSegment<TravelMode>(
-                          value: TravelMode.cycle,
-                          label: Text('Cycle'),
+                          value: TravelMode.drive,
+                          label: Text('Drive'),
                         ),
                       ],
                       selected: <TravelMode>{state.mode},

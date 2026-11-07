@@ -66,7 +66,7 @@ class RouteEndpointTarget {
 class RouteState {
   const RouteState({
     this.status = RouteStatus.idle,
-    this.mode = TravelMode.drive,
+    this.mode = TravelMode.cycle,
     this.routes = const <Route>[],
     this.selectedIndex = 0,
     this.origin,
