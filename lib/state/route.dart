@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/errors/app_exception.dart';
 import '../core/errors/result.dart';
+import '../domain/entities/cycling_options.dart';
 import '../domain/entities/lat_lon.dart';
 import '../domain/entities/location_sample.dart';
 import '../domain/entities/place.dart';
@@ -83,6 +84,7 @@ class RouteState {
     this.fewerTransfers = false,
     this.lessWalking = false,
     this.transitDetailOpen = false,
+    this.cycling = CyclingOptions.defaults,
   });
 
   final RouteStatus status;
@@ -117,6 +119,10 @@ class RouteState {
   /// journey list (step 1).
   final bool transitDetailOpen;
 
+  /// Bicycle cost tuning for a [TravelMode.cycle] route (bicycle type, hills,
+  /// surface, road and speed weighting).
+  final CyclingOptions cycling;
+
   Route? get selectedRoute =>
       selectedIndex >= 0 && selectedIndex < routes.length
       ? routes[selectedIndex]
@@ -149,6 +155,7 @@ class RouteState {
     bool? fewerTransfers,
     bool? lessWalking,
     bool? transitDetailOpen,
+    CyclingOptions? cycling,
     bool clearError = false,
     bool clearDestination = false,
     bool clearPickTarget = false,
@@ -176,12 +183,18 @@ class RouteState {
     fewerTransfers: fewerTransfers ?? this.fewerTransfers,
     lessWalking: lessWalking ?? this.lessWalking,
     transitDetailOpen: transitDetailOpen ?? this.transitDetailOpen,
+    cycling: cycling ?? this.cycling,
   );
 }
 
 /// Plans routes between editable endpoints and draws them on the map.
 class RouteController extends Notifier<RouteState> {
   StreamSubscription<LatLon>? _longPressSub;
+
+  /// True once the bicycle options changed without a request picking them up
+  /// (a slider preview); the next committed change re-plans even if the value
+  /// is unchanged from the last preview.
+  bool _cyclingDirty = false;
 
   @override
   RouteState build() {
@@ -375,6 +388,27 @@ class RouteController extends Notifier<RouteState> {
     await _replan();
   }
 
+  /// Applies bicycle cost options and re-plans; the options only affect a
+  /// cycle route (they are forwarded to the router for `TravelMode.cycle`).
+  ///
+  /// Pass `replan: false` while a slider is being dragged so the thumb updates
+  /// without firing a request per pixel. The drag's `onChangeEnd` call then
+  /// re-plans once — even though the value is unchanged from the last preview —
+  /// because the option set is marked dirty until a request picks it up.
+  Future<void> setCyclingOptions(
+    CyclingOptions options, {
+    bool replan = true,
+  }) async {
+    if (options != state.cycling) {
+      state = state.copyWith(cycling: options, clearError: true);
+      _cyclingDirty = true;
+    }
+    if (replan && _cyclingDirty) {
+      _cyclingDirty = false;
+      await _replan();
+    }
+  }
+
   /// Selects a public-transport journey and draws it on the map.
   void selectItinerary(int index) {
     if (index < 0 || index >= state.itineraries.length) {
@@ -531,6 +565,7 @@ class RouteController extends Notifier<RouteState> {
 
   void clear() {
     state = const RouteState();
+    _cyclingDirty = false;
     final MapService map = ref.read(mapServiceProvider);
     unawaited(map.setRouteLines(const <RouteLine>[]));
     unawaited(map.setTransitStopMarkers(const <TransitStopMarker>[]));
@@ -588,6 +623,7 @@ class RouteController extends Notifier<RouteState> {
         destination.position,
       ],
       mode: state.mode,
+      cycling: state.mode == TravelMode.cycle ? state.cycling : null,
     );
     result.fold(
       ok: (List<Route> routes) {

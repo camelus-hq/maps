@@ -1,5 +1,6 @@
 import '../../core/errors/app_exception.dart';
 import '../../core/errors/result.dart';
+import '../entities/cycling_options.dart';
 import '../entities/lat_lon.dart';
 import '../entities/route.dart';
 import '../entities/travel_mode.dart';
@@ -14,6 +15,7 @@ class RequestRoute {
   Future<Result<List<Route>>> call({
     required List<LatLon> waypoints,
     required TravelMode mode,
+    CyclingOptions? cycling,
   }) async {
     if (waypoints.length < 2) {
       return const Err(
@@ -24,6 +26,7 @@ class RequestRoute {
       final List<Route> routes = await _routingService.route(
         waypoints: waypoints,
         mode: mode,
+        cycling: cycling,
       );
       if (routes.isEmpty) {
         return const Err(NotFoundException('No route found'));

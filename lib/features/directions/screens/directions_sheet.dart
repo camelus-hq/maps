@@ -13,6 +13,7 @@ import '../../../state/route.dart';
 import '../../../state/settings.dart';
 import '../../common/error_text.dart';
 import '../../common/map_sheet.dart';
+import '../widgets/cycle_options.dart';
 import '../widgets/maneuver_glyph.dart';
 import '../widgets/transit_itineraries.dart';
 
@@ -269,6 +270,12 @@ class DirectionsSheet extends ConsumerWidget {
                     ),
                 ],
               ),
+            ],
+            // Bicycle cost options sit between the route alternatives and the
+            // turn-by-turn directions.
+            if (state.mode == TravelMode.cycle) ...<Widget>[
+              const SizedBox(height: AppSpacing.sm),
+              const CycleOptionsPanel(),
             ],
             const Divider(height: AppSpacing.lg),
             for (final Leg leg in selected.legs)

@@ -183,6 +183,7 @@ sync test fails if it drifts from the registry.
 | `review.simulate.add` | Demo/debug only: inject a synthetic review so the map badge and the place sheet can be driven without relays (params: {id? (place id), pubkey?, name?, rating?, text?, lat?, lon?, friend?}). Works only on the keyless fake backend. |
 | `route.addStop` | Add a stop before the destination (params: {id}). |
 | `route.clear` | Clear the current route. |
+| `route.cycle` | Tune bicycle routing options and re-plan (params: {bicycle_type?: road\|hybrid\|cross\|mountain, use_hills?: 0..1, avoid_bad_surfaces?: 0..1, cycling_speed?: km/h, use_roads?: 0..1, avoid_edges?: bool}). Omitted options keep their current value. |
 | `route.destination` | Set the route destination (params: {id}). |
 | `route.editEndpoint` | Open the search-style place picker for a route endpoint (params: {field: origin\|destination\|stop, index?}). A "stop" with no index picks a new stop to append; with an index it edits that stop. |
 | `route.endpoint.close` | Close the endpoint place picker. |

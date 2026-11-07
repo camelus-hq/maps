@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import '../../domain/entities/cycling_options.dart';
 import '../../domain/entities/elevation.dart';
 import '../../domain/entities/lat_lon.dart';
 import '../../domain/entities/route.dart';
@@ -17,6 +18,7 @@ class FakeRoutingService implements RoutingService {
   Future<List<Route>> route({
     required List<LatLon> waypoints,
     required TravelMode mode,
+    CyclingOptions? cycling,
   }) async {
     final List<Leg> legs = <Leg>[];
     final List<LatLon> geometry = <LatLon>[];
@@ -38,7 +40,11 @@ class FakeRoutingService implements RoutingService {
         );
       }
 
-      final Duration segmentDuration = _durationFor(segmentMeters, mode);
+      final Duration segmentDuration = _durationFor(
+        segmentMeters,
+        mode,
+        cycling,
+      );
       legs.add(
         Leg(
           maneuvers: <Maneuver>[
@@ -98,10 +104,16 @@ class FakeRoutingService implements RoutingService {
     return ElevationProfile(points);
   }
 
-  Duration _durationFor(double meters, TravelMode mode) {
+  Duration _durationFor(
+    double meters,
+    TravelMode mode,
+    CyclingOptions? cycling,
+  ) {
     final double metersPerSecond = switch (mode) {
       TravelMode.drive => 13.9, // ~50 km/h
-      TravelMode.cycle => 4.2, // ~15 km/h
+      // Honour a chosen cruising speed (km/h → m/s), so the cycle options are
+      // observable without a keyed provider.
+      TravelMode.cycle => (cycling?.effectiveCyclingSpeed ?? 18) / 3.6,
       TravelMode.walk => 1.4, // ~5 km/h
       TravelMode.transit => 7.0, // ~25 km/h average with stops
     };

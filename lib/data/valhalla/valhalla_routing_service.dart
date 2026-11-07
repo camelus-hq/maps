@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../core/errors/app_exception.dart';
+import '../../domain/entities/cycling_options.dart';
 import '../../domain/entities/elevation.dart';
 import '../../domain/entities/lat_lon.dart';
 import '../../domain/entities/route.dart';
@@ -27,6 +28,7 @@ class ValhallaRoutingService implements RoutingService {
   Future<List<Route>> route({
     required List<LatLon> waypoints,
     required TravelMode mode,
+    CyclingOptions? cycling,
   }) async {
     if (waypoints.length < 2) {
       throw const ValidationException('A route needs at least two waypoints');
@@ -45,6 +47,15 @@ class ValhallaRoutingService implements RoutingService {
       'turn_lanes': true,
       'alternates': _alternates,
     };
+    // Bicycle cost tuning (bicycle_type, hills/surface/road weighting, speed).
+    // Only options that differ from Valhalla's defaults are sent, so an
+    // untouched panel never changes the route. Never sent for drive/walk.
+    if (mode == TravelMode.cycle && cycling != null) {
+      final Map<String, Object?> overrides = cycling.changedOptions();
+      if (overrides.isNotEmpty) {
+        body['costing_options'] = <String, Object?>{'bicycle': overrides};
+      }
+    }
 
     final http.Response response;
     try {

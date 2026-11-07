@@ -147,6 +147,7 @@ void main() {
       routeControllerProvider.notifier,
     );
 
+    await controller.setMode(TravelMode.drive);
     await controller.plan(destination);
     expect(container.read(routeControllerProvider).mode, TravelMode.drive);
     expect(container.read(routeControllerProvider).routes, isNotEmpty);

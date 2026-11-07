@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:openmaps/core/errors/app_exception.dart';
 import 'package:openmaps/data/valhalla/valhalla_routing_service.dart';
+import 'package:openmaps/domain/entities/cycling_options.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/route.dart';
 import 'package:openmaps/domain/entities/travel_mode.dart';
@@ -51,6 +52,91 @@ void main() {
     // Lane-level guidance is requested (Valhalla only emits `maneuver.lanes`
     // when `turn_lanes` is set).
     expect(body['turn_lanes'], isTrue);
+  });
+
+  test('only changed bicycle options are posted as costing_options', () async {
+    late http.Request captured;
+    final http.Client client = MockClient((http.Request request) async {
+      if (!request.url.path.endsWith('/height')) {
+        captured = request;
+      }
+      return http.Response(_routeBody(), 200);
+    });
+    final ValhallaRoutingService service = ValhallaRoutingService(
+      client: client,
+      baseUrl: 'https://valhalla.example.com/',
+    );
+
+    await service.route(
+      waypoints: <LatLon>[const LatLon(1, 2), const LatLon(3, 4)],
+      mode: TravelMode.cycle,
+      cycling: const CyclingOptions(
+        bicycleType: BicycleType.mountain,
+        useHills: 0.9,
+        avoidEdges: true,
+      ),
+    );
+
+    final Map<String, Object?> body =
+        jsonDecode(captured.body) as Map<String, Object?>;
+    expect(body['costing'], 'bicycle');
+    final Map<String, Object?> options =
+        body['costing_options'] as Map<String, Object?>;
+    final Map<String, Object?> bicycle =
+        options['bicycle'] as Map<String, Object?>;
+    expect(bicycle['bicycle_type'], 'mountain');
+    expect(bicycle['use_hills'], 0.9);
+    expect(bicycle['avoid_edges'], isTrue);
+    // The type default speed and untouched weights are not forced on Valhalla.
+    expect(bicycle.containsKey('cycling_speed'), isFalse);
+    expect(bicycle.containsKey('use_roads'), isFalse);
+  });
+
+  test('an untouched bicycle panel posts no costing_options', () async {
+    late http.Request captured;
+    final http.Client client = MockClient((http.Request request) async {
+      if (!request.url.path.endsWith('/height')) {
+        captured = request;
+      }
+      return http.Response(_routeBody(), 200);
+    });
+    final ValhallaRoutingService service = ValhallaRoutingService(
+      client: client,
+      baseUrl: 'https://x',
+    );
+
+    await service.route(
+      waypoints: <LatLon>[const LatLon(1, 2), const LatLon(3, 4)],
+      mode: TravelMode.cycle,
+      cycling: CyclingOptions.defaults,
+    );
+
+    final Map<String, Object?> body =
+        jsonDecode(captured.body) as Map<String, Object?>;
+    expect(body.containsKey('costing_options'), isFalse);
+  });
+
+  test('driving never forwards bicycle costing_options', () async {
+    late http.Request captured;
+    final http.Client client = MockClient((http.Request request) async {
+      captured = request;
+      return http.Response(_routeBody(), 200);
+    });
+    final ValhallaRoutingService service = ValhallaRoutingService(
+      client: client,
+      baseUrl: 'https://x',
+    );
+
+    await service.route(
+      waypoints: <LatLon>[const LatLon(1, 2), const LatLon(3, 4)],
+      mode: TravelMode.drive,
+      cycling: const CyclingOptions(bicycleType: BicycleType.mountain),
+    );
+
+    final Map<String, Object?> body =
+        jsonDecode(captured.body) as Map<String, Object?>;
+    expect(body['costing'], 'auto');
+    expect(body.containsKey('costing_options'), isFalse);
   });
 
   test('non-200 becomes a NetworkException', () async {
@@ -246,3 +332,16 @@ void main() {
     expect(paths, isNot(contains('/height')));
   });
 }
+
+/// A minimal Valhalla `/route` response body with one leg and a 2-point shape.
+String _routeBody() => jsonEncode(<String, Object?>{
+  'trip': <String, Object?>{
+    'summary': <String, Object?>{'length': 1.0, 'time': 120},
+    'legs': <Object?>[
+      <String, Object?>{
+        'shape': '??o}@_|B',
+        'summary': <String, Object?>{'length': 1.0, 'time': 120},
+      },
+    ],
+  },
+});

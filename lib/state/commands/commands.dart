@@ -18,6 +18,7 @@ import '../../data/fakes/fake_social_service.dart';
 import '../../domain/entities/app_settings.dart';
 import '../../domain/entities/app_update.dart';
 import '../../domain/entities/camera.dart';
+import '../../domain/entities/cycling_options.dart';
 import '../../domain/entities/friend.dart';
 import '../../domain/entities/friend_location.dart';
 import '../../domain/entities/friend_marker.dart';
@@ -759,6 +760,9 @@ List<Command> buildCommands(Ref ref) {
         final Result<List<Route>> result = await ref.read(requestRouteProvider)(
           waypoints: <LatLon>[origin, destination],
           mode: mode,
+          cycling: mode == TravelMode.cycle
+              ? ref.read(routeControllerProvider).cycling
+              : null,
         );
         if (result.isErr) {
           throw result.errorOrNull ?? const UnknownException('Routing failed');
@@ -799,6 +803,40 @@ List<Command> buildCommands(Ref ref) {
         final TravelMode mode = _travelMode(request.params['mode']);
         await ref.read(routeControllerProvider.notifier).setMode(mode);
         return mode.name;
+      },
+    ),
+    Command(
+      id: 'route.cycle',
+      description:
+          'Tune bicycle routing options and re-plan (params: '
+          '{bicycle_type?: road|hybrid|cross|mountain, use_hills?: 0..1, '
+          'avoid_bad_surfaces?: 0..1, cycling_speed?: km/h, use_roads?: 0..1, '
+          'avoid_edges?: bool}). Omitted options keep their current value.',
+      handler: (CommandRequest request) async {
+        final CyclingOptions current = ref
+            .read(routeControllerProvider)
+            .cycling;
+        final bool hasType = request.params.containsKey('bicycle_type');
+        final double? speed = _finite(request.params['cycling_speed']);
+        final CyclingOptions next = current.copyWith(
+          bicycleType: hasType
+              ? BicycleType.parse(request.params['bicycle_type'])
+              : null,
+          useHills: _finite(request.params['use_hills']),
+          avoidBadSurfaces: _finite(request.params['avoid_bad_surfaces']),
+          cyclingSpeed: speed,
+          // Changing the bike drops an explicit speed so the new type's default
+          // applies, unless a speed was given in the same call.
+          clearCyclingSpeed: hasType && speed == null,
+          useRoads: _finite(request.params['use_roads']),
+          avoidEdges: request.params['avoid_edges'] is bool
+              ? request.params['avoid_edges'] as bool
+              : null,
+        );
+        await ref
+            .read(routeControllerProvider.notifier)
+            .setCyclingOptions(next);
+        return next.toJson();
       },
     ),
     Command(
