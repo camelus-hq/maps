@@ -178,6 +178,60 @@ void main() {
     expect(map.camera.target, isNot(browsed));
   });
 
+  test(
+    'recenterOrOverview recenters a browsed map, else toggles overview',
+    () async {
+      final ProviderContainer container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final List<Route> routes =
+          (await container.read(requestRouteProvider)(
+            waypoints: <LatLon>[
+              const LatLon(52.5200, 13.4050),
+              const LatLon(52.5300, 13.4200),
+            ],
+            mode: TravelMode.drive,
+          )).valueOrNull ??
+          const <Route>[];
+      expect(routes, isNotEmpty);
+
+      final NavigationController controller = container.read(
+        navigationControllerProvider.notifier,
+      );
+      controller.start(routes.first);
+      final FakeMapService map =
+          container.read(mapServiceProvider) as FakeMapService;
+
+      // While tracking, the button toggles the whole-route overview.
+      controller.recenterOrOverview();
+      expect(container.read(navigationControllerProvider).overview, isTrue);
+      expect(
+        container.read(navigationControllerProvider).cameraFollows,
+        isFalse,
+      );
+
+      // From the overview, it goes back to tracking.
+      controller.recenterOrOverview();
+      expect(container.read(navigationControllerProvider).overview, isFalse);
+      expect(
+        container.read(navigationControllerProvider).cameraFollows,
+        isTrue,
+      );
+
+      // After a manual pan it re-centers instead of opening the overview.
+      map.emitUserGesture();
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        container.read(navigationControllerProvider).cameraFollows,
+        isFalse,
+      );
+      controller.recenterOrOverview();
+      final NavState state = container.read(navigationControllerProvider);
+      expect(state.cameraFollows, isTrue);
+      expect(state.overview, isFalse);
+    },
+  );
+
   test('setMode re-skins the session without touching the route', () async {
     final ProviderContainer container = ProviderContainer();
     addTearDown(container.dispose);

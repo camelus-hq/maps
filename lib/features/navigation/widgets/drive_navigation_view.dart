@@ -39,7 +39,7 @@ class DriveNavigationView extends ConsumerWidget {
           bottom: controlsBottom,
           child: NavSideControls(
             tracking: tracking,
-            onToggleOverview: controller.toggleOverview,
+            onToggleOverview: controller.recenterOrOverview,
           ),
         ),
         if (style.showSpeed)

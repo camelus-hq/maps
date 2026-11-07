@@ -50,7 +50,7 @@ class _AttributionCredit extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ColorScheme scheme = Theme.of(context).colorScheme;
     final TextStyle? linkStyle = Theme.of(context).textTheme.labelSmall
-        ?.copyWith(color: scheme.onSurfaceVariant, fontSize: 11);
+        ?.copyWith(color: scheme.onSurfaceVariant, fontSize: 9);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: scheme.surface.withValues(alpha: 0.82),

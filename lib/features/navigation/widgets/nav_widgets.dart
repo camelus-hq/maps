@@ -355,6 +355,49 @@ class _SpeedLimitSign extends StatelessWidget {
   }
 }
 
+/// The floating "Re-center" pill shown during guidance once the user has taken
+/// the camera away from the position (a manual pan/pinch/zoom). Tapping it flies
+/// back to the current position and resumes tracking (`nav.resume`).
+class NavRecenterButton extends StatelessWidget {
+  const NavRecenterButton({super.key, required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surface,
+      elevation: 4,
+      borderRadius: BorderRadius.circular(AppSpacing.pillRadius),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm + 2,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(Icons.navigation, size: 20, color: scheme.primary),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                'Re-center',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: scheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// The right-hand floating controls during guidance.
 class NavSideControls extends StatelessWidget {
   const NavSideControls({

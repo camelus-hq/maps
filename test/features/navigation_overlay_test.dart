@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' hide Route;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openmaps/app/app.dart';
+import 'package:openmaps/data/fakes/fake_map_service.dart';
 import 'package:openmaps/domain/entities/elevation.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/location_sample.dart';
@@ -162,6 +163,48 @@ void main() {
       expect(find.text('200 m'), findsOneWidget);
     },
   );
+
+  testWidgets('a manual map pan during guidance shows the Re-center pill', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+    await _pumpApp(tester, container);
+
+    container
+        .read(navigationControllerProvider.notifier)
+        .start(_turnRoute(), mode: TravelMode.drive);
+    await tester.pumpAndSettle();
+
+    // While the camera tracks the position there is no floating pill.
+    expect(find.byType(NavRecenterButton), findsNothing);
+
+    // The user pans the map: tracking pauses and the pill appears, above the
+    // ETA sheet and in the bottom half of the screen.
+    final FakeMapService map =
+        container.read(mapServiceProvider) as FakeMapService;
+    map.emitUserGesture();
+    await tester.pumpAndSettle();
+
+    expect(container.read(navigationControllerProvider).cameraFollows, isFalse);
+    final Finder pill = find.byType(NavRecenterButton);
+    expect(pill, findsOneWidget);
+    expect(
+      find.descendant(of: pill, matching: find.text('Re-center')),
+      findsOneWidget,
+    );
+    // Floats above the trip sheet's header, i.e. above the resting sheet.
+    expect(
+      tester.getBottomLeft(pill).dy,
+      lessThan(tester.getTopLeft(find.byType(NavEtaHeader)).dy),
+    );
+
+    // Tapping it re-centers, resumes tracking and hides the pill.
+    await tester.tap(pill);
+    await tester.pumpAndSettle();
+    expect(container.read(navigationControllerProvider).cameraFollows, isTrue);
+    expect(find.byType(NavRecenterButton), findsNothing);
+  });
 
   testWidgets('switching mode re-skins the same session', (
     WidgetTester tester,

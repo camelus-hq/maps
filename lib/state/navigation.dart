@@ -277,6 +277,21 @@ class NavigationController extends Notifier<NavState> {
     unawaited(_flyToCamera());
   }
 
+  /// The camera button action during guidance: re-center on the current position
+  /// when the user has browsed the camera away, otherwise toggle the whole-route
+  /// overview. This keeps the button label ("Re-center" vs "Route overview")
+  /// honest — previously a panned map fell into the overview instead.
+  void recenterOrOverview() {
+    if (state.route == null) {
+      return;
+    }
+    if (!state.overview && !state.cameraFollows) {
+      resumeTracking();
+    } else {
+      toggleOverview();
+    }
+  }
+
   void _onUserGesture() {
     if (state.status != NavStatus.navigating) {
       return;
