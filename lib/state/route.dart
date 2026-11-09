@@ -357,6 +357,26 @@ class RouteController extends Notifier<RouteState> {
     _draw(<Route>[route], 0, fit: false);
   }
 
+  /// Replaces the transit journeys after a schedule re-plan during guidance and
+  /// redraws the selected one, leaving the tracking camera alone (guidance owns
+  /// the camera).
+  void replaceTransitItineraries(
+    List<TransitItinerary> itineraries,
+    int index,
+  ) {
+    if (itineraries.isEmpty || index < 0 || index >= itineraries.length) {
+      return;
+    }
+    state = state.copyWith(
+      mode: TravelMode.transit,
+      status: RouteStatus.data,
+      itineraries: itineraries,
+      selectedItineraryIndex: index,
+      clearError: true,
+    );
+    _drawTransit(itineraries[index], fit: false);
+  }
+
   Future<void> setMode(TravelMode mode) async {
     if (mode == state.mode) {
       return;
@@ -694,7 +714,7 @@ class RouteController extends Notifier<RouteState> {
 
   /// Draws a public-transport journey: one line per leg, in the operator's own
   /// colour for rides and a dashed neutral line for walking.
-  void _drawTransit(TransitItinerary itinerary) {
+  void _drawTransit(TransitItinerary itinerary, {bool fit = true}) {
     ref.read(followModeProvider.notifier).disable();
     final MapService map = ref.read(mapServiceProvider);
     final List<RouteLine> lines = <RouteLine>[
@@ -710,7 +730,7 @@ class RouteController extends Notifier<RouteState> {
     unawaited(map.setRouteLines(lines));
     unawaited(map.setTransitStopMarkers(_stopMarkersFor(itinerary)));
     final List<LatLon> geometry = itinerary.geometry;
-    if (geometry.length >= 2) {
+    if (fit && geometry.length >= 2) {
       unawaited(map.fitCoordinates(geometry));
     }
   }

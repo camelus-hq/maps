@@ -6,7 +6,9 @@ import 'package:openmaps/domain/entities/camera.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/location_sample.dart';
 import 'package:openmaps/domain/entities/route.dart';
+import 'package:openmaps/domain/entities/transit.dart';
 import 'package:openmaps/domain/entities/travel_mode.dart';
+import 'package:openmaps/domain/ports/transit_routing_service.dart';
 import 'package:openmaps/state/navigation.dart';
 import 'package:openmaps/state/ports.dart';
 import 'package:openmaps/state/route.dart';
@@ -361,4 +363,177 @@ void main() {
     state = container.read(navigationControllerProvider);
     expect(state.nextManeuver?.type, ManeuverType.arrive);
   });
+
+  test('transit guidance keeps the camera flat and detects boarding', () async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final TransitItinerary itinerary = _transitJourney();
+    final NavigationController controller = container.read(
+      navigationControllerProvider.notifier,
+    );
+    controller.start(
+      itinerary.toRoute(),
+      mode: TravelMode.transit,
+      transit: itinerary,
+    );
+    // Flush the initial fly-to.
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    // Transit guidance keeps the camera flat and north-up.
+    final FakeMapService map =
+        container.read(mapServiceProvider) as FakeMapService;
+    expect(map.camera.tilt, 0);
+    expect(map.camera.bearing, 0);
+
+    expect(
+      container.read(navigationControllerProvider).transitProgress?.phase,
+      TransitPhase.walk,
+    );
+
+    // A live fix on the ride's geometry reads as "on board".
+    final List<LatLon> ride = itinerary.legs[1].geometry;
+    await controller.handlePosition(
+      LocationSample(position: ride[ride.length ~/ 2], bearing: 90),
+    );
+    final TransitProgress progress = container
+        .read(navigationControllerProvider)
+        .transitProgress!;
+    expect(progress.phase, TransitPhase.ride);
+    expect(progress.legIndex, 1);
+
+    // On board, the whole ride section is framed (not a close-up of the fix).
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    final LatLon center = LatLon(
+      (ride.first.latitude + ride.last.latitude) / 2,
+      (ride.first.longitude + ride.last.longitude) / 2,
+    );
+    expect(map.camera.target.latitude, closeTo(center.latitude, 1e-6));
+    expect(map.camera.target.longitude, closeTo(center.longitude, 1e-6));
+  });
+
+  test('a live schedule mismatch re-plans the journey', () async {
+    final _ReplanTransit service = _ReplanTransit('REPLAN');
+    final ProviderContainer container = ProviderContainer(
+      overrides: [transitRoutingServiceProvider.overrideWithValue(service)],
+    );
+    addTearDown(container.dispose);
+
+    // A stale plan: the ride should already be over, but the position is still
+    // at its start — the traveller is on a different (earlier) train.
+    final TransitItinerary stale = _transitJourney(
+      base: DateTime.now().subtract(const Duration(minutes: 30)),
+    );
+    final NavigationController controller = container.read(
+      navigationControllerProvider.notifier,
+    );
+    controller.start(
+      stale.toRoute(),
+      mode: TravelMode.transit,
+      transit: stale,
+      live: true,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    final LatLon ridePoint = stale.legs[1].geometry[4];
+    for (int i = 0; i < 3; i++) {
+      await controller.handlePosition(LocationSample(position: ridePoint));
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
+
+    expect(service.plans, 1);
+    final NavState state = container.read(navigationControllerProvider);
+    expect(state.status, NavStatus.navigating);
+    expect(state.transit?.legs[1].routeShortName, 'REPLAN');
+    // The sheet's remaining time is the new journey's schedule, not the old one.
+    expect(state.remaining.inMinutes, inInclusiveRange(18, 20));
+  });
+
+  test('a schedule mismatch without live positions never re-plans', () async {
+    final _ReplanTransit service = _ReplanTransit('REPLAN');
+    final ProviderContainer container = ProviderContainer(
+      overrides: [transitRoutingServiceProvider.overrideWithValue(service)],
+    );
+    addTearDown(container.dispose);
+
+    final TransitItinerary stale = _transitJourney(
+      base: DateTime.now().subtract(const Duration(minutes: 30)),
+    );
+    final NavigationController controller = container.read(
+      navigationControllerProvider.notifier,
+    );
+    controller.start(stale.toRoute(), mode: TravelMode.transit, transit: stale);
+
+    final LatLon rideStart = stale.legs[1].geometry.first;
+    for (int i = 0; i < 5; i++) {
+      await controller.handlePosition(LocationSample(position: rideStart));
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+    }
+    expect(service.plans, 0);
+  });
+}
+
+TransitItinerary _transitJourney({DateTime? base, String tag = 'U2'}) {
+  final DateTime start = base ?? DateTime.utc(2026, 1, 1, 9);
+  List<LatLon> line(double aLat, double aLon, double bLat, double bLon) =>
+      <LatLon>[
+        for (int i = 0; i <= 8; i++)
+          LatLon(aLat + (bLat - aLat) * i / 8, aLon + (bLon - aLon) * i / 8),
+      ];
+  return TransitItinerary(
+    startTime: start,
+    endTime: start.add(const Duration(minutes: 20)),
+    legs: <TransitLeg>[
+      TransitLeg(
+        mode: TransitMode.walk,
+        from: const TransitStop(name: 'Start', position: LatLon(52.50, 13.40)),
+        to: const TransitStop(
+          name: 'Stop A',
+          id: 'a',
+          position: LatLon(52.51, 13.40),
+        ),
+        startTime: start,
+        endTime: start.add(const Duration(minutes: 5)),
+        duration: const Duration(minutes: 5),
+        geometry: line(52.50, 13.40, 52.51, 13.40),
+      ),
+      TransitLeg(
+        mode: TransitMode.subway,
+        from: const TransitStop(
+          name: 'Stop A',
+          id: 'a',
+          position: LatLon(52.51, 13.40),
+        ),
+        to: const TransitStop(
+          name: 'Stop B',
+          id: 'b',
+          position: LatLon(52.55, 13.42),
+        ),
+        startTime: start.add(const Duration(minutes: 6)),
+        endTime: start.add(const Duration(minutes: 20)),
+        duration: const Duration(minutes: 14),
+        routeShortName: tag,
+        geometry: line(52.51, 13.40, 52.55, 13.42),
+      ),
+    ],
+  );
+}
+
+/// A transit planner that always returns one fresh journey tagged [tag].
+class _ReplanTransit implements TransitRoutingService {
+  _ReplanTransit(this.tag);
+
+  final String tag;
+  int plans = 0;
+
+  @override
+  Future<List<TransitItinerary>> plan(TransitQuery query) async {
+    plans++;
+    return <TransitItinerary>[_transitJourney(base: DateTime.now(), tag: tag)];
+  }
+
+  @override
+  Future<List<TransitStopDeparture>> departures(
+    TransitDeparturesQuery query,
+  ) async => const <TransitStopDeparture>[];
 }

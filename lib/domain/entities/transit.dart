@@ -472,6 +472,190 @@ class TransitItinerary {
 
   /// The destination stop of the last leg.
   TransitStop? get destinationStop => legs.isEmpty ? null : legs.last.to;
+
+  /// Where the traveller is after covering [traveledMeters] along the
+  /// journey's concatenated [geometry] (the same geometry the guidance uses to
+  /// project a position). Never throws: an empty or zero-length journey reads
+  /// as [TransitPhase.arrived].
+  TransitProgress progressAt(double traveledMeters) {
+    if (legs.isEmpty) {
+      return TransitProgress.arrived;
+    }
+    final List<double> starts = <double>[];
+    final List<double> ends = <double>[];
+    double cursor = 0;
+    for (final TransitLeg leg in legs) {
+      starts.add(cursor);
+      cursor += _geometryLength(leg.geometry);
+      ends.add(cursor);
+    }
+    final double total = cursor;
+    final double traveled = traveledMeters.isFinite
+        ? traveledMeters.clamp(0, total)
+        : 0;
+    if (total <= 0 || traveled >= total) {
+      return TransitProgress(
+        phase: TransitPhase.arrived,
+        legIndex: legs.length - 1,
+      );
+    }
+    int index = 0;
+    // A position exactly on a leg boundary belongs to the *later* leg, so a
+    // traveller standing at the boarding stop already reads as "on board"
+    // rather than still walking.
+    while (index < legs.length - 1 && traveled >= ends[index]) {
+      index++;
+    }
+    final TransitLeg leg = legs[index];
+    final double span = ends[index] - starts[index];
+    final double remaining = (ends[index] - traveled).clamp(0, double.infinity);
+    final double fraction = span <= 0
+        ? 0
+        : ((traveled - starts[index]) / span).clamp(0, 1);
+    if (leg.isTransit) {
+      return TransitProgress(
+        phase: TransitPhase.ride,
+        legIndex: index,
+        ride: leg,
+        rideLegIndex: index,
+        stopsRemaining: _stopsRemaining(
+          leg,
+          traveled - starts[index],
+          fraction,
+        ),
+        remainingInLeg: remaining,
+        fractionInLeg: fraction,
+      );
+    }
+    final int? nextRide = _nextTransitIndex(index);
+    return TransitProgress(
+      phase: TransitPhase.walk,
+      legIndex: index,
+      ride: nextRide == null ? null : legs[nextRide],
+      rideLegIndex: nextRide,
+      remainingInLeg: remaining,
+      fractionInLeg: fraction,
+    );
+  }
+
+  /// The index of the next ride after [index] (walking toward it), or `null`
+  /// when only a final walk to the destination remains.
+  int? _nextTransitIndex(int index) {
+    for (int i = index + 1; i < legs.length; i++) {
+      if (legs[i].isTransit) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  /// How many stops are left before alighting from [leg], given the distance
+  /// already covered inside it (the alight stop counts as one). Uses the
+  /// intermediate stops' coordinates when the provider gave them, and falls
+  /// back to the ride's progress fraction otherwise.
+  int _stopsRemaining(TransitLeg leg, double traveledInLeg, double fraction) {
+    final List<TransitStop> stops = leg.intermediateStops;
+    final List<LatLon> line = leg.geometry;
+    if (line.length >= 2 && stops.isNotEmpty) {
+      final List<double> cumulative = <double>[0];
+      for (int i = 1; i < line.length; i++) {
+        cumulative.add(cumulative[i - 1] + line[i - 1].distanceTo(line[i]));
+      }
+      int remaining = 0;
+      for (final TransitStop stop in stops) {
+        final LatLon? position = stop.position;
+        if (position == null) {
+          remaining++;
+          continue;
+        }
+        double best = double.infinity;
+        int bestIndex = 0;
+        for (int i = 0; i < line.length; i++) {
+          final double distance = line[i].distanceTo(position);
+          if (distance < best) {
+            best = distance;
+            bestIndex = i;
+          }
+        }
+        if (cumulative[bestIndex] > traveledInLeg) {
+          remaining++;
+        }
+      }
+      // The alight stop itself is one more stop.
+      return remaining + 1;
+    }
+    final int total = stops.length + 1;
+    final int left = ((1 - fraction) * total).ceil();
+    return left.clamp(1, total);
+  }
+
+  static double _geometryLength(List<LatLon> geometry) {
+    double total = 0;
+    for (int i = 1; i < geometry.length; i++) {
+      total += geometry[i - 1].distanceTo(geometry[i]);
+    }
+    return total;
+  }
+}
+
+/// The phase of a public-transport journey the traveller is currently in.
+enum TransitPhase {
+  /// On foot toward the next boarding stop (or the final destination).
+  walk,
+
+  /// Standing at a stop waiting to board the next ride.
+  board,
+
+  /// On board a vehicle.
+  ride,
+
+  /// The journey is complete.
+  arrived,
+}
+
+/// Where the traveller is within a [TransitItinerary], derived from the
+/// distance covered along the journey's geometry. Pure data — the UI turns it
+/// into the top card and the live timeline indicator.
+class TransitProgress {
+  const TransitProgress({
+    required this.phase,
+    required this.legIndex,
+    this.ride,
+    this.rideLegIndex,
+    this.stopsRemaining = 0,
+    this.remainingInLeg = 0,
+    this.fractionInLeg = 0,
+  });
+
+  final TransitPhase phase;
+
+  /// The leg whose geometry the traveller is on (a walk or a ride).
+  final int legIndex;
+
+  /// The ride that governs the current step: the ride being ridden
+  /// ([TransitPhase.ride]) or the next one being walked to/boarded.
+  final TransitLeg? ride;
+
+  /// The index of [ride] within the itinerary's legs, when known.
+  final int? rideLegIndex;
+
+  /// Stops left before alighting the current ride (0 while not riding).
+  final int stopsRemaining;
+
+  /// Metres left in the current leg.
+  final double remainingInLeg;
+
+  /// How far through the current leg, 0…1.
+  final double fractionInLeg;
+
+  /// Whether the traveller is currently on board a vehicle.
+  bool get onBoard => phase == TransitPhase.ride;
+
+  /// The completed journey.
+  static const TransitProgress arrived = TransitProgress(
+    phase: TransitPhase.arrived,
+    legIndex: 0,
+  );
 }
 
 /// A public-transport routing request.
@@ -550,3 +734,110 @@ int transitModeColor(TransitMode mode) => switch (mode) {
   TransitMode.monorail => 0xFF7A5C1E,
   _ => 0xFF4A6B63,
 };
+
+/// A request for the next departures from one stop (the "Departures" board).
+class TransitDeparturesQuery {
+  const TransitDeparturesQuery({
+    required this.stopId,
+    this.time,
+    this.limit = 12,
+  });
+
+  /// The provider's stop id (MOTIS `stopId`).
+  final String stopId;
+
+  /// Don't return departures before this time; `null` means "now".
+  final DateTime? time;
+
+  /// The maximum number of departures to return (bounded by the adapter).
+  final int limit;
+}
+
+/// One departure from a stop: a line, where it goes, when it leaves and — with
+/// a realtime feed — how late it is. The fields mirror what MOTIS `/stoptimes`
+/// reports, mapped into the domain's own vocabulary.
+class TransitStopDeparture {
+  const TransitStopDeparture({
+    required this.mode,
+    required this.departure,
+    this.headsign,
+    this.direction,
+    this.scheduledDeparture,
+    this.track,
+    this.scheduledTrack,
+    this.routeShortName,
+    this.routeLongName,
+    this.tripId,
+    this.agencyName,
+    this.routeColor,
+    this.routeTextColor,
+    this.realTime = false,
+    this.cancelled = false,
+    this.wheelchairAccessible = false,
+    this.bikesAllowed = false,
+  });
+
+  final TransitMode mode;
+
+  /// The scheduled or predicted departure time (UTC).
+  final DateTime departure;
+
+  /// The planned departure time, when a realtime one superseded it.
+  final DateTime? scheduledDeparture;
+
+  /// Where the trip is headed (its destination), i.e. the "to" name.
+  final String? headsign;
+
+  /// A secondary direction description, when the provider gives one.
+  final String? direction;
+
+  /// The platform/track actually used (realtime), when known.
+  final String? track;
+
+  /// The planned platform/track.
+  final String? scheduledTrack;
+
+  final String? routeShortName;
+  final String? routeLongName;
+  final String? tripId;
+  final String? agencyName;
+  final int? routeColor;
+  final int? routeTextColor;
+  final bool realTime;
+  final bool cancelled;
+  final bool wheelchairAccessible;
+  final bool bikesAllowed;
+
+  /// The departure time to show (the live one wins).
+  DateTime get displayDeparture => departure;
+
+  /// The track to show: the live one when known, else the scheduled one.
+  String? get displayTrack {
+    final String? value = (track ?? scheduledTrack)?.trim();
+    return value == null || value.isEmpty ? null : value;
+  }
+
+  bool get hasTrack => displayTrack != null;
+
+  /// How late (positive) or early (negative) the departure is, when the
+  /// provider gave both a scheduled and a realtime time.
+  Duration? get delay {
+    final DateTime? scheduled = scheduledDeparture;
+    if (scheduled == null || !realTime) {
+      return null;
+    }
+    return departure.difference(scheduled);
+  }
+
+  /// The label drawn on a line badge ("U7", "Bus 100", …).
+  String get lineLabel {
+    final String? short = _nonEmpty(routeShortName);
+    if (short != null) {
+      return short;
+    }
+    return _nonEmpty(routeLongName) ?? mode.label;
+  }
+
+  /// The operator's own colour, else our mode fallback.
+  int get displayColor => routeColor ?? transitModeColor(mode);
+}

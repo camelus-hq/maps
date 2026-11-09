@@ -13,8 +13,10 @@ import '../../../state/reviews.dart';
 import '../../../state/route.dart';
 import '../../../state/settings.dart';
 import '../../../state/social.dart';
+import '../../../state/transit_departures.dart';
 import '../../directions/screens/directions_sheet.dart';
 import '../../directions/widgets/directions_endpoint_card.dart';
+import '../../directions/widgets/transit/transit_departures_sheet.dart';
 import '../../navigation/widgets/navigation_notification_layer.dart';
 import '../../navigation/widgets/navigation_overlay.dart';
 import '../../onboarding/screens/onboarding_screen.dart';
@@ -147,6 +149,11 @@ class MapHomeScreen extends ConsumerWidget {
               const MapAttribution(),
           ],
           if (navigating) const NavigationOverlay(),
+          // The "Departures" board floats above whatever sheet is showing (the
+          // journey detail or the live navigation sheet) when a station on the
+          // timeline is tapped.
+          if (ref.watch(transitDeparturesProvider).isOpen)
+            const TransitDeparturesSheet(),
           // Drives the ongoing OS notification of the running trip (and routes
           // its "Exit navigation" action back into guidance). Invisible.
           const NavigationNotificationLayer(),

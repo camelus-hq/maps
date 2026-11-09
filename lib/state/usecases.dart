@@ -5,6 +5,7 @@ import '../domain/usecases/check_for_update.dart';
 import '../domain/usecases/load_reviews.dart';
 import '../domain/usecases/publish_review.dart';
 import '../domain/usecases/request_route.dart';
+import '../domain/usecases/request_stop_departures.dart';
 import '../domain/usecases/request_transit_route.dart';
 import '../domain/usecases/search_places.dart';
 import '../domain/usecases/toggle_bookmark.dart';
@@ -31,6 +32,13 @@ final Provider<RequestTransitRoute> requestTransitRouteProvider =
     Provider<RequestTransitRoute>(
       (Ref ref) =>
           RequestTransitRoute(ref.watch(transitRoutingServiceProvider)),
+    );
+
+/// Reads the next departures from a stop (the "Departures" board).
+final Provider<RequestStopDepartures> requestStopDeparturesProvider =
+    Provider<RequestStopDepartures>(
+      (Ref ref) =>
+          RequestStopDepartures(ref.watch(transitRoutingServiceProvider)),
     );
 
 final Provider<WatchLocation> watchLocationProvider = Provider<WatchLocation>(

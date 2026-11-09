@@ -16,6 +16,13 @@ class _AlwaysFailingTransit implements TransitRoutingService {
   Future<List<TransitItinerary>> plan(TransitQuery query) async {
     throw const TransitFailure();
   }
+
+  @override
+  Future<List<TransitStopDeparture>> departures(
+    TransitDeparturesQuery query,
+  ) async {
+    throw const TransitFailure();
+  }
 }
 
 class TransitFailure implements Exception {

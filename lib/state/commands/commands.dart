@@ -59,6 +59,7 @@ import '../screenshot.dart';
 import '../search.dart';
 import '../settings.dart';
 import '../social.dart';
+import '../transit_departures.dart';
 import '../update.dart';
 import '../usecases.dart';
 import 'command.dart';
@@ -1193,6 +1194,32 @@ List<Command> buildCommands(Ref ref) {
       },
     ),
     Command(
+      id: 'transit.departures',
+      description:
+          'Open the departures board for a stop (params: {stopId, name?}). '
+          'Returns the loaded departures.',
+      handler: (CommandRequest request) async {
+        final Object? rawId = request.params['stopId'];
+        final String? stopId = rawId is String ? rawId.trim() : null;
+        if (stopId == null || stopId.isEmpty) {
+          throw const CommandException('bad_params', '"stopId" is required');
+        }
+        final Object? rawName = request.params['name'];
+        await ref
+            .read(transitDeparturesProvider.notifier)
+            .open(stopId: stopId, stopName: rawName is String ? rawName : null);
+        return _departuresJson(ref.read(transitDeparturesProvider));
+      },
+    ),
+    Command(
+      id: 'transit.departures.close',
+      description: 'Close the departures board.',
+      handler: (CommandRequest request) async {
+        ref.read(transitDeparturesProvider.notifier).close();
+        return true;
+      },
+    ),
+    Command(
       id: 'transit.navigate',
       description:
           'Start guidance along the selected public-transport journey (the '
@@ -1216,7 +1243,15 @@ List<Command> buildCommands(Ref ref) {
         }
         ref
             .read(navigationControllerProvider.notifier)
-            .start(route, mode: TravelMode.transit);
+            .start(
+              route,
+              mode: TravelMode.transit,
+              transit: itinerary,
+              // Transit guidance follows the live GNSS stream (the map tracks
+              // the traveller and boarding is detected from the position);
+              // pass `live:false` for a purely simulated run.
+              live: request.params['live'] != false,
+            );
         return _navJson(ref.read(navigationControllerProvider));
       },
     ),
@@ -2836,6 +2871,31 @@ Object _transitResult(Ref ref) {
   return state.itineraries.map(_itineraryJson).toList(growable: false);
 }
 
+/// The departures-board state (its status, stop and rows) for agents/tests.
+Map<String, Object?> _departuresJson(
+  TransitDeparturesState state,
+) => <String, Object?>{
+  'status': state.status.name,
+  'stopId': state.stopId,
+  'stopName': state.stopName,
+  'departures': <Map<String, Object?>>[
+    for (final TransitStopDeparture departure in state.departures)
+      <String, Object?>{
+        'line': departure.lineLabel,
+        'headsign': departure.headsign,
+        'mode': departure.mode.name,
+        'departure': departure.displayDeparture.toIso8601String(),
+        'scheduledDeparture': departure.scheduledDeparture?.toIso8601String(),
+        'track': departure.displayTrack,
+        'agency': departure.agencyName,
+        'realTime': departure.realTime,
+        'cancelled': departure.cancelled,
+        'wheelchairAccessible': departure.wheelchairAccessible,
+        'bikesAllowed': departure.bikesAllowed,
+      },
+  ],
+};
+
 /// A [Place] for a transit endpoint picked by coordinate.
 Place _transitPlace(String id, LatLon position, {String? name}) => Place(
   id: 'transit-$id',
@@ -2947,6 +3007,7 @@ Map<String, Object?> _updateJson(UpdateState state) {
 
 Map<String, Object?> _navJson(NavState nav) {
   final LatLon? position = nav.position;
+  final TransitProgress? progress = nav.transitProgress;
   return <String, Object?>{
     'status': nav.status.name,
     'mode': nav.mode.name,
@@ -2957,6 +3018,17 @@ Map<String, Object?> _navJson(NavState nav) {
     'instruction': nav.nextManeuver?.instruction,
     'overview': nav.overview,
     'cameraFollows': nav.cameraFollows,
+    if (progress != null)
+      'transit': <String, Object?>{
+        'phase': progress.phase.name,
+        'legIndex': progress.legIndex,
+        'rideLegIndex': progress.rideLegIndex,
+        'line': progress.ride?.lineLabel,
+        'headsign': progress.ride?.headsign,
+        'stopsRemaining': progress.stopsRemaining,
+        'remainingInLegMeters': progress.remainingInLeg,
+        'fractionInLeg': progress.fractionInLeg,
+      },
     'position': position == null
         ? null
         : <String, Object?>{

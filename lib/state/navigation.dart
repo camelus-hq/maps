@@ -9,6 +9,7 @@ import '../domain/entities/camera.dart';
 import '../domain/entities/lat_lon.dart';
 import '../domain/entities/location_sample.dart';
 import '../domain/entities/route.dart';
+import '../domain/entities/transit.dart';
 import '../domain/entities/travel_mode.dart';
 import '../domain/ports/map_service.dart';
 import 'follow.dart';
@@ -36,6 +37,8 @@ class NavState {
     this.notice,
     this.overview = false,
     this.cameraFollows = true,
+    this.transit,
+    this.transitProgress,
   });
 
   final NavStatus status;
@@ -60,6 +63,13 @@ class NavState {
   /// position updates no longer recenter it. Reset by re-centering.
   final bool cameraFollows;
 
+  /// The public-transport journey being followed, when the session is a transit
+  /// one (drives the transit banner and the live timeline sheet).
+  final TransitItinerary? transit;
+
+  /// Where the traveller is on [transit], refreshed with every position update.
+  final TransitProgress? transitProgress;
+
   NavState copyWith({
     NavStatus? status,
     TravelMode? mode,
@@ -76,6 +86,8 @@ class NavState {
     bool clearNotice = false,
     bool? overview,
     bool? cameraFollows,
+    TransitItinerary? transit,
+    TransitProgress? transitProgress,
   }) => NavState(
     status: status ?? this.status,
     mode: mode ?? this.mode,
@@ -92,6 +104,8 @@ class NavState {
     notice: clearNotice ? null : (notice ?? this.notice),
     overview: overview ?? this.overview,
     cameraFollows: cameraFollows ?? this.cameraFollows,
+    transit: transit ?? this.transit,
+    transitProgress: transitProgress ?? this.transitProgress,
   );
 }
 
@@ -113,6 +127,31 @@ class NavigationController extends Notifier<NavState> {
 
   /// When the tracking camera was last asked to move (for smooth-follow speed).
   DateTime? _lastCameraMoveAt;
+
+  /// The ride leg whose whole geometry is currently framed on the map while the
+  /// traveller is on board (so the camera does not chase every fix).
+  int? _fittedRideLeg;
+
+  /// Consecutive live fixes whose position is out of step with the timetable.
+  int _driftStreak = 0;
+
+  /// When the journey was last re-planned for a schedule mismatch (cooldown).
+  DateTime? _lastReplanAt;
+
+  /// A mismatch (vs. the schedule) must exceed this to re-plan; it is generous
+  /// because timetables are not always accurate. A false re-plan is worse than
+  /// a slightly stale plan.
+  static const Duration _driftThreshold = Duration(minutes: 6);
+
+  /// How long to wait before another schedule re-plan.
+  static const Duration _driftCooldown = Duration(minutes: 2);
+
+  /// How many consecutive live fixes must be out of step before re-planning.
+  static const int _driftFixesNeeded = 3;
+
+  /// The itinerary's times must be within this window of "now" for a schedule
+  /// comparison to be meaningful (a stale/fake plan is ignored).
+  static const Duration _scheduleSanityWindow = Duration(hours: 3);
 
   List<LatLon> _geometry = const <LatLon>[];
   List<double> _cumulative = const <double>[];
@@ -153,11 +192,12 @@ class NavigationController extends Notifier<NavState> {
     bool auto = false,
     bool live = false,
     TravelMode mode = TravelMode.drive,
+    TransitItinerary? transit,
   }) {
     if (route.geometry.length < 2) {
       return;
     }
-    _loadRoute(route);
+    _loadRoute(route, transit: transit);
     // Navigation owns the camera; stop follow mode so the two don't fight.
     ref.read(followModeProvider.notifier).disable();
     state = state.copyWith(
@@ -170,6 +210,9 @@ class NavigationController extends Notifier<NavState> {
     _timer?.cancel();
     _timer = null;
     _live = live;
+    _fittedRideLeg = null;
+    _driftStreak = 0;
+    _lastReplanAt = null;
     unawaited(_flyToCamera());
     if (auto) {
       _timer = Timer.periodic(
@@ -206,7 +249,10 @@ class NavigationController extends Notifier<NavState> {
     final LatLon point = sample.position;
     final (int index, double deviation) = _nearestVertex(point);
     final double traveled = _cumulative.isEmpty ? 0 : _cumulative[index];
-    if (deviation > _deviationMeters) {
+    // A public-transport journey is followed as-is: straying from the line
+    // (GPS noise at a station, a parallel street) must not trigger a road
+    // reroute — the provider's journey is not a drivable route.
+    if (deviation > _deviationMeters && state.transit == null) {
       await _reroute(point);
       return;
     }
@@ -218,17 +264,26 @@ class NavigationController extends Notifier<NavState> {
         traveledMeters: state.totalMeters,
         remaining: Duration.zero,
         clearNotice: true,
+        transitProgress: state.transit == null ? null : TransitProgress.arrived,
       );
       _timer?.cancel();
       return;
     }
-    _apply(routedTraveled: traveled, position: point, bearing: sample.bearing);
+    _apply(
+      routedTraveled: traveled,
+      position: point,
+      bearing: sample.bearing,
+      live: _live,
+    );
   }
 
   void stop() {
     _timer?.cancel();
     _timer = null;
     _live = false;
+    _fittedRideLeg = null;
+    _driftStreak = 0;
+    _lastReplanAt = null;
     state = const NavState();
   }
 
@@ -303,6 +358,7 @@ class NavigationController extends Notifier<NavState> {
     required double routedTraveled,
     required LatLon? position,
     required double? bearing,
+    bool live = false,
   }) {
     final Route? route = state.route;
     if (route == null) {
@@ -318,6 +374,7 @@ class NavigationController extends Notifier<NavState> {
         remaining: Duration.zero,
         maneuverIndex: _maneuverEnds.length - 1,
         clearNotice: true,
+        transitProgress: state.transit == null ? null : TransitProgress.arrived,
       );
       return;
     }
@@ -339,21 +396,178 @@ class NavigationController extends Notifier<NavState> {
     final double fraction = total == 0
         ? 1
         : (routedTraveled / total).clamp(0, 1);
+    final TransitProgress? progress = state.transit?.progressAt(routedTraveled);
     state = state.copyWith(
       status: NavStatus.navigating,
       position: position ?? at.$1,
       bearing: bearing ?? at.$2,
       traveledMeters: routedTraveled,
       totalMeters: total,
-      remaining: Duration(
-        seconds: (route.duration.inSeconds * (1 - fraction)).round(),
-      ),
+      // A transit journey is scheduled, not distance-paced: the time left is the
+      // gap to the itinerary's arrival, so the ETA matches the timetable (a
+      // road route is estimated from the distance covered).
+      remaining: _remainingFor(route, fraction),
       nextManeuver: next,
       distanceToNextManeuver: toNext,
       maneuverIndex: nextIndex < 0 ? 0 : nextIndex,
       clearNotice: true,
+      transitProgress: progress,
     );
-    _moveCamera();
+    _updateTransitCamera(progress);
+    if (live) {
+      unawaited(_maybeReplanOnDrift(progress));
+    }
+  }
+
+  /// Keeps the tracking camera sensible while a journey is followed.
+  ///
+  /// On foot the camera follows the traveller's position (with the flat transit
+  /// pose). Once on board it frames the **whole ride section at once** and stays
+  /// there, so the traveller can see the train's route rather than a churning
+  /// close-up — reframing only when the ride leg changes or tracking resumes.
+  void _updateTransitCamera(TransitProgress? progress) {
+    if (progress == null || !progress.onBoard) {
+      _fittedRideLeg = null;
+      _moveCamera();
+      return;
+    }
+    // The traveller is browsing the map themselves — don't reframe under them.
+    if (state.overview || !state.cameraFollows) {
+      return;
+    }
+    final int? legIndex = progress.rideLegIndex;
+    final TransitLeg? ride = progress.ride;
+    if (legIndex == null || ride == null || ride.geometry.length < 2) {
+      _moveCamera();
+      return;
+    }
+    if (_fittedRideLeg == legIndex) {
+      // The whole section is already framed; leave the camera steady.
+      return;
+    }
+    _fittedRideLeg = legIndex;
+    unawaited(ref.read(mapServiceProvider).fitCoordinates(ride.geometry));
+  }
+
+  /// Compares where the traveller actually is with where the timetable says
+  /// they should be. A sustained, large mismatch (they caught an earlier train,
+  /// missed one, or the plan is stale) re-plans the journey from the current
+  /// position — conservatively, because timetable data is not always accurate.
+  Future<void> _maybeReplanOnDrift(TransitProgress? progress) async {
+    final TransitItinerary? transit = state.transit;
+    if (transit == null || transit.legs.isEmpty || progress == null) {
+      _driftStreak = 0;
+      return;
+    }
+    // Only a ride leg can be matched: walking pace varies, and the timetable
+    // says nothing about it.
+    if (!progress.onBoard) {
+      _driftStreak = 0;
+      return;
+    }
+    final DateTime now = DateTime.now();
+    // Ignore a stale or synthetic plan whose times are nowhere near "now".
+    if (now.difference(transit.startTime).abs() > _scheduleSanityWindow) {
+      _driftStreak = 0;
+      return;
+    }
+    final TransitLeg leg = transit.legs[progress.legIndex];
+    final DateTime scheduledAtPosition = leg.startTime.add(
+      Duration(
+        seconds: (leg.duration.inSeconds * progress.fractionInLeg).round(),
+      ),
+    );
+    final Duration drift = now.difference(scheduledAtPosition);
+    if (drift.abs() <= _driftThreshold) {
+      _driftStreak = 0;
+      return;
+    }
+    _driftStreak++;
+    final DateTime? last = _lastReplanAt;
+    if (_driftStreak < _driftFixesNeeded ||
+        (last != null && now.difference(last) < _driftCooldown)) {
+      return;
+    }
+    _driftStreak = 0;
+    _lastReplanAt = now;
+    await _replanTransit(state.position);
+  }
+
+  /// Re-plans the journey from [from] (the current position) to its
+  /// destination, then continues guidance along the new itinerary.
+  Future<void> _replanTransit(LatLon? from) async {
+    final TransitItinerary? transit = state.transit;
+    if (transit == null || transit.legs.isEmpty) {
+      return;
+    }
+    final LatLon? start =
+        from ??
+        transit.originStop?.position ??
+        (transit.geometry.isEmpty ? null : transit.geometry.first);
+    final LatLon? destination =
+        transit.legs.last.to.position ??
+        (transit.geometry.isEmpty ? null : transit.geometry.last);
+    if (start == null || destination == null) {
+      return;
+    }
+    state = state.copyWith(
+      status: NavStatus.rerouting,
+      notice: 'Updating your journey…',
+    );
+    final Result<List<TransitItinerary>> result = await ref.read(
+      requestTransitRouteProvider,
+    )(TransitQuery(origin: start, destination: destination));
+    // stop() (or arrival) may have happened while the re-plan was in flight.
+    if (state.status != NavStatus.rerouting) {
+      return;
+    }
+    result.fold(
+      ok: (List<TransitItinerary> itineraries) {
+        if (itineraries.isEmpty) {
+          state = state.copyWith(
+            status: NavStatus.navigating,
+            notice: 'Journey update failed',
+          );
+          return;
+        }
+        _fittedRideLeg = null;
+        _loadRoute(itineraries.first.toRoute(), transit: itineraries.first);
+        state = state.copyWith(status: NavStatus.navigating, clearNotice: true);
+        ref
+            .read(routeControllerProvider.notifier)
+            .replaceTransitItineraries(itineraries, 0);
+        unawaited(_flyToCamera());
+      },
+      err: (AppException error) => state = state.copyWith(
+        status: NavStatus.navigating,
+        notice: 'Journey update failed',
+      ),
+    );
+  }
+
+  /// The time left for the running journey.
+  ///
+  /// A transit journey is scheduled, so the time left is the gap to the
+  /// itinerary's arrival (this also recomputes the moment a re-plan lands);
+  /// a road route is estimated from the distance covered.
+  Duration _remainingFor(Route route, double fraction) {
+    final Duration? scheduled = _scheduledRemaining(state.transit);
+    if (scheduled != null) {
+      return scheduled;
+    }
+    return Duration(
+      seconds: (route.duration.inSeconds * (1 - fraction)).round(),
+    );
+  }
+
+  /// The scheduled gap to [transit]'s arrival, or `null` when there is no
+  /// itinerary or its arrival already passed (fall back to a distance estimate).
+  static Duration? _scheduledRemaining(TransitItinerary? transit) {
+    if (transit == null) {
+      return null;
+    }
+    final Duration left = transit.endTime.difference(DateTime.now());
+    return left.isNegative ? null : left;
   }
 
   Future<void> _reroute(LatLon from) async {
@@ -396,7 +610,7 @@ class NavigationController extends Notifier<NavState> {
     );
   }
 
-  void _loadRoute(Route route) {
+  void _loadRoute(Route route, {TransitItinerary? transit}) {
     _geometry = route.geometry;
     _cumulative = _geometry.length >= 2
         ? _cumulativeDistances(_geometry)
@@ -413,27 +627,40 @@ class NavigationController extends Notifier<NavState> {
       route: route,
       totalMeters: total,
       traveledMeters: 0,
-      remaining: route.duration,
+      remaining: _scheduledRemaining(transit) ?? route.duration,
       position: _geometry.isEmpty ? null : _geometry.first,
       nextManeuver: nextIndex < 0 ? null : maneuvers[nextIndex],
       distanceToNextManeuver: _maneuverEnds.isEmpty ? 0 : _maneuverEnds.first,
       maneuverIndex: nextIndex < 0 ? 0 : nextIndex,
+      transit: transit,
+      transitProgress: transit?.progressAt(0),
     );
   }
 
-  /// The initial fly to the navigation camera pose (a short animated zoom into
-  /// the tilted tracking view).
+  /// The initial fly to the navigation camera pose. On foot this is a short
+  /// animated zoom into the tracking view; on board a transit ride it frames the
+  /// whole ride section instead.
   Future<void> _flyToCamera() async {
     if (state.overview || !state.cameraFollows) {
+      return;
+    }
+    final MapService map = ref.read(mapServiceProvider);
+    final TransitProgress? progress = state.transitProgress;
+    final TransitLeg? ride = progress?.ride;
+    if (progress != null &&
+        progress.onBoard &&
+        ride != null &&
+        ride.geometry.length >= 2) {
+      _fittedRideLeg = progress.rideLegIndex;
+      await map.fitCoordinates(ride.geometry);
       return;
     }
     final LatLon? position = state.position;
     if (position == null) {
       return;
     }
-    final MapService map = ref.read(mapServiceProvider);
     await map.moveCamera(
-      Camera(target: position, zoom: 17, bearing: state.bearing ?? 0, tilt: 45),
+      _trackingPose(position),
       animated: true,
       duration: const Duration(milliseconds: 900),
     );
@@ -451,17 +678,24 @@ class NavigationController extends Notifier<NavState> {
     final MapService map = ref.read(mapServiceProvider);
     unawaited(
       map.moveCamera(
-        Camera(
-          target: position,
-          zoom: 17,
-          bearing: state.bearing ?? 0,
-          tilt: 45,
-        ),
+        _trackingPose(position),
         animated: true,
         duration: _glideDuration(),
       ),
     );
   }
+
+  /// The tracking camera pose for the running session. Transit guidance keeps
+  /// the map north-up and flat (as transit apps do), centred on the traveller;
+  /// the road modes tilt into the heading so the route reads ahead.
+  Camera _trackingPose(LatLon position) => state.mode == TravelMode.transit
+      ? Camera(target: position, zoom: 16, bearing: 0, tilt: 0)
+      : Camera(
+          target: position,
+          zoom: 17,
+          bearing: state.bearing ?? 0,
+          tilt: 45,
+        );
 
   /// The animation length that keeps the tracking camera gliding between fixes
   /// (roughly the time since the last one), so guidance moves smoothly instead

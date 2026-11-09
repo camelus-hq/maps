@@ -182,4 +182,65 @@ void main() {
     );
     expect(captured.url.queryParameters.containsKey('time'), isFalse);
   });
+
+  test(
+    'requests /v1/stoptimes with the stop id and parses departures',
+    () async {
+      late http.Request captured;
+      final http.Client client = MockClient((http.Request request) async {
+        captured = request;
+        return http.Response(
+          jsonEncode(<String, Object?>{
+            'stopTimes': <Object?>[
+              <String, Object?>{
+                'mode': 'METRO',
+                'realTime': true,
+                'headsign': 'Ringbahn S 41',
+                'routeShortName': 'S41',
+                'place': <String, Object?>{
+                  'name': 'S Messe Nord/ZOB',
+                  'stopId': 'de:1',
+                  'track': '2',
+                  'departure': '2026-11-09T10:09:00Z',
+                  'scheduledDeparture': '2026-11-09T10:05:00Z',
+                },
+              },
+            ],
+          }),
+          200,
+        );
+      });
+      final TransitousTransitRoutingService service =
+          TransitousTransitRoutingService(
+            client: client,
+            baseUrl: 'https://api.example.org/api/',
+            userAgent: 'OpenMaps/0.1 (test)',
+          );
+
+      final List<TransitStopDeparture> departures = await service.departures(
+        const TransitDeparturesQuery(stopId: 'de:1', limit: 4),
+      );
+
+      expect(departures, hasLength(1));
+      expect(departures.first.lineLabel, 'S41');
+      expect(captured.url.path, '/api/v1/stoptimes');
+      expect(captured.url.queryParameters['stopId'], 'de:1');
+      expect(captured.url.queryParameters['n'], '4');
+      expect(captured.headers['User-Agent'], 'OpenMaps/0.1 (test)');
+    },
+  );
+
+  test('departures rejects an empty stop id without a request', () async {
+    final TransitousTransitRoutingService service =
+        TransitousTransitRoutingService(
+          client: MockClient(
+            (http.Request request) async => http.Response('{}', 200),
+          ),
+          baseUrl: 'https://x',
+        );
+    await expectLater(
+      service.departures(const TransitDeparturesQuery(stopId: '  ')),
+      throwsA(isA<ValidationException>()),
+    );
+  });
 }

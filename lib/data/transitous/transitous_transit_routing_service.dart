@@ -8,6 +8,7 @@ import '../../domain/entities/lat_lon.dart';
 import '../../domain/entities/transit.dart';
 import '../../domain/ports/transit_routing_service.dart';
 import '../dto/motis_plan_dto.dart';
+import '../dto/motis_stoptimes_dto.dart';
 
 /// [TransitRoutingService] backed by the Transitous (MOTIS 2) HTTP API.
 ///
@@ -56,6 +57,30 @@ class TransitousTransitRoutingService implements TransitRoutingService {
     return _planChainedStops(waypoints, query);
   }
 
+  @override
+  Future<List<TransitStopDeparture>> departures(
+    TransitDeparturesQuery query,
+  ) async {
+    final String stopId = query.stopId.trim();
+    if (stopId.isEmpty) {
+      throw const ValidationException('A stop id is required');
+    }
+    final Uri uri =
+        Uri.parse('${baseUrl.replaceFirst(RegExp(r'/+$'), '')}/v1/stoptimes')
+            .replace(
+              queryParameters: <String, String>{
+                'stopId': stopId,
+                'n': query.limit.clamp(1, 40).toString(),
+                if (query.time != null) 'time': _formatTime(query.time!),
+              },
+            );
+    final Object? decoded = await _getJson(
+      uri,
+      what: 'Loading departures failed',
+    );
+    return MotisStoptimesDto.departuresFromResponse(decoded);
+  }
+
   /// Plans a multi-stop journey by chaining segments; each next segment departs
   /// when the previous one arrives.
   Future<List<TransitItinerary>> _planChainedStops(
@@ -101,6 +126,21 @@ class TransitousTransitRoutingService implements TransitRoutingService {
       '${baseUrl.replaceFirst(RegExp(r'/+$'), '')}/v1/plan',
     ).replace(queryParameters: _queryParameters(from, to, query, time));
 
+    final Object? decoded = await _getJson(
+      uri,
+      what: 'Transit planning failed',
+    );
+    final List<TransitItinerary> itineraries =
+        MotisPlanDto.itinerariesFromResponse(decoded);
+    if (itineraries.isEmpty) {
+      throw const NotFoundException('No journeys found');
+    }
+    return itineraries;
+  }
+
+  /// Fetches and decodes a JSON response, mapping transport failures and bad
+  /// payloads to typed [AppException]s.
+  Future<Object?> _getJson(Uri uri, {required String what}) async {
     final http.Response response;
     try {
       response = await client
@@ -113,32 +153,23 @@ class TransitousTransitRoutingService implements TransitRoutingService {
           )
           .timeout(timeout);
     } on TimeoutException {
-      throw const RequestTimeoutException('Transit planning timed out');
+      throw RequestTimeoutException('$what (timed out)');
     } on http.ClientException catch (error) {
       // No connection / DNS failure / connection dropped: treat as offline.
-      throw OfflineException('Transit planning failed', cause: error);
+      throw OfflineException(what, cause: error);
     } catch (error) {
-      throw NetworkException('Transit planning failed', cause: error);
+      throw NetworkException(what, cause: error);
     }
 
     if (response.statusCode != 200) {
-      throw NetworkException(
-        'Transit planning failed (HTTP ${response.statusCode})',
-      );
+      throw NetworkException('$what (HTTP ${response.statusCode})');
     }
 
-    final Object? decoded;
     try {
-      decoded = jsonDecode(response.body);
+      return jsonDecode(response.body);
     } on FormatException {
-      throw const ValidationException('Malformed transit response');
+      throw ValidationException('$what (malformed response)');
     }
-    final List<TransitItinerary> itineraries =
-        MotisPlanDto.itinerariesFromResponse(decoded);
-    if (itineraries.isEmpty) {
-      throw const NotFoundException('No journeys found');
-    }
-    return itineraries;
   }
 
   Map<String, String> _queryParameters(

@@ -24,6 +24,17 @@ class _StubTransitService implements TransitRoutingService {
     }
     return itineraries;
   }
+
+  @override
+  Future<List<TransitStopDeparture>> departures(
+    TransitDeparturesQuery query,
+  ) async {
+    final AppException? failure = error;
+    if (failure != null) {
+      throw failure;
+    }
+    return const <TransitStopDeparture>[];
+  }
 }
 
 TransitLeg _ride({int minutes = 10}) => TransitLeg(
@@ -130,6 +141,13 @@ void main() {
 class _Thrower implements TransitRoutingService {
   @override
   Future<List<TransitItinerary>> plan(TransitQuery query) async {
+    throw StateError('boom');
+  }
+
+  @override
+  Future<List<TransitStopDeparture>> departures(
+    TransitDeparturesQuery query,
+  ) async {
     throw StateError('boom');
   }
 }

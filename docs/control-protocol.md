@@ -217,6 +217,8 @@ sync test fails if it drifts from the registry.
 | `social.share.stop` | Stop the active live-location share. |
 | `social.simulate.friendLocation` | Demo/debug only: inject a synthetic friend live location (params: {pubkey?, lat?, lon?, minutes?}). Works only when the keyless fake backend is active. |
 | `social.state` | Return the social state: Nostr identity, live friends, outgoing live-share status. |
+| `transit.departures` | Open the departures board for a stop (params: {stopId, name?}). Returns the loaded departures. |
+| `transit.departures.close` | Close the departures board. |
 | `transit.detail` | Open the detail view (step 2) for a public-transport journey (params: {index?}; defaults to the selected). Returns the journey. |
 | `transit.detail.close` | Return from the journey detail to the journey list. |
 | `transit.itineraries` | List the public-transport journeys currently planned. |

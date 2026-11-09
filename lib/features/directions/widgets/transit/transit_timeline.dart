@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_spacing.dart';
@@ -10,13 +12,20 @@ import 'transit_line_badge.dart';
 /// the left (dotted for walking/transfers, a solid bar in the operator's colour
 /// along each ride) with the stop names, times, platforms, wait times and ride
 /// details on the right.
-class TransitTimeline extends StatelessWidget {
+///
+/// While guidance runs, a **live indicator** (a downward navigation arrow) sits
+/// on the rail and moves down it with the traveller's actual progress through
+/// the current leg.
+class TransitTimeline extends StatefulWidget {
   const TransitTimeline({
     super.key,
     required this.itinerary,
     required this.originName,
     required this.destinationName,
     required this.imperial,
+    this.liveLegIndex,
+    this.liveFraction,
+    this.onStopTap,
   });
 
   final TransitItinerary itinerary;
@@ -24,9 +33,49 @@ class TransitTimeline extends StatelessWidget {
   final String destinationName;
   final bool imperial;
 
+  /// The leg the traveller is currently on, when guidance is running.
+  final int? liveLegIndex;
+
+  /// How far through the current leg, 0…1, positioning the live indicator.
+  final double? liveFraction;
+
+  /// Called when a stop row is tapped (opens the departures board).
+  final void Function(TransitStop stop)? onStopTap;
+
+  @override
+  State<TransitTimeline> createState() => _TransitTimelineState();
+}
+
+class _TransitTimelineState extends State<TransitTimeline> {
+  final GlobalKey _overlayKey = GlobalKey();
+  GlobalKey? _startKey;
+  GlobalKey? _endKey;
+  int? _keyedLeg;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncKeys();
+  }
+
+  /// Keeps the rail anchors stable for a given live leg (recreating them every
+  /// build would reset the stateful ride details).
+  void _syncKeys() {
+    if (_keyedLeg == widget.liveLegIndex) {
+      return;
+    }
+    _keyedLeg = widget.liveLegIndex;
+    _startKey = widget.liveLegIndex == null ? null : GlobalKey();
+    _endKey = widget.liveLegIndex == null ? null : GlobalKey();
+  }
+
   @override
   Widget build(BuildContext context) {
+    _syncKeys();
     final ColorScheme scheme = Theme.of(context).colorScheme;
+    final TransitItinerary itinerary = widget.itinerary;
+    final bool imperial = widget.imperial;
+    final int? liveLegIndex = widget.liveLegIndex;
     final List<TransitLeg> legs = itinerary.legs;
     final _TimelineConnector dotted = _TimelineConnector(
       color: scheme.outlineVariant,
@@ -35,14 +84,16 @@ class TransitTimeline extends StatelessWidget {
     final List<Widget> rows = <Widget>[];
 
     // Origin.
+    final TransitStop? originStop = itinerary.originStop;
     rows.add(
       _TimelineRow(
         entry: _TimelineEntry(
           node: _OriginNode(color: scheme.primary),
           below: dotted,
           child: _StopPointRow(
-            name: originName,
+            name: widget.originName,
             trailing: transitClock(context, itinerary.startTime.toLocal()),
+            onTap: originStop == null ? null : _onTapFor(originStop),
           ),
         ),
       ),
@@ -50,6 +101,7 @@ class TransitTimeline extends StatelessWidget {
 
     for (int i = 0; i < legs.length; i++) {
       final TransitLeg leg = legs[i];
+      final bool live = liveLegIndex == i;
       final Duration wait = itinerary.waitBefore(i);
       if (wait.inMinutes >= 1) {
         rows.add(
@@ -72,9 +124,10 @@ class TransitTimeline extends StatelessWidget {
           color: Color(leg.displayColor),
           width: 4,
         );
-        // Board.
+        // Board — the rail anchor where the live indicator starts on this ride.
         rows.add(
           _TimelineRow(
+            key: live ? _startKey : null,
             entry: _TimelineEntry(
               node: _ModeNode(leg: leg),
               above: dotted,
@@ -83,6 +136,7 @@ class TransitTimeline extends StatelessWidget {
                 name: leg.from.name,
                 trailing: transitClock(context, leg.startTime.toLocal()),
                 track: leg.from.hasTrack ? leg.from.displayTrack : null,
+                onTap: _onTapFor(leg.from),
               ),
             ),
           ),
@@ -97,9 +151,10 @@ class TransitTimeline extends StatelessWidget {
             ),
           ),
         );
-        // Alight.
+        // Alight — the rail anchor where the indicator ends on this ride.
         rows.add(
           _TimelineRow(
+            key: live ? _endKey : null,
             entry: _TimelineEntry(
               node: _AlightNode(color: Color(leg.displayColor)),
               above: ride,
@@ -108,6 +163,7 @@ class TransitTimeline extends StatelessWidget {
                 name: leg.to.name,
                 trailing: transitClock(context, leg.endTime.toLocal()),
                 track: leg.to.hasTrack ? leg.to.displayTrack : null,
+                onTap: _onTapFor(leg.to),
               ),
             ),
           ),
@@ -115,6 +171,7 @@ class TransitTimeline extends StatelessWidget {
       } else {
         rows.add(
           _TimelineRow(
+            key: live ? _startKey : null,
             entry: _TimelineEntry(
               node: Icon(
                 transitModeIcon(leg.mode),
@@ -123,7 +180,11 @@ class TransitTimeline extends StatelessWidget {
               ),
               above: dotted,
               below: dotted,
-              child: _WalkLegRow(leg: leg, imperial: imperial),
+              child: _WalkLegRow(
+                leg: leg,
+                imperial: imperial,
+                onTap: _onTapFor(leg.to),
+              ),
             ),
           ),
         );
@@ -137,17 +198,119 @@ class TransitTimeline extends StatelessWidget {
           node: Icon(Icons.place, size: 22, color: scheme.error),
           above: dotted,
           child: _StopPointRow(
-            name: destinationName,
+            name: widget.destinationName,
             trailing: transitClock(context, itinerary.endTime.toLocal()),
           ),
         ),
       ),
     );
 
-    return Column(
+    final Widget column = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: rows,
     );
+    final GlobalKey? startKey = _startKey;
+    if (liveLegIndex == null || startKey == null) {
+      return column;
+    }
+    return Stack(
+      key: _overlayKey,
+      clipBehavior: Clip.none,
+      children: <Widget>[
+        column,
+        _LiveRailIndicator(
+          overlayKey: _overlayKey,
+          startKey: startKey,
+          endKey: _endKey,
+          fraction: (widget.liveFraction ?? 0).clamp(0, 1),
+        ),
+      ],
+    );
+  }
+
+  VoidCallback? _onTapFor(TransitStop stop) {
+    final void Function(TransitStop stop)? handler = widget.onStopTap;
+    final String? id = stop.id?.trim();
+    if (handler == null || id == null || id.isEmpty) {
+      return null;
+    }
+    return () => handler(stop);
+  }
+}
+
+/// Positions the live navigation arrow on the rail, measured from the current
+/// leg's start and end rows and moved down by [fraction] (0 → start, 1 → end).
+class _LiveRailIndicator extends StatefulWidget {
+  const _LiveRailIndicator({
+    required this.overlayKey,
+    required this.startKey,
+    required this.fraction,
+    this.endKey,
+  });
+
+  final GlobalKey overlayKey;
+  final GlobalKey startKey;
+  final GlobalKey? endKey;
+  final double fraction;
+
+  @override
+  State<_LiveRailIndicator> createState() => _LiveRailIndicatorState();
+}
+
+class _LiveRailIndicatorState extends State<_LiveRailIndicator> {
+  double? _top;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleMeasure();
+  }
+
+  @override
+  void didUpdateWidget(covariant _LiveRailIndicator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _scheduleMeasure();
+  }
+
+  void _scheduleMeasure() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _measure();
+      }
+    });
+  }
+
+  void _measure() {
+    final RenderObject? overlay = widget.overlayKey.currentContext
+        ?.findRenderObject();
+    final RenderObject? start = widget.startKey.currentContext
+        ?.findRenderObject();
+    if (overlay is! RenderBox || start is! RenderBox) {
+      return;
+    }
+    final double startY = start
+        .localToGlobal(Offset.zero, ancestor: overlay)
+        .dy;
+    final RenderObject? end = widget.endKey?.currentContext?.findRenderObject();
+    final double endY = end is RenderBox
+        ? end.localToGlobal(Offset.zero, ancestor: overlay).dy
+        : startY + start.size.height;
+    final double top = startY + (endY - startY) * widget.fraction;
+    if (!mounted) {
+      return;
+    }
+    if (_top == null || (_top! - top).abs() > 0.5) {
+      setState(() => _top = top);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double? top = _top;
+    if (top == null) {
+      return const SizedBox.shrink();
+    }
+    return Positioned(top: top, left: 5, child: const _LiveNode());
   }
 }
 
@@ -196,7 +359,7 @@ class _TimelineConnector {
 /// One timeline row: the rail on the left (stretched to the content height) and
 /// the content on the right.
 class _TimelineRow extends StatelessWidget {
-  const _TimelineRow({required this.entry});
+  const _TimelineRow({super.key, required this.entry});
 
   final _TimelineEntry entry;
 
@@ -392,17 +555,60 @@ class _AlightNode extends StatelessWidget {
   }
 }
 
+/// The live position indicator: a filled brand-coloured disc with a downward
+/// navigation arrow, marking how far the traveller is on the journey rail.
+class _LiveNode extends StatelessWidget {
+  const _LiveNode();
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: scheme.primary,
+        border: Border.all(color: scheme.surface, width: 3),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: scheme.primary.withValues(alpha: 0.35),
+            blurRadius: 8,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      // The arrow points down the rail (the direction of travel).
+      child: Transform.rotate(
+        angle: math.pi,
+        child: Icon(
+          Icons.navigation,
+          size: 12,
+          color: scheme.onPrimary,
+          semanticLabel: 'Current position',
+        ),
+      ),
+    );
+  }
+}
+
 /// A stop name with its time and (at transfers) its platform/track.
 class _StopPointRow extends StatelessWidget {
-  const _StopPointRow({required this.name, required this.trailing, this.track});
+  const _StopPointRow({
+    required this.name,
+    required this.trailing,
+    this.track,
+    this.onTap,
+  });
 
   final String name;
   final String trailing;
   final String? track;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final Widget row = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Expanded(
@@ -415,19 +621,32 @@ class _StopPointRow extends StatelessWidget {
         Text(trailing, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
+    final VoidCallback? tap = onTap;
+    if (tap == null) {
+      return row;
+    }
+    return InkWell(
+      onTap: tap,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: row,
+      ),
+    );
   }
 }
 
 /// A walking/biking leg: "Walk 4 min (260 m)" and its arrival time.
 class _WalkLegRow extends StatelessWidget {
-  const _WalkLegRow({required this.leg, required this.imperial});
+  const _WalkLegRow({required this.leg, required this.imperial, this.onTap});
 
   final TransitLeg leg;
   final bool imperial;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final Widget row = Row(
       children: <Widget>[
         Expanded(
           child: Text(
@@ -440,6 +659,18 @@ class _WalkLegRow extends StatelessWidget {
           style: Theme.of(context).textTheme.bodySmall,
         ),
       ],
+    );
+    final VoidCallback? tap = onTap;
+    if (tap == null) {
+      return row;
+    }
+    return InkWell(
+      onTap: tap,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: row,
+      ),
     );
   }
 }

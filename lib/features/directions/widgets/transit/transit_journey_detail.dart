@@ -94,12 +94,26 @@ class TransitJourneyDetail extends ConsumerWidget {
                 originName: originName,
                 destinationName: destinationName,
                 imperial: imperial,
+                onStopTap: (TransitStop stop) => _openDepartures(ref, stop),
               ),
             ],
           ),
         ),
         _DetailFooter(itinerary: itinerary),
       ],
+    );
+  }
+
+  void _openDepartures(WidgetRef ref, TransitStop stop) {
+    final String? id = stop.id?.trim();
+    if (id == null || id.isEmpty) {
+      return;
+    }
+    unawaited(
+      ref.read(commandRegistryProvider).dispatch('transit.departures', {
+        'stopId': id,
+        'name': stop.name,
+      }),
     );
   }
 }

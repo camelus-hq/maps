@@ -19,6 +19,32 @@ class FakeTransitRoutingService implements TransitRoutingService {
   static const int _samplesPerSegment = 8;
 
   @override
+  Future<List<TransitStopDeparture>> departures(
+    TransitDeparturesQuery query,
+  ) async {
+    final DateTime base = (query.time ?? now ?? DateTime.now()).toUtc();
+    final int count = query.limit.clamp(1, 12);
+    return List<TransitStopDeparture>.unmodifiable(<TransitStopDeparture>[
+      for (int i = 0; i < count; i++)
+        TransitStopDeparture(
+          mode: i.isEven ? TransitMode.suburbanRail : TransitMode.subway,
+          departure: base.add(Duration(minutes: i * 5)),
+          scheduledDeparture: base.add(Duration(minutes: i * 5)),
+          headsign: i.isEven ? 'S+U Gesundbrunnen Bhf' : 'S+U Alexanderplatz',
+          track: '${(i % 4) + 1}',
+          routeShortName: i.isEven ? 'S41' : 'U8',
+          routeLongName: i.isEven ? 'Ringbahn S 41' : 'U8',
+          tripId: 'fake-departure-$i',
+          agencyName: 'City Transit',
+          routeColor: i.isEven ? 0xFFCB6418 : 0xFF5B4CC4,
+          realTime: i.isOdd,
+          wheelchairAccessible: true,
+          bikesAllowed: i.isEven,
+        ),
+    ]);
+  }
+
+  @override
   Future<List<TransitItinerary>> plan(TransitQuery query) async {
     final List<LatLon> waypoints = query.waypoints;
     if (waypoints.length < 2) {

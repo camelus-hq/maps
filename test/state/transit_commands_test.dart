@@ -147,6 +147,34 @@ void main() {
       const <String, Object?>{},
     ) as Map<String, Object?>;
     expect(nav['status'], 'navigating');
+    // The journey is attached so the transit banner and live timeline can read
+    // the current step.
+    final Map<String, Object?> progress =
+        nav['transit']! as Map<String, Object?>;
+    expect(progress['phase'], 'walk');
+    expect(progress['legIndex'], 0);
+    expect(progress['line'], 'M2');
+  });
+
+  test('transit.departures opens a stop board and closes it', () async {
+    final Map<String, Object?> board = await registry.dispatch(
+      'transit.departures',
+      <String, Object?>{'stopId': 'fake:stop-a', 'name': 'North Street'},
+    ) as Map<String, Object?>;
+    expect(board['status'], 'data');
+    expect(board['stopName'], 'North Street');
+    final List<Object?> departures = board['departures']! as List<Object?>;
+    expect(departures, isNotEmpty);
+
+    await registry.dispatch(
+      'transit.departures.close',
+      const <String, Object?>{},
+    );
+    // Bad params are rejected.
+    expect(
+      () => registry.dispatch('transit.departures', const <String, Object?>{}),
+      throwsA(isA<CommandException>()),
+    );
   });
 
   test('map.transitStops lists the drawn stop circles', () async {
