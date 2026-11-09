@@ -52,7 +52,7 @@ class Place {
   /// no attempt to interpret it.
   final String? openingHours;
 
-  /// The raw OpenStreetMap tags for the element (Nominatim `extratags`), bounded
+  /// The raw OpenStreetMap tags for the element (Overpass `tags`), bounded
   /// by the data layer. Never empty for a place when OSM publishes any tags.
   final Map<String, String> osmTags;
 

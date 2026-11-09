@@ -9,7 +9,7 @@ import '../../domain/entities/place.dart';
 /// malformed feature is dropped (returns `null`), never thrown (AGENTS.md
 /// "Never crash"). The feature's `osm_type`/`osm_id` become our canonical
 /// `node/…` / `way/…` / `relation/…` id, so a place's details can still be
-/// enriched through the Nominatim element lookup and reviews key correctly.
+/// enriched through the Overpass element lookup and reviews key correctly.
 abstract final class PhotonPlaceMapper {
   static Place? fromFeature(Object? raw) {
     if (raw is! Map<String, Object?>) {

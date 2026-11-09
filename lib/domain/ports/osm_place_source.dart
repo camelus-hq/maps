@@ -8,7 +8,7 @@ import '../entities/place.dart';
 /// this looks the element up in OpenStreetMap so the sheet shows the real name
 /// and address instead of `node/2764050762`.
 ///
-/// Implemented in `data/osm/` (the public Nominatim lookup endpoint, OSM data)
+/// Implemented in `data/osm/` (the Overpass API element query, OSM data)
 /// and by an in-memory fake for tests and keyless runs.
 abstract interface class OsmPlaceSource {
   /// The element named by [osmRef] (e.g. `way/123456`), or `null` when it does

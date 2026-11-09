@@ -83,10 +83,6 @@ void main() {
         'https://photon.map.camelus.app',
       );
       expect(
-        AppConfig.defaultCamelusNominatimBaseUrl,
-        'https://nominatim.map.camelus.app',
-      );
-      expect(
         AppConfig.defaultCamelusOverpassBaseUrl,
         'https://overpass.map.camelus.app/api',
       );

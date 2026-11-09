@@ -115,7 +115,7 @@ class SettingsScreen extends ConsumerWidget {
                   title: const Text('Camelus'),
                   subtitle: Text(
                     hasCamelusToken
-                        ? 'Photon, Overpass, Nominatim, Valhalla and transit '
+                        ? 'Photon, Overpass, Valhalla and transit '
                               'via camelus.app'
                         : 'Needs an API key — OpenStreetMap is used instead',
                   ),

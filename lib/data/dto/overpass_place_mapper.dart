@@ -2,13 +2,15 @@ import '../../core/utils/osm_ref.dart';
 import '../../domain/entities/lat_lon.dart';
 import '../../domain/entities/place.dart';
 
-/// Lenient mapper for **Overpass API** elements (`out center`), the key-less
-/// OpenStreetMap query service that powers OpenStreetMap POI categories.
+/// Lenient mapper for **Overpass API** elements, the key-less OpenStreetMap
+/// query service that powers OpenStreetMap POI categories and the OSM element
+/// lookup behind the place sheet.
 ///
 /// Hostile-safe: every field is type-checked and a malformed element is dropped
 /// (returns `null`), never thrown (AGENTS.md "Never crash"). The element's
-/// `type`/`id` become our canonical `node/…` id, so the place sheet can still
-/// enrich it through the Nominatim element lookup.
+/// `type`/`id` become our canonical `node/…` id, and its whole `tags` map is
+/// carried onto the [Place] so the sheet can show the contact, accessibility,
+/// opening-hours, payment and image details.
 abstract final class OverpassPlaceMapper {
   /// The category tag keys we read, most descriptive first.
   static const List<String> _categoryKeys = <String>[
@@ -23,7 +25,13 @@ abstract final class OverpassPlaceMapper {
     'natural',
   ];
 
-  static Place? fromElement(Object? raw) {
+  /// Maps one Overpass element into a [Place].
+  ///
+  /// [fallbackName] is used as the name of last resort, after the element's own
+  /// `name`, its `addr:*` street and its category — the element lookup uses the
+  /// requested OSM reference so an unnamed element still yields a place. It is
+  /// left `null` for POI browse, which drops an element it cannot name.
+  static Place? fromElement(Object? raw, {String? fallbackName}) {
     if (raw is! Map<String, Object?>) {
       return null;
     }
@@ -53,7 +61,9 @@ abstract final class OverpassPlaceMapper {
     final String? category = _category(tags);
     final String? name =
         _string(tags['name'], 120) ??
-        (category == null ? null : _humanise(category));
+        _streetName(tags) ??
+        (category == null ? null : _humanise(category)) ??
+        fallbackName;
     if (name == null) {
       return null;
     }
@@ -63,6 +73,21 @@ abstract final class OverpassPlaceMapper {
       position: position,
       category: category,
       address: _address(tags),
+      email: _contact(tags, const <String>['contact:email', 'email'], 254),
+      phone: _contact(tags, const <String>[
+        'contact:phone',
+        'phone',
+        'contact:mobile',
+        'mobile',
+      ], 40),
+      website: _contact(tags, const <String>[
+        'contact:website',
+        'website',
+        'url',
+      ], 300),
+      wheelchairAccessible: _wheelchair(tags),
+      openingHours: _contact(tags, const <String>['opening_hours'], 200),
+      osmTags: tags,
     );
   }
 
@@ -107,6 +132,44 @@ abstract final class OverpassPlaceMapper {
       return null;
     }
     return built.length > 300 ? built.substring(0, 300) : built;
+  }
+
+  /// `addr:housenumber` + `addr:street` as a name fallback for an element that
+  /// publishes no `name` tag.
+  static String? _streetName(Map<String, String> tags) {
+    final String? street = _string(tags['addr:street'], 120);
+    if (street == null) {
+      return null;
+    }
+    final String? number = _string(tags['addr:housenumber'], 20);
+    return number == null ? street : '$number $street';
+  }
+
+  /// The first present, non-empty value among [keys], bounded to `maxLength`.
+  /// Every value is attacker-controlled OSM data.
+  static String? _contact(
+    Map<String, String> tags,
+    List<String> keys,
+    int maxLength,
+  ) {
+    for (final String key in keys) {
+      final String? value = _string(tags[key], maxLength);
+      if (value != null) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  /// OSM's three-valued `wheelchair` tag: `yes`/`designated` → true, `no` →
+  /// false, anything else (including `limited`) → unknown.
+  static bool? _wheelchair(Map<String, String> tags) {
+    final String? value = _contact(tags, const <String>['wheelchair'], 20);
+    return switch (value?.toLowerCase()) {
+      'yes' || 'designated' || 'true' || '1' => true,
+      'no' || 'false' || '0' => false,
+      _ => null,
+    };
   }
 
   /// Turns an OSM tag value into a short human label (`fuel` → `Fuel`,

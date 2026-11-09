@@ -15,7 +15,7 @@ enum AppThemeMode { system, light, dark }
 ///   set, so browsing an amenity it does not index is an error.
 /// * [openstreetmap] — Photon (autocomplete/free-text) + Overpass (POIs), both
 ///   key-less community services over OpenStreetMap data.
-/// * [camelus] — the Camelus map services: Photon, Nominatim, Overpass,
+/// * [camelus] — the Camelus map services: Photon, Overpass,
 ///   Valhalla and MOTIS behind one API key. Selecting it also routes
 ///   directions, transit and place lookups through camelus.app.
 enum SearchBackend { mapbox, openstreetmap, camelus }

@@ -20,8 +20,8 @@ import '../data/nostr/ndk_review_service.dart';
 import '../data/nostr/ndk_social_service.dart';
 import '../data/notifications/local_live_share_notifications.dart';
 import '../data/notifications/local_navigation_notifications.dart';
-import '../data/osm/nominatim_place_source.dart';
 import '../data/osm/osm_search_service.dart';
+import '../data/osm/overpass_place_source.dart';
 import '../data/platform/url_launcher_external_actions.dart';
 import '../data/transitous/transitous_transit_routing_service.dart';
 import '../data/update/android_app_installer.dart';
@@ -89,15 +89,18 @@ List<Override> buildAppOverrides(
     locationServiceProvider.overrideWith(
       (Ref ref) => GeolocatorLocationService(),
     ),
-    // OpenStreetMap element lookup (Nominatim). Public HTTP with no key by
+    // OpenStreetMap element lookup (Overpass). Public HTTP with no key by
     // default; with the Camelus provider selected it points at
-    // `nominatim.map.camelus.app` and carries the API key. Requests are cached
+    // `overpass.map.camelus.app` and carries the API key. Requests are cached
     // and spaced per the public policy.
     osmPlaceSourceProvider.overrideWith((Ref ref) {
       final bool camelus = _camelusSelected(ref, config);
-      return NominatimPlaceSource(
+      return OverpassPlaceSource(
         client: _httpClient(ref, apiKey: camelus ? config.camelusApiToken : ''),
-        baseUrl: camelus ? config.camelusNominatimBaseUrl : config.osmBaseUrl,
+        baseUrl: camelus
+            ? config.camelusOverpassBaseUrl
+            : config.overpassBaseUrl,
+        userAgent: config.searchUserAgent,
         minInterval: const Duration(seconds: 1),
       );
     }),

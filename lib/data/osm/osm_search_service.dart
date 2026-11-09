@@ -24,7 +24,7 @@ import 'osm_category_filter.dart';
 /// response becomes a typed [AppException] rather than a crash (AGENTS.md
 /// "Never crash"). Results are OpenStreetMap elements, so their ids are
 /// canonical `node/…` / `way/…` / `relation/…` references the place sheet can
-/// enrich through the Nominatim lookup.
+/// enrich through the Overpass element lookup.
 class OsmSearchService implements SearchService {
   OsmSearchService({
     required this.client,

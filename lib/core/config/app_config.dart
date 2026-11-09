@@ -11,7 +11,6 @@ class AppConfig {
     this.liveShareRelays = defaultLiveShareRelays,
     this.reviewRelays = defaultReviewRelays,
     this.blossomServers = defaultBlossomServers,
-    this.osmBaseUrl = defaultOsmBaseUrl,
     this.photonBaseUrl = defaultPhotonBaseUrl,
     this.overpassBaseUrl = defaultOverpassBaseUrl,
     this.searchUserAgent = defaultSearchUserAgent,
@@ -21,7 +20,6 @@ class AppConfig {
     this.nostrNsec = '',
     this.camelusApiToken = '',
     this.camelusPhotonBaseUrl = defaultCamelusPhotonBaseUrl,
-    this.camelusNominatimBaseUrl = defaultCamelusNominatimBaseUrl,
     this.camelusOverpassBaseUrl = defaultCamelusOverpassBaseUrl,
     this.camelusValhallaBaseUrl = defaultCamelusValhallaBaseUrl,
     this.camelusTransitBaseUrl = defaultCamelusTransitBaseUrl,
@@ -76,19 +74,15 @@ class AppConfig {
     'https://nostr.download',
   ];
 
-  /// Base URL of the OpenStreetMap element lookup (Nominatim's `lookup`
-  /// endpoint). Public HTTP, no key or account; used when a place is only known
-  /// from a review's OSM key. Override with `--dart-define=OSM_BASE_URL=…`.
-  static const String defaultOsmBaseUrl = 'https://nominatim.openstreetmap.org';
-
   /// Base URL of **Photon** (`photon.komoot.io`), the key-less OpenStreetMap
   /// geocoder that powers OpenStreetMap search/autocomplete. Override with
   /// `--dart-define=SEARCH_PHOTON_URL=…`.
   static const String defaultPhotonBaseUrl = 'https://photon.komoot.io';
 
   /// Base URL of the **Overpass API** (`overpass-api.de/api`), the key-less
-  /// OpenStreetMap query service that powers OpenStreetMap POI categories.
-  /// Override with `--dart-define=SEARCH_OVERPASS_URL=…`.
+  /// OpenStreetMap query service that powers OpenStreetMap POI categories and
+  /// the OSM element lookup behind the place sheet. Override with
+  /// `--dart-define=SEARCH_OVERPASS_URL=…`.
   static const String defaultOverpassBaseUrl = 'https://overpass-api.de/api';
 
   /// `User-Agent` sent to Photon/Overpass. Both ask callers to identify
@@ -108,8 +102,8 @@ class AppConfig {
   /// `--dart-define=TRANSIT_USER_AGENT=…` before any wider release.
   static const String defaultTransitUserAgent = 'OpenMaps/0.1 (Flutter)';
 
-  /// The **Camelus** map services: Photon (search), Nominatim (place lookup),
-  /// Overpass (POI categories), Valhalla (routing) and MOTIS (public transport)
+  /// The **Camelus** map services: Photon (search), Overpass (POI categories
+  /// and OSM element lookup), Valhalla (routing) and MOTIS (public transport)
   /// behind one API key. Selected with the `camelus` search provider; every
   /// request carries the key as an `X-API-Key` header.
   ///
@@ -117,8 +111,6 @@ class AppConfig {
   /// `--dart-define=CAMELUS_MAP_API_TOKEN=…`.
   static const String defaultCamelusPhotonBaseUrl =
       'https://photon.map.camelus.app';
-  static const String defaultCamelusNominatimBaseUrl =
-      'https://nominatim.map.camelus.app';
   static const String defaultCamelusOverpassBaseUrl =
       'https://overpass.map.camelus.app/api';
   static const String defaultCamelusValhallaBaseUrl =
@@ -147,15 +139,11 @@ class AppConfig {
   /// Blossom servers review photos upload to.
   final List<String> blossomServers;
 
-  /// Base URL of the OpenStreetMap element lookup (Nominatim). Public HTTP, no
-  /// key; override with `--dart-define=OSM_BASE_URL=…`.
-  final String osmBaseUrl;
-
   /// Base URL of the OpenStreetMap geocoder used for search (Photon).
   final String photonBaseUrl;
 
-  /// Base URL of the OpenStreetMap query service used for POI categories
-  /// (Overpass API).
+  /// Base URL of the OpenStreetMap query service used for POI categories and
+  /// the OSM element lookup (Overpass API).
   final String overpassBaseUrl;
 
   /// `User-Agent` sent to Photon/Overpass (see [defaultSearchUserAgent]).
@@ -188,10 +176,7 @@ class AppConfig {
   /// Base URL of the Camelus Photon geocoder (search/autocomplete).
   final String camelusPhotonBaseUrl;
 
-  /// Base URL of the Camelus Nominatim element lookup.
-  final String camelusNominatimBaseUrl;
-
-  /// Base URL of the Camelus Overpass API (POI categories).
+  /// Base URL of the Camelus Overpass API (POI categories and element lookup).
   final String camelusOverpassBaseUrl;
 
   /// Base URL of the Camelus Valhalla router.
@@ -238,10 +223,6 @@ class AppConfig {
     blossomServers: _parseBlossomServers(
       const String.fromEnvironment('BLOSSOM_SERVERS'),
     ),
-    osmBaseUrl: _httpBase(
-      const String.fromEnvironment('OSM_BASE_URL'),
-      defaultOsmBaseUrl,
-    ),
     photonBaseUrl: _httpBase(
       const String.fromEnvironment('SEARCH_PHOTON_URL'),
       defaultPhotonBaseUrl,
@@ -266,10 +247,6 @@ class AppConfig {
     camelusPhotonBaseUrl: _httpBase(
       const String.fromEnvironment('CAMELUS_PHOTON_URL'),
       defaultCamelusPhotonBaseUrl,
-    ),
-    camelusNominatimBaseUrl: _httpBase(
-      const String.fromEnvironment('CAMELUS_NOMINATIM_URL'),
-      defaultCamelusNominatimBaseUrl,
     ),
     camelusOverpassBaseUrl: _httpBase(
       const String.fromEnvironment('CAMELUS_OVERPASS_URL'),

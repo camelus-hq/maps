@@ -4,7 +4,7 @@ import '../entities/place.dart';
 
 /// Forward geocoding and autocomplete.
 ///
-/// Implemented by Mapbox Geocoding or Nominatim in `data/`.
+/// Implemented by Mapbox Geocoding or Photon in `data/`.
 abstract interface class SearchService {
   /// Searches for [query]. When [proximity] is given the results are biased
   /// toward that point (the user's location), for "near me" behaviour; when

@@ -30,11 +30,10 @@ public domain/CC0, OSI-open-source, or CC-with-redistribution only. Screenshots 
 | Friend QR scanning (npub) | `mobile_scanner` (ML Kit barcode scanning on Android) | BSD-3-Clause / Google ML Kit terms · no Maps data |
 | Own npub QR *rendering* (drawn by our own painter from `qr`'s module matrix) | `qr` (3.0.2) | BSD-3-Clause |
 | Place reviews (public Nostr kind 31987) + photo upload | Nostr relays + Blossom servers via `ndk` / `ndk_flutter` | MIT client · public relays/servers, no account |
-| OSM element lookup (a place's name/address from its OSM id) | Nominatim `lookup` (OpenStreetMap) | ODbL data · Nominatim usage policy (cached, ≤1 req/s, descriptive User-Agent) |
 | Search + autocomplete (selectable "OpenStreetMap" search provider) | Photon (`photon.komoot.io`, Komoot) | ODbL data (© OpenStreetMap contributors) · Photon usage policy (descriptive User-Agent) |
-| POI category browse (selectable "OpenStreetMap" search provider) | Overpass API (`overpass-api.de`) | ODbL data (© OpenStreetMap contributors) · Overpass usage policy (bounded queries, descriptive User-Agent) |
+| POI category browse + OSM element lookup for the place sheet | Overpass API (`overpass-api.de`) | ODbL data (© OpenStreetMap contributors) · Overpass usage policy (bounded queries, descriptive User-Agent) |
 | Public-transport journeys | Transitous (community MOTIS 2 API, `api.transitous.org`) | Open data via [Transitous sources](https://transitous.org/sources/) (ODbL/OpenStreetMap) · non-commercial usage policy, descriptive `User-Agent`, attribution link |
-| Search, place lookup, POI browse, routing and transit (selectable "Camelus" provider) | Camelus map services (`*.map.camelus.app`: Photon, Nominatim, Overpass, Valhalla, MOTIS) | ODbL data (© OpenStreetMap contributors) · owner-supplied API key (`CAMELUS_MAP_API_TOKEN`, `X-API-Key` header) |
+| Search, place lookup, POI browse, routing and transit (selectable "Camelus" provider) | Camelus map services (`*.map.camelus.app`: Photon, Overpass, Valhalla, MOTIS) | ODbL data (© OpenStreetMap contributors) · owner-supplied API key (`CAMELUS_MAP_API_TOKEN`, `X-API-Key` header) |
 | Review photo selection | `image_picker` (platform photo picker) | Apache-2.0 / platform |
 | Opening a place's contact details (dial / e-mail / website) | `url_launcher` (platform intents) | BSD-3-Clause / platform |
 | Self-update (version check + APK install) | Owner-hosted HTTP manifest (`UPDATE_MANIFEST_URL`) + the Android package installer; `package_info_plus`, `crypto`, `path_provider` | BSD-3-Clause / platform APIs · no third-party service |
