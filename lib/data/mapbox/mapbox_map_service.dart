@@ -303,6 +303,9 @@ class MapboxMapService implements MapService {
     }
     _darkMode = enabled;
     await _syncTheme();
+    // The route-preview palette is brightness-dependent, so redraw the drawn
+    // lines so an alternative stays legible after a theme switch.
+    unawaited(setRouteLines(_routeLines));
   }
 
   Future<void> _syncTheme() async {
@@ -827,8 +830,22 @@ class MapboxMapService implements MapService {
     }
   }
 
-  /// Default colour for a [RouteLine] without an explicit one (street routes).
-  static const int _defaultLineColor = 0xFF116B5B;
+  /// Route-preview colours for a [RouteLine] without an explicit one. The chosen
+  /// route is highlighted (and drawn above the alternatives); the dark variants
+  /// are brighter so the preview stays legible on the dark basemap preset.
+  static const int _routeSelectedLight = 0xFF116B5B;
+  static const int _routeAlternativeLight = 0xFF8A8F98;
+  static const int _routeSelectedDark = 0xFF4BD6B6;
+  static const int _routeAlternativeDark = 0xFFA7B0BA;
+
+  /// The colour for a [RouteLine] that carries no explicit one, from its
+  /// [RouteLine.primary] emphasis and the current brightness.
+  int _routeLineColor(RouteLine line) {
+    if (line.primary) {
+      return _darkMode ? _routeSelectedDark : _routeSelectedLight;
+    }
+    return _darkMode ? _routeAlternativeDark : _routeAlternativeLight;
+  }
 
   @override
   Future<void> setRouteLines(List<RouteLine> lines) async {
@@ -846,7 +863,10 @@ class MapboxMapService implements MapService {
         if (!line.isDrawable) {
           continue;
         }
-        final int color = line.color ?? _defaultLineColor;
+        final int color = line.color ?? _routeLineColor(line);
+        // A higher sort key draws the chosen route above the alternatives where
+        // they overlap, regardless of creation order.
+        final double sortKey = line.primary ? 1.0 : 0.0;
         // Mapbox's polyline annotations have no dash pattern, so a dashed line
         // is drawn as a run of short segments along the same path.
         final List<List<LatLon>> pieces = line.dashed
@@ -866,6 +886,11 @@ class MapboxMapService implements MapService {
               ),
               lineColor: color,
               lineWidth: line.width,
+              lineSortKey: sortKey,
+              // The Standard style's night preset dims annotations through its
+              // lighting; make route lines emit their own light so the preview
+              // stays legible on the dark basemap.
+              lineEmissiveStrength: _darkMode ? 1.0 : null,
             ),
           );
         }

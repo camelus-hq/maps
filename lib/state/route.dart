@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/errors/app_exception.dart';
 import '../core/errors/result.dart';
+import '../domain/entities/camera.dart';
 import '../domain/entities/cycling_options.dart';
 import '../domain/entities/lat_lon.dart';
 import '../domain/entities/location_sample.dart';
@@ -190,6 +192,10 @@ class RouteState {
 /// Plans routes between editable endpoints and draws them on the map.
 class RouteController extends Notifier<RouteState> {
   StreamSubscription<LatLon>? _longPressSub;
+  StreamSubscription<LatLon>? _tapSub;
+
+  /// How close (in logical pixels) a tap must land to a route line to select it.
+  static const double _routeTapTolerancePx = 22;
 
   /// True once the bicycle options changed without a request picking them up
   /// (a slider preview); the next committed change re-plans even if the value
@@ -198,13 +204,17 @@ class RouteController extends Notifier<RouteState> {
 
   @override
   RouteState build() {
+    final MapService map = ref.read(mapServiceProvider);
     // React to map long-presses so a picked endpoint can be filled without the
     // UI being on screen (agents drive `route.pickOnMap` then long-press).
-    _longPressSub = ref
-        .read(mapServiceProvider)
-        .longPressStream
-        .listen(_applyPickedPoint);
-    ref.onDispose(() => unawaited(_longPressSub?.cancel()));
+    _longPressSub = map.longPressStream.listen(_applyPickedPoint);
+    // Tapping a drawn route alternative on the map switches to it (without
+    // yanking the camera, which the user has positioned themselves).
+    _tapSub = map.tapStream.listen(_selectRouteAt);
+    ref.onDispose(() {
+      unawaited(_longPressSub?.cancel());
+      unawaited(_tapSub?.cancel());
+    });
     return const RouteState();
   }
 
@@ -336,12 +346,16 @@ class RouteController extends Notifier<RouteState> {
     state = state.copyWith(pickTarget: target);
   }
 
-  void selectRoute(int index) {
+  /// Selects the route alternative at [index] and redraws it highlighted.
+  ///
+  /// Pass `fit: false` when the selection comes from a tap on the map so the
+  /// camera the user positioned stays put.
+  void selectRoute(int index, {bool fit = true}) {
     if (index < 0 || index >= state.routes.length) {
       return;
     }
     state = state.copyWith(selectedIndex: index);
-    _draw(state.routes, index);
+    _draw(state.routes, index, fit: fit);
   }
 
   /// Replaces the selected route without changing the camera — used after a
@@ -604,6 +618,81 @@ class RouteController extends Notifier<RouteState> {
     }
   }
 
+  /// Selects the route alternative nearest to a map tap, if the tap landed on
+  /// (or close to) one of the drawn lines. Keeps the camera put — a tap is a
+  /// highlight, not a re-zoom.
+  void _selectRouteAt(LatLon point) {
+    final List<Route> routes = state.routes;
+    if (routes.length < 2) {
+      return; // nothing to switch between
+    }
+    final Camera camera = ref.read(mapServiceProvider).camera;
+    final double toleranceMeters = _metersForPixels(
+      camera,
+      _routeTapTolerancePx,
+    );
+    int? nearest;
+    double nearestMeters = double.infinity;
+    for (int i = 0; i < routes.length; i++) {
+      final double distance = _distanceToPolyline(point, routes[i].geometry);
+      if (distance < nearestMeters) {
+        nearestMeters = distance;
+        nearest = i;
+      }
+    }
+    if (nearest != null &&
+        nearest != state.selectedIndex &&
+        nearestMeters <= toleranceMeters) {
+      selectRoute(nearest, fit: false);
+    }
+  }
+
+  /// The ground distance covered by [pixels] at [camera]'s zoom and latitude.
+  static double _metersForPixels(Camera camera, double pixels) {
+    final double latRadians = camera.target.latitude * math.pi / 180;
+    final double zoom = camera.zoom.clamp(0.0, 22.0);
+    final double metersPerPixel =
+        156543.03392 * math.cos(latRadians).abs() / math.pow(2, zoom);
+    return pixels * metersPerPixel;
+  }
+
+  /// The shortest distance (metres) from [point] to the polyline [line], using
+  /// an equirectangular projection around [point] (plenty at map scale).
+  static double _distanceToPolyline(LatLon point, List<LatLon> line) {
+    if (line.isEmpty) {
+      return double.infinity;
+    }
+    final double cosLat = math
+        .cos(point.latitude * math.pi / 180)
+        .abs()
+        .clamp(0.01, 1.0);
+    double x(LatLon q) => (q.longitude - point.longitude) * 111320 * cosLat;
+    double y(LatLon q) => (q.latitude - point.latitude) * 111320;
+    if (line.length == 1) {
+      final double dx = x(line.first);
+      final double dy = y(line.first);
+      return math.sqrt(dx * dx + dy * dy);
+    }
+    double best = double.infinity;
+    for (int i = 0; i + 1 < line.length; i++) {
+      final double ax = x(line[i]);
+      final double ay = y(line[i]);
+      final double dx = x(line[i + 1]) - ax;
+      final double dy = y(line[i + 1]) - ay;
+      final double lengthSquared = dx * dx + dy * dy;
+      final double t = lengthSquared <= 0
+          ? 0.0
+          : ((-ax * dx - ay * dy) / lengthSquared).clamp(0.0, 1.0);
+      final double px = ax + dx * t;
+      final double py = ay + dy * t;
+      final double distance = math.sqrt(px * px + py * py);
+      if (distance < best) {
+        best = distance;
+      }
+    }
+    return best;
+  }
+
   void _applyPickedPoint(LatLon point) {
     final RouteEndpointTarget? target = state.pickTarget;
     if (target == null) {
@@ -805,20 +894,21 @@ class RouteController extends Notifier<RouteState> {
     // A route overview / preview takes camera ownership away from follow mode.
     ref.read(followModeProvider.notifier).disable();
     final MapService map = ref.read(mapServiceProvider);
-    unawaited(
-      map.setRouteLines(<RouteLine>[
-        for (int i = 0; i < routes.length; i++)
-          RouteLine(
-            points: routes[i].geometry,
-            color: i == selectedIndex ? 0xFF116B5B : 0xFF8A8F98,
-            width: i == selectedIndex ? 6 : 4,
-          ),
-      ]),
-    );
-    unawaited(map.setTransitStopMarkers(const <TransitStopMarker>[]));
     final Route? selected = selectedIndex >= 0 && selectedIndex < routes.length
         ? routes[selectedIndex]
         : null;
+    // Draw the alternatives first and the chosen route last so it sits on top
+    // where the routes overlap (the adapter's sort key enforces it too). The
+    // colour itself is resolved by the adapter so it can follow the theme.
+    final List<RouteLine> lines = <RouteLine>[
+      for (int i = 0; i < routes.length; i++)
+        if (i != selectedIndex) RouteLine(points: routes[i].geometry, width: 4),
+    ];
+    if (selected != null) {
+      lines.add(RouteLine(points: selected.geometry, primary: true, width: 6));
+    }
+    unawaited(map.setRouteLines(lines));
+    unawaited(map.setTransitStopMarkers(const <TransitStopMarker>[]));
     if (fit && selected != null && selected.geometry.isNotEmpty) {
       unawaited(map.fitCoordinates(selected.geometry));
     }

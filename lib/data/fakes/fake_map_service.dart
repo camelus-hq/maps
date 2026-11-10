@@ -143,6 +143,7 @@ class FakeMapService implements MapService {
           color: line.color,
           dashed: line.dashed,
           width: line.width,
+          primary: line.primary,
         ),
     ];
   }

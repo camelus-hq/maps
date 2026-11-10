@@ -2356,6 +2356,7 @@ Map<String, Object?> _routeLineJson(RouteLine line) {
     'color': line.color,
     'dashed': line.dashed,
     'width': line.width,
+    'primary': line.primary,
     'pointCount': points.length,
     'first': first == null
         ? null

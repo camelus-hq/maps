@@ -11,6 +11,7 @@ class RouteLine {
     this.color,
     this.dashed = false,
     this.width = 5,
+    this.primary = false,
   });
 
   /// Ordered polyline vertices (at least two to be drawn).
@@ -24,6 +25,13 @@ class RouteLine {
 
   /// Line width in logical pixels.
   final double width;
+
+  /// Whether this is the traveller's chosen line — drawn emphasised and above
+  /// the other routes where they overlap.
+  ///
+  /// Ignored when [color] is set explicitly (a public-transport leg keeps the
+  /// operator's own colour).
+  final bool primary;
 
   bool get isDrawable => points.length >= 2;
 }
