@@ -169,6 +169,31 @@ void main() {
     expect(find.byIcon(Icons.history), findsOneWidget);
   });
 
+  testWidgets('tapping a recent place opens it on the map', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const ProviderScope(child: OpenMapsApp()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Search here'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'coffee');
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Harbour Coffee'));
+    await tester.pumpAndSettle();
+
+    // Reopen search and tap the recent row: it must open the place again
+    // (a recent place is resolvable even though it is not bookmarked).
+    await tester.tap(find.text('Search here'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Harbour Coffee'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Directions'), findsOneWidget);
+    expect(find.text('Harbour Coffee'), findsOneWidget);
+  });
+
   testWidgets('"Add" under Home picks a place and saves it', (
     WidgetTester tester,
   ) async {

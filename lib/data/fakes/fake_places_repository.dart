@@ -29,6 +29,11 @@ class FakePlacesRepository implements PlacesRepository {
     if (_work?.id == id) {
       return _work;
     }
+    for (final RecentSearch entry in _recent) {
+      if (entry is RecentPlaceSearch && entry.place.id == id) {
+        return entry.place;
+      }
+    }
     return null;
   }
 

@@ -63,6 +63,13 @@ class DatabasePlacesRepository implements PlacesRepository {
     if (work?.id == id) {
       return work;
     }
+    // A recent place is a known place too, so tapping a recent row can resolve
+    // it (and `place.select` can open it) without it being a bookmark.
+    for (final RecentSearch entry in await recentSearches()) {
+      if (entry is RecentPlaceSearch && entry.place.id == id) {
+        return entry.place;
+      }
+    }
     return null;
   }
 

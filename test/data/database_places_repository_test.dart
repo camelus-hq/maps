@@ -88,12 +88,19 @@ void main() {
     expect(await repo.home(), isNull);
   });
 
-  test('placeById resolves bookmarks, home and work', () async {
+  test('placeById resolves bookmarks, home, work and recents', () async {
     final repo = DatabasePlacesRepository(database: InMemoryAppDatabase());
     await repo.setBookmark(coffee, bookmarked: true);
     await repo.setHome(shop);
+    const Place recent = Place(
+      id: 'node/recent',
+      name: 'Recent',
+      position: LatLon(52.5, 13.4),
+    );
+    await repo.recordRecentPlace(recent);
     expect(await repo.placeById('poi.coffee'), coffee);
     expect(await repo.placeById('poi.shop'), shop);
+    expect(await repo.placeById('node/recent'), recent);
     expect(await repo.placeById('missing'), isNull);
   });
 
