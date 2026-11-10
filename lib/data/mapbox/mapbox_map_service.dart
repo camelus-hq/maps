@@ -777,7 +777,11 @@ class MapboxMapService implements MapService {
   static const double maxFitZoom = 16;
 
   @override
-  Future<void> fitCoordinates(List<LatLon> points) async {
+  Future<void> fitCoordinates(
+    List<LatLon> points, {
+    bool animated = false,
+    Duration? duration,
+  }) async {
     if (points.isEmpty) {
       return;
     }
@@ -808,7 +812,16 @@ class MapboxMapService implements MapService {
               bearing: fitted.bearing,
               pitch: fitted.pitch,
             );
-      await map.setCamera(options);
+      if (animated) {
+        final int millis =
+            (duration == null ? _defaultAnimationMs : duration.inMilliseconds)
+                .clamp(1, 10000);
+        await _guard(
+          () => map.easeTo(options, MapAnimationOptions(duration: millis)),
+        );
+      } else {
+        await map.setCamera(options);
+      }
       final Point? center = options.center;
       if (center != null) {
         final LatLon? target = LatLon.tryParse(

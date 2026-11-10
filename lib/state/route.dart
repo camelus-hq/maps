@@ -910,7 +910,9 @@ class RouteController extends Notifier<RouteState> {
     unawaited(map.setRouteLines(lines));
     unawaited(map.setTransitStopMarkers(const <TransitStopMarker>[]));
     if (fit && selected != null && selected.geometry.isNotEmpty) {
-      unawaited(map.fitCoordinates(selected.geometry));
+      // Glide between alternatives instead of snapping, so switching routes
+      // with the sheet's chips animates rather than jumps.
+      unawaited(map.fitCoordinates(selected.geometry, animated: true));
     }
   }
 }

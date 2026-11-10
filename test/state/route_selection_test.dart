@@ -102,6 +102,19 @@ void main() {
     expect(harness.map.camera.target, before.target);
   });
 
+  test('switching routes animates the camera fit instead of jumping', () async {
+    final _Harness harness = _Harness();
+    addTearDown(harness.container.dispose);
+    await harness.planRoute();
+
+    harness.map.lastFitAnimated = false;
+    harness.container.read(routeControllerProvider.notifier).selectRoute(1);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(harness.map.lastFitAnimated, isTrue);
+    expect(harness.container.read(routeControllerProvider).selectedIndex, 1);
+  });
+
   test('a tap far from every route leaves the selection unchanged', () async {
     final _Harness harness = _Harness();
     addTearDown(harness.container.dispose);

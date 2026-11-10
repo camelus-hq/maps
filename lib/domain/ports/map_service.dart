@@ -41,7 +41,14 @@ abstract interface class MapService {
   });
 
   /// Fits the camera to the given points (search results, route, …).
-  Future<void> fitCoordinates(List<LatLon> points);
+  ///
+  /// Pass `animated: true` to glide to the fitted pose instead of jumping;
+  /// [duration] overrides the default animation length.
+  Future<void> fitCoordinates(
+    List<LatLon> points, {
+    bool animated = false,
+    Duration? duration,
+  });
 
   /// Draws styled route polylines (street routes or public-transport legs).
   /// An empty list clears them.

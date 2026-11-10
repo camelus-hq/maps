@@ -74,6 +74,9 @@ class FakeMapService implements MapService {
   /// Whether the traffic overlay is on (for tests/control channel).
   bool get trafficEnabled => _traffic;
 
+  /// Whether the last [fitCoordinates] was asked to animate (for tests).
+  bool lastFitAnimated = false;
+
   @override
   Stream<LatLon> get tapStream => _tapController.stream;
 
@@ -160,10 +163,15 @@ class FakeMapService implements MapService {
   List<TransitStopMarker> get transitStopMarkers => _transitStopMarkers;
 
   @override
-  Future<void> fitCoordinates(List<LatLon> points) async {
+  Future<void> fitCoordinates(
+    List<LatLon> points, {
+    bool animated = false,
+    Duration? duration,
+  }) async {
     if (points.isEmpty) {
       return;
     }
+    lastFitAnimated = animated;
     double minLat = points.first.latitude;
     double maxLat = minLat;
     double minLon = points.first.longitude;
@@ -182,7 +190,11 @@ class FakeMapService implements MapService {
     final double zoom = span <= 0
         ? 16
         : (math.log(360 / span) / math.ln2 + 0.5).clamp(3.0, 16.0);
-    await moveCamera(Camera(target: center, zoom: zoom));
+    await moveCamera(
+      Camera(target: center, zoom: zoom),
+      animated: animated,
+      duration: duration,
+    );
   }
 
   /// Injects a tap, for tests and the control channel.
