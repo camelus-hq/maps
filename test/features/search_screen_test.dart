@@ -5,6 +5,7 @@ import 'package:openmaps/app/app.dart';
 import 'package:openmaps/data/fakes/fake_map_service.dart';
 import 'package:openmaps/state/home.dart';
 import 'package:openmaps/state/ports.dart';
+import 'package:openmaps/state/saved_places.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 void main() {
@@ -116,5 +117,108 @@ void main() {
 
     // Back on the map, the place-details sheet is open (its actions are shown).
     expect(find.text('Directions'), findsOneWidget);
+  });
+
+  testWidgets(
+    'the empty search screen shows Home, Work and the recent header',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(const ProviderScope(child: OpenMapsApp()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Search here'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Home'), findsOneWidget);
+      expect(find.text('Work'), findsOneWidget);
+      // Neither slot is set yet.
+      expect(find.text('Add'), findsNWidgets(2));
+      expect(find.text('Recent'), findsOneWidget);
+      expect(find.text('Clear recents'), findsOneWidget);
+    },
+  );
+
+  testWidgets('selecting a place adds it to the recent list', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const OpenMapsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Search here'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'coffee');
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Harbour Coffee'));
+    await tester.pumpAndSettle();
+    await container.read(recentSearchesProvider.notifier).recordQuery('pizza');
+
+    // Reopening search shows the place in "Recent", with its category glyph,
+    // alongside the text query (clock).
+    await tester.tap(find.text('Search here'));
+    await tester.pumpAndSettle();
+    expect(find.text('Harbour Coffee'), findsOneWidget);
+    expect(find.text('pizza'), findsOneWidget);
+    expect(find.byIcon(PhosphorIconsRegular.coffee), findsWidgets);
+    expect(find.byIcon(Icons.history), findsOneWidget);
+  });
+
+  testWidgets('"Add" under Home picks a place and saves it', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const OpenMapsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Search here'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add').first); // Home
+    await tester.pumpAndSettle();
+    expect(find.text('Set home'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'coffee');
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Harbour Coffee'));
+    await tester.pumpAndSettle();
+
+    expect(container.read(savedPlacesProvider).home?.name, 'Harbour Coffee');
+  });
+
+  testWidgets('"Clear recents" empties the list', (WidgetTester tester) async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const OpenMapsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Search here'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'coffee');
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+
+    expect(container.read(recentSearchesProvider), isNotEmpty);
+    await container.read(recentSearchesProvider.notifier).clear();
+    await tester.pumpAndSettle();
+    expect(container.read(recentSearchesProvider), isEmpty);
   });
 }

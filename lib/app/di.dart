@@ -9,9 +9,9 @@ import 'package:ndk_flutter/ndk_flutter.dart';
 
 import '../core/config/app_config.dart';
 import '../data/http/api_key_client.dart';
+import '../data/local/database/database_places_repository.dart';
 import '../data/local/local_settings_repository.dart';
 import '../data/local/prefs_live_share_store.dart';
-import '../data/local/prefs_places_repository.dart';
 import '../data/location/geolocator_location_service.dart';
 import '../data/mapbox/mapbox_map_service.dart';
 import '../data/mapbox/mapbox_map_view.dart';
@@ -65,8 +65,12 @@ List<Override> buildAppOverrides(
         ref.onDispose(database.close);
         return database;
       }),
-    // Local persistence is always available (recent searches, bookmarks).
-    placesRepositoryProvider.overrideWith((Ref ref) => PrefsPlacesRepository()),
+    // Local persistence (recent searches, home/work, bookmarks) shares the
+    // local database opened by `openAppDatabaseSafely()` at bootstrap.
+    placesRepositoryProvider.overrideWith(
+      (Ref ref) =>
+          DatabasePlacesRepository(database: ref.watch(appDatabaseProvider)),
+    ),
     settingsRepositoryProvider.overrideWith(
       (Ref ref) =>
           LocalSettingsRepository(database: ref.watch(appDatabaseProvider)),

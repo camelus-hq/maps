@@ -1,13 +1,16 @@
 import '../../domain/entities/place.dart';
+import '../../domain/entities/recent_search.dart';
 import '../../domain/ports/places_repository.dart';
 import 'sample_data.dart';
 
-/// In-memory [PlacesRepository]; persistence lands in M3.
+/// In-memory [PlacesRepository] for tests and keyless runs.
 class FakePlacesRepository implements PlacesRepository {
-  static const int _maxRecent = 10;
+  static const int _maxRecent = 20;
 
   final Map<String, Place> _bookmarked = <String, Place>{};
-  final List<String> _recent = <String>[];
+  final List<RecentSearch> _recent = <RecentSearch>[];
+  Place? _home;
+  Place? _work;
 
   @override
   Future<Place?> placeById(String id) async {
@@ -16,7 +19,17 @@ class FakePlacesRepository implements PlacesRepository {
         return place;
       }
     }
-    return _bookmarked[id];
+    final Place? bookmark = _bookmarked[id];
+    if (bookmark != null) {
+      return bookmark;
+    }
+    if (_home?.id == id) {
+      return _home;
+    }
+    if (_work?.id == id) {
+      return _work;
+    }
+    return null;
   }
 
   @override
@@ -33,22 +46,47 @@ class FakePlacesRepository implements PlacesRepository {
   }
 
   @override
-  Future<List<String>> recentQueries() async =>
-      List<String>.unmodifiable(_recent);
+  Future<List<RecentSearch>> recentSearches() async =>
+      List<RecentSearch>.unmodifiable(_recent);
 
   @override
-  Future<void> recordQuery(String query) async {
+  Future<void> recordRecentPlace(Place place) =>
+      _record(RecentPlaceSearch(place));
+
+  @override
+  Future<void> recordRecentQuery(String query) async {
     final String trimmed = query.trim();
     if (trimmed.isEmpty) {
       return;
     }
-    _recent.remove(trimmed);
-    _recent.insert(0, trimmed);
+    await _record(RecentTextSearch(trimmed));
+  }
+
+  Future<void> _record(RecentSearch entry) async {
+    _recent.removeWhere((RecentSearch candidate) => candidate.key == entry.key);
+    _recent.insert(0, entry);
     if (_recent.length > _maxRecent) {
       _recent.removeRange(_maxRecent, _recent.length);
     }
   }
 
   @override
-  Future<void> clearRecentQueries() async => _recent.clear();
+  Future<void> clearRecentSearches() async => _recent.clear();
+
+  @override
+  Future<void> removeRecentSearch(RecentSearch entry) async {
+    _recent.removeWhere((RecentSearch candidate) => candidate.key == entry.key);
+  }
+
+  @override
+  Future<Place?> home() async => _home;
+
+  @override
+  Future<void> setHome(Place? place) async => _home = place;
+
+  @override
+  Future<Place?> work() async => _work;
+
+  @override
+  Future<void> setWork(Place? place) async => _work = place;
 }

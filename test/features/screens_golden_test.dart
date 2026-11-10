@@ -5,12 +5,14 @@ import 'package:openmaps/app/app.dart';
 import 'package:openmaps/core/theme/app_theme.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/place.dart';
+import 'package:openmaps/domain/ports/places_repository.dart';
 import 'package:openmaps/features/directions/screens/directions_sheet.dart';
 import 'package:openmaps/features/directions/screens/endpoint_picker_screen.dart';
 import 'package:openmaps/features/directions/widgets/directions_endpoint_card.dart';
 import 'package:openmaps/features/place_details/widgets/place_details_sheet.dart';
 import 'package:openmaps/features/saved/screens/saved_screen.dart';
 import 'package:openmaps/state/commands/commands_provider.dart';
+import 'package:openmaps/state/ports.dart';
 
 /// Screen-level goldens guarding the parity we've reached.
 ///
@@ -36,6 +38,58 @@ void main() {
     category: 'Cafe',
     address: 'Alexanderufer 1, Berlin',
   );
+
+  testWidgets('the empty search screen with recents matches the golden', (
+    WidgetTester tester,
+  ) async {
+    setSurface(tester);
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+    final PlacesRepository repo = container.read(placesRepositoryProvider);
+    await repo.setHome(
+      const Place(
+        id: 'home',
+        name: 'Home',
+        position: LatLon(52.5170, 13.3889),
+        address: 'Paul-Löbe-Allee 1, Berlin',
+      ),
+    );
+    await repo.recordRecentPlace(
+      const Place(
+        id: 'recent.1',
+        name: 'Königin-Luise-Gedächtniskirche',
+        position: LatLon(52.458, 13.29),
+        category: 'Church',
+        address: 'Gustav-Müller-Platz, 10829 Berlin',
+      ),
+    );
+    await repo.recordRecentPlace(
+      const Place(
+        id: 'recent.2',
+        name: 'go asia Supermarkt',
+        position: LatLon(52.53, 13.41),
+        category: 'Supermarket',
+        address: 'Hauptstraße 132, 10827 Berlin',
+      ),
+    );
+    await repo.recordRecentQuery('Alexanderplatz');
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const OpenMapsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Search here'));
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byType(MaterialApp),
+      matchesGoldenFile('goldens/search_recent.png'),
+    );
+  });
 
   testWidgets('search results match the golden', (WidgetTester tester) async {
     setSurface(tester);

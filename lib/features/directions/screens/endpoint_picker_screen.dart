@@ -7,8 +7,10 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format.dart';
 import '../../../domain/entities/lat_lon.dart';
 import '../../../domain/entities/place.dart';
+import '../../../domain/entities/recent_search.dart';
 import '../../../state/place.dart';
 import '../../../state/route.dart';
+import '../../../state/saved_places.dart';
 import '../../../state/search.dart';
 import '../../../state/settings.dart';
 import '../../common/error_text.dart';
@@ -134,7 +136,7 @@ class _EndpointPickerScreenState extends ConsumerState<EndpointPickerScreen> {
           onRetry: state.query.isEmpty ? null : () => _submit(state.query),
         );
       case SearchStatus.idle:
-        return _emptyState(target, state.recentQueries);
+        return _emptyState(target);
       case SearchStatus.data:
         if (state.results.isEmpty) {
           return const _Message(icon: Icons.search_off, text: 'No results');
@@ -143,8 +145,9 @@ class _EndpointPickerScreenState extends ConsumerState<EndpointPickerScreen> {
     }
   }
 
-  Widget _emptyState(RouteEndpointTarget target, List<String> recent) {
+  Widget _emptyState(RouteEndpointTarget target) {
     final AsyncValue<List<Place>> saved = ref.watch(bookmarksProvider);
+    final List<RecentSearch> recent = ref.watch(recentSearchesProvider);
     return ListView(
       children: <Widget>[
         ListTile(
@@ -202,15 +205,29 @@ class _EndpointPickerScreenState extends ConsumerState<EndpointPickerScreen> {
             child: Text('No recent searches yet'),
           )
         else
-          for (final String query in recent)
-            ListTile(
-              leading: const Icon(Icons.history),
-              title: Text(query),
-              onTap: () {
-                _text.text = query;
-                _submit(query);
-              },
-            ),
+          for (final RecentSearch entry in recent)
+            switch (entry) {
+              RecentPlaceSearch(place: final Place place) => ListTile(
+                leading: Icon(placeResultIcon(place.category)),
+                title: Text(place.name),
+                subtitle: place.address == null
+                    ? null
+                    : Text(
+                        place.address!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                onTap: () => _choose(target, place),
+              ),
+              RecentTextSearch(text: final String text) => ListTile(
+                leading: const Icon(Icons.history),
+                title: Text(text),
+                onTap: () {
+                  _text.text = text;
+                  _submit(text);
+                },
+              ),
+            },
       ],
     );
   }

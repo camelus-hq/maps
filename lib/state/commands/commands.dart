@@ -30,6 +30,7 @@ import '../../domain/entities/marker.dart';
 import '../../domain/entities/metric_event.dart';
 import '../../domain/entities/place.dart';
 import '../../domain/entities/place_category.dart';
+import '../../domain/entities/recent_search.dart';
 import '../../domain/entities/review.dart';
 import '../../domain/entities/review_draft.dart';
 import '../../domain/entities/review_marker.dart';
@@ -55,6 +56,7 @@ import '../place.dart';
 import '../ports.dart';
 import '../reviews.dart';
 import '../route.dart';
+import '../saved_places.dart';
 import '../screenshot.dart';
 import '../search.dart';
 import '../settings.dart';
@@ -92,6 +94,14 @@ List<Command> buildCommands(Ref ref) {
           'traffic': ref.read(trafficProvider),
           'followingLocation': ref.read(followModeProvider),
           'orientation': ref.read(mapOrientationProvider).name,
+          'home': switch (ref.read(savedPlacesProvider).home) {
+            final Place place => _placeJson(place),
+            _ => null,
+          },
+          'work': switch (ref.read(savedPlacesProvider).work) {
+            final Place place => _placeJson(place),
+            _ => null,
+          },
         };
       },
     ),
@@ -642,6 +652,73 @@ List<Command> buildCommands(Ref ref) {
         return <String, Object?>{
           'pinned': ref.read(settingsProvider).pinnedCategoryIds,
         };
+      },
+    ),
+    Command(
+      id: 'search.recents',
+      description:
+          'List the recent searches — places and queries — newest first.',
+      handler: (CommandRequest request) async => <Object?>[
+        for (final RecentSearch entry in ref.read(recentSearchesProvider))
+          _recentSearchJson(entry),
+      ],
+    ),
+    Command(
+      id: 'search.recents.clear',
+      description: 'Clear the recent-search list.',
+      handler: (CommandRequest request) async {
+        await ref.read(recentSearchesProvider.notifier).clear();
+        return true;
+      },
+    ),
+    Command(
+      id: 'place.setHome',
+      description:
+          'Save a place as Home (params: {id?}; defaults to the selected '
+          'place).',
+      handler: (CommandRequest request) async {
+        final Place? place = await _resolvePlace(ref, request, enrich: false);
+        if (place == null) {
+          throw const CommandException(
+            'bad_params',
+            'pass an "id" or select a place first',
+          );
+        }
+        await ref.read(savedPlacesProvider.notifier).setHome(place);
+        return _placeJson(place);
+      },
+    ),
+    Command(
+      id: 'place.clearHome',
+      description: 'Remove the saved Home place.',
+      handler: (CommandRequest request) async {
+        await ref.read(savedPlacesProvider.notifier).setHome(null);
+        return true;
+      },
+    ),
+    Command(
+      id: 'place.setWork',
+      description:
+          'Save a place as Work (params: {id?}; defaults to the selected '
+          'place).',
+      handler: (CommandRequest request) async {
+        final Place? place = await _resolvePlace(ref, request, enrich: false);
+        if (place == null) {
+          throw const CommandException(
+            'bad_params',
+            'pass an "id" or select a place first',
+          );
+        }
+        await ref.read(savedPlacesProvider.notifier).setWork(place);
+        return _placeJson(place);
+      },
+    ),
+    Command(
+      id: 'place.clearWork',
+      description: 'Remove the saved Work place.',
+      handler: (CommandRequest request) async {
+        await ref.read(savedPlacesProvider.notifier).setWork(null);
+        return true;
       },
     ),
     Command(
@@ -2429,6 +2506,17 @@ Map<String, Object?> _placeJson(Place place) => <String, Object?>{
       for (final OsmPaymentMethod method in place.paymentMethods)
         method.suffix: method.value,
     },
+};
+
+Map<String, Object?> _recentSearchJson(RecentSearch entry) => switch (entry) {
+  RecentPlaceSearch(:final Place place) => <String, Object?>{
+    'type': 'place',
+    'place': _placeJson(place),
+  },
+  RecentTextSearch(:final String text) => <String, Object?>{
+    'type': 'query',
+    'text': text,
+  },
 };
 
 Map<String, Object?> _friendJson(Friend friend, FriendLocation? live) {

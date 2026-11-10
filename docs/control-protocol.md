@@ -164,12 +164,16 @@ sync test fails if it drifts from the registry.
 | `place.bookmarks` | List saved (bookmarked) places. |
 | `place.call` | Open the dialler for a place phone number (params: {id?, phone?}; defaults to the selected place's OSM number). Returns the number and whether an app opened. |
 | `place.clear` | Clear the selected place. |
+| `place.clearHome` | Remove the saved Home place. |
+| `place.clearWork` | Remove the saved Work place. |
 | `place.copyAddress` | Copy a place address to the clipboard (params: {id?}; defaults to the selected place). |
 | `place.details` | Details for a place (params: {id?}; defaults to the selected place), merged with its OpenStreetMap tags — contact phone/e-mail/website, wheelchair access, opening hours, accepted payments, images and the raw tags. |
 | `place.email` | Compose an e-mail to a place (params: {id?, email?}; defaults to the selected place's OSM address). Returns the address and whether an app opened. |
 | `place.nearby` | Browse places near a place (params: {id?}; defaults to the selected place). Opens the category results over the map. |
 | `place.openWebsite` | Open a place website (params: {id?, website?}; defaults to the selected place's OSM site). Returns the URL and whether a browser opened. |
 | `place.select` | Select a place by id; keeps the other result pins and highlights it (params: {id, focus?}). Set focus:false to leave the camera as-is. |
+| `place.setHome` | Save a place as Home (params: {id?}; defaults to the selected place). |
+| `place.setWork` | Save a place as Work (params: {id?}; defaults to the selected place). |
 | `place.share` | Copy a share line for a place (params: {id?}; defaults to the selected place) — name, address and OpenStreetMap link where known. Returns the text. |
 | `review.compose` | Open the "Write a review" sheet for a place (params: {id?}; defaults to the selected place). Returns the draft state. |
 | `review.compose.close` | Close the "Write a review" sheet. |
@@ -201,6 +205,8 @@ sync test fails if it drifts from the registry.
 | `search.category` | Browse a category near the user, keeping the map visible with the places pinned and a results sheet (params: {name: <label or id>}). Passing no {name} clears the browse. Returns the results. |
 | `search.pin` | Pin a category chip to the row under the search bar (params: {name: <label or id>}). Up to 10 pins; returns {"pinned": <ids>, "added": <bool>}. |
 | `search.query` | Run a search query (params: {text}) and return the results. |
+| `search.recents` | List the recent searches — places and queries — newest first. |
+| `search.recents.clear` | Clear the recent-search list. |
 | `search.unpin` | Unpin a category chip from the row under the search bar (params: {name: <label or id>}); returns {"pinned": <ids>}. |
 | `session.help` | Describe one command (params: {id}) or all of them. |
 | `session.list` | List every command id and its description. |

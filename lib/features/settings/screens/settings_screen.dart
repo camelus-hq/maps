@@ -144,7 +144,7 @@ class SettingsScreen extends ConsumerWidget {
             leading: const Icon(Icons.history),
             title: const Text('Clear recent searches'),
             onTap: () async {
-              await ref.read(placesRepositoryProvider).clearRecentQueries();
+              await ref.read(placesRepositoryProvider).clearRecentSearches();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Recent searches cleared')),

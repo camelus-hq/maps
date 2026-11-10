@@ -7,6 +7,7 @@ import '../core/utils/osm_ref.dart';
 import '../domain/entities/marker.dart';
 import '../domain/entities/place.dart';
 import 'ports.dart';
+import 'saved_places.dart';
 
 /// Bookmarked (saved) places, re-read from the repository.
 final FutureProvider<List<Place>> bookmarksProvider =
@@ -39,7 +40,13 @@ class SelectedPlaceController extends Notifier<Place?> {
   @override
   Place? build() => null;
 
-  void select(Place place) => state = place;
+  /// Selects [place] and records it in the recent-search list — opening a place
+  /// (from the map, a search result or the saved list) is what puts it in
+  /// "Recent", matching the reference.
+  void select(Place place) {
+    state = place;
+    unawaited(ref.read(recentSearchesProvider.notifier).recordPlace(place));
+  }
 
   void clear() => state = null;
 }

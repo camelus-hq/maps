@@ -18,6 +18,7 @@ import '../domain/entities/travel_mode.dart';
 import '../domain/ports/map_service.dart';
 import 'follow.dart';
 import 'ports.dart';
+import 'saved_places.dart';
 import 'usecases.dart';
 
 enum RouteStatus { idle, loading, data, error }
@@ -220,6 +221,9 @@ class RouteController extends Notifier<RouteState> {
 
   /// Plans from the current location to [destination].
   Future<void> plan(Place destination) async {
+    unawaited(
+      ref.read(recentSearchesProvider.notifier).recordPlace(destination),
+    );
     final Place? origin = await _currentLocationPlace();
     if (origin == null) {
       state = state.copyWith(
@@ -574,6 +578,9 @@ class RouteController extends Notifier<RouteState> {
     bool fewerTransfers = false,
     bool lessWalking = false,
   }) async {
+    unawaited(
+      ref.read(recentSearchesProvider.notifier).recordPlace(destination),
+    );
     state = state.copyWith(
       mode: TravelMode.transit,
       origin: origin,

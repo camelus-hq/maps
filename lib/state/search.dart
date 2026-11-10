@@ -17,6 +17,7 @@ import 'home.dart';
 import 'map_camera.dart';
 import 'map_viewport.dart';
 import 'ports.dart';
+import 'saved_places.dart';
 import 'usecases.dart';
 
 enum SearchStatus { idle, loading, data, error }
@@ -28,7 +29,6 @@ class SearchState {
     this.status = SearchStatus.idle,
     this.results = const <Place>[],
     this.error,
-    this.recentQueries = const <String>[],
     this.lastQuery,
     this.resultsCamera,
   });
@@ -37,7 +37,6 @@ class SearchState {
   final SearchStatus status;
   final List<Place> results;
   final AppException? error;
-  final List<String> recentQueries;
 
   /// The query the current results came from (null when there are none).
   final String? lastQuery;
@@ -51,7 +50,6 @@ class SearchState {
     List<Place>? results,
     AppException? error,
     bool clearError = false,
-    List<String>? recentQueries,
     String? lastQuery,
     bool clearResults = false,
     Camera? resultsCamera,
@@ -60,7 +58,6 @@ class SearchState {
     status: status ?? this.status,
     results: clearResults ? const <Place>[] : (results ?? this.results),
     error: clearError ? null : (error ?? this.error),
-    recentQueries: recentQueries ?? this.recentQueries,
     lastQuery: clearResults ? null : (lastQuery ?? this.lastQuery),
     resultsCamera: clearResults ? null : (resultsCamera ?? this.resultsCamera),
   );
@@ -78,15 +75,7 @@ class SearchController extends Notifier<SearchState> {
   @override
   SearchState build() {
     ref.onDispose(() => _debounce?.cancel());
-    unawaited(_loadRecent());
     return const SearchState();
-  }
-
-  Future<void> _loadRecent() async {
-    final List<String> recent = await ref
-        .read(placesRepositoryProvider)
-        .recentQueries();
-    state = state.copyWith(recentQueries: recent);
   }
 
   void queryChanged(String query) {
@@ -118,8 +107,7 @@ class SearchController extends Notifier<SearchState> {
     if (trimmed.isEmpty) {
       return;
     }
-    await ref.read(placesRepositoryProvider).recordQuery(trimmed);
-    await _loadRecent();
+    await ref.read(recentSearchesProvider.notifier).recordQuery(trimmed);
     state = state.copyWith(
       query: query,
       status: SearchStatus.loading,
@@ -135,6 +123,26 @@ class SearchController extends Notifier<SearchState> {
       await _browse(category, displayQuery: category.label, useViewport: false);
       return;
     }
+    await _run(trimmed, expectedQuery: trimmed);
+  }
+
+  /// A plain text search that never diverts to a category browse.
+  ///
+  /// Used when the search screen is picking a place for a saved Home/Work slot:
+  /// a query that happens to name a category ("cafes") should still list the
+  /// places it matches there, not open the category results.
+  Future<void> submitText(String query) async {
+    _debounce?.cancel();
+    final String trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    await ref.read(recentSearchesProvider.notifier).recordQuery(trimmed);
+    state = state.copyWith(
+      query: query,
+      status: SearchStatus.loading,
+      clearError: true,
+    );
     await _run(trimmed, expectedQuery: trimmed);
   }
 

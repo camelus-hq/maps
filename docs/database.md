@@ -49,6 +49,13 @@ is needed. `LocalSettingsRepository` reads the first set from the database and
 the second from prefs, and copies any pre-database (`shared_preferences`) values
 into the database once.
 
+The **places** store (`DatabasePlacesRepository`) also lives in the database:
+the recent searches (opened/navigated-to places and submitted queries), the saved
+**Home**/**Work** places and the bookmarks are JSON values under the `places.*`
+keys, so a new entry needs no schema change. It copies the pre-database
+`openmaps.recent_queries` / `openmaps.bookmarks` values in once, the same way the
+settings do.
+
 ## Migrations — the checklist
 
 Everything hinges on one integer, `kAppDatabaseSchemaVersion` in
