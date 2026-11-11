@@ -8,6 +8,7 @@ import '../core/errors/result.dart';
 import '../domain/entities/camera.dart';
 import '../domain/entities/lat_lon.dart';
 import '../domain/entities/location_sample.dart';
+import '../domain/entities/navigation_camera.dart';
 import '../domain/entities/route.dart';
 import '../domain/entities/transit.dart';
 import '../domain/entities/travel_mode.dart';
@@ -31,6 +32,7 @@ class NavState {
     this.traveledMeters = 0,
     this.totalMeters = 0,
     this.tripTraveledMeters = 0,
+    this.speedMetersPerSecond,
     this.startedAt,
     this.remaining = Duration.zero,
     this.nextManeuver,
@@ -61,6 +63,13 @@ class NavState {
   /// the new line), so trip statistics must use this instead of
   /// [traveledMeters] to survive a re-plan.
   final double tripTraveledMeters;
+
+  /// The smoothed current speed in metres per second, or `null` when unknown.
+  ///
+  /// Drives the tracking-camera zoom ([NavigationCamera]): the faster the
+  /// traveller, the further the camera zooms out. It is `null` for a simulated
+  /// session with no speed supplied, which is treated as stationary.
+  final double? speedMetersPerSecond;
 
   /// When the current guidance trip started (wall clock), or `null` while
   /// idle. The trip's elapsed time is measured from here, so a reroute never
@@ -98,6 +107,8 @@ class NavState {
     double? traveledMeters,
     double? totalMeters,
     double? tripTraveledMeters,
+    double? speedMetersPerSecond,
+    bool clearSpeed = false,
     DateTime? startedAt,
     Duration? remaining,
     Maneuver? nextManeuver,
@@ -118,6 +129,9 @@ class NavState {
     traveledMeters: traveledMeters ?? this.traveledMeters,
     totalMeters: totalMeters ?? this.totalMeters,
     tripTraveledMeters: tripTraveledMeters ?? this.tripTraveledMeters,
+    speedMetersPerSecond: clearSpeed
+        ? null
+        : (speedMetersPerSecond ?? this.speedMetersPerSecond),
     startedAt: startedAt ?? this.startedAt,
     remaining: remaining ?? this.remaining,
     nextManeuver: nextManeuver ?? this.nextManeuver,
@@ -150,6 +164,15 @@ class NavigationController extends Notifier<NavState> {
 
   /// When the tracking camera was last asked to move (for smooth-follow speed).
   DateTime? _lastCameraMoveAt;
+
+  /// The smoothed speed estimate that drives the camera zoom, or `null` until a
+  /// usable speed is seen.
+  double? _speedMps;
+
+  /// The previous fix and its time, used to estimate speed when the GNSS sample
+  /// carries none.
+  LatLon? _lastFixPosition;
+  DateTime? _lastFixAt;
 
   /// The ride leg whose whole geometry is currently framed on the map while the
   /// traveller is on board (so the camera does not chase every fix).
@@ -239,6 +262,9 @@ class NavigationController extends Notifier<NavState> {
     }
     _tripTraveledBase = 0;
     _trail.clear();
+    _speedMps = null;
+    _lastFixPosition = null;
+    _lastFixAt = null;
     _loadRoute(route, transit: transit);
     // Navigation owns the camera; stop follow mode so the two don't fight.
     ref.read(followModeProvider.notifier).disable();
@@ -248,6 +274,7 @@ class NavigationController extends Notifier<NavState> {
       overview: false,
       cameraFollows: true,
       clearNotice: true,
+      clearSpeed: true,
       // The trip clock starts here and survives every later reroute.
       startedAt: DateTime.now(),
       tripTraveledMeters: 0,
@@ -272,14 +299,28 @@ class NavigationController extends Notifier<NavState> {
   }
 
   /// Advances the simulated position (control channel / UI tick).
-  void step({double meters = 40}) {
+  ///
+  /// [speedMetersPerSecond] optionally sets the simulated speed so the tracking
+  /// camera zoom (see [NavigationCamera]) can be exercised without a live GNSS
+  /// feed; omitting it leaves the last known speed untouched.
+  void step({double meters = 40, double? speedMetersPerSecond}) {
     final Route? route = state.route;
     if (route == null || state.status != NavStatus.navigating) {
       return;
     }
+    if (speedMetersPerSecond != null &&
+        speedMetersPerSecond.isFinite &&
+        speedMetersPerSecond >= 0) {
+      _speedMps = speedMetersPerSecond;
+    }
     final double total = _cumulative.isEmpty ? 0 : _cumulative.last;
     final double traveled = math.min(state.traveledMeters + meters, total);
-    _apply(routedTraveled: traveled, position: null, bearing: null);
+    _apply(
+      routedTraveled: traveled,
+      position: null,
+      bearing: null,
+      speedMetersPerSecond: _speedMps,
+    );
     if (state.status == NavStatus.arrived) {
       _timer?.cancel();
       _timer = null;
@@ -296,6 +337,7 @@ class NavigationController extends Notifier<NavState> {
       return;
     }
     final LatLon point = sample.position;
+    _updateSpeed(sample);
     final (double traveled, double deviation) = _projectOntoRoute(point);
     // Record where the traveller actually went before any reroute branch, so
     // the trail keeps the off-route detour too.
@@ -326,7 +368,41 @@ class NavigationController extends Notifier<NavState> {
       position: point,
       bearing: sample.bearing,
       live: _live,
+      speedMetersPerSecond: _speedMps,
     );
+  }
+
+  /// Updates the smoothed speed estimate from a fix.
+  ///
+  /// Prefers the GNSS-reported speed and, when the sample carries none, falls
+  /// back to the distance between fixes over the elapsed time. Either way the
+  /// value is smoothed (an exponential average) so the camera zoom glides with
+  /// the traveller instead of jittering with the position noise.
+  void _updateSpeed(LocationSample sample) {
+    final DateTime now = DateTime.now();
+    final double? reported = sample.speedMetersPerSecond;
+    double? measured;
+    if (reported != null && reported.isFinite && reported >= 0) {
+      measured = reported;
+    } else {
+      final LatLon? previous = _lastFixPosition;
+      final DateTime? previousAt = _lastFixAt;
+      if (previous != null && previousAt != null) {
+        final double seconds = now.difference(previousAt).inMilliseconds / 1000;
+        if (seconds > 0.2) {
+          measured = previous.distanceTo(sample.position) / seconds;
+        }
+      }
+    }
+    _lastFixPosition = sample.position;
+    _lastFixAt = now;
+    if (measured == null || !measured.isFinite || measured < 0) {
+      return;
+    }
+    final double? previousSpeed = _speedMps;
+    _speedMps = previousSpeed == null
+        ? measured
+        : previousSpeed * 0.6 + measured * 0.4;
   }
 
   void stop() {
@@ -338,6 +414,9 @@ class NavigationController extends Notifier<NavState> {
     _lastReplanAt = null;
     _tripTraveledBase = 0;
     _trail.clear();
+    _speedMps = null;
+    _lastFixPosition = null;
+    _lastFixAt = null;
     state = const NavState();
     unawaited(ref.read(mapServiceProvider).setTraveledPath(const <LatLon>[]));
   }
@@ -414,6 +493,7 @@ class NavigationController extends Notifier<NavState> {
     required LatLon? position,
     required double? bearing,
     bool live = false,
+    double? speedMetersPerSecond,
   }) {
     final Route? route = state.route;
     if (route == null) {
@@ -462,6 +542,7 @@ class NavigationController extends Notifier<NavState> {
       traveledMeters: routedTraveled,
       totalMeters: total,
       tripTraveledMeters: _tripTraveledBase + routedTraveled,
+      speedMetersPerSecond: speedMetersPerSecond,
       // A transit journey is scheduled, not distance-paced: the time left is the
       // gap to the itinerary's arrival, so the ETA matches the timetable (a
       // road route is estimated from the distance covered).
@@ -768,12 +849,24 @@ class NavigationController extends Notifier<NavState> {
 
   /// The tracking camera pose for the running session. Transit guidance keeps
   /// the map north-up and flat (as transit apps do), centred on the traveller;
-  /// the road modes tilt into the heading so the route reads ahead.
+  /// the road modes tilt into the heading so the route reads ahead and zoom out
+  /// with the traveller's speed, holding the close-in zoom as a turn nears
+  /// ([NavigationCamera]).
   Camera _trackingPose(LatLon position) => state.mode == TravelMode.transit
-      ? Camera(target: position, zoom: 16, bearing: 0, tilt: 0)
+      ? Camera(
+          target: position,
+          zoom: NavigationCamera.transitZoom,
+          bearing: 0,
+          tilt: 0,
+        )
       : Camera(
           target: position,
-          zoom: 17,
+          zoom: NavigationCamera.zoom(
+            mode: state.mode,
+            speedMetersPerSecond: state.speedMetersPerSecond,
+            nextManeuver: state.nextManeuver,
+            distanceToNextManeuver: state.distanceToNextManeuver,
+          ),
           bearing: state.bearing ?? 0,
           tilt: 45,
         );

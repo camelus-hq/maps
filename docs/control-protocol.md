@@ -82,8 +82,8 @@ adb forward tcp:7981 tcp:7981
 | `route.useCurrentLocation` | `{field?: origin\|destination\|stop, index?}` | the selected route |
 | `route.pickOnMap` | `{field: origin\|destination\|stop, index?}` | `true` (then long-press the map) |
 | `nav.start` | `{index?, auto?, live?}` | the guidance state (needs a planned route) |
-| `nav.position` | `{lat, lon, heading?}` | the guidance state |
-| `nav.step` | `{meters?}` | the guidance state |
+| `nav.position` | `{lat, lon, heading?, speed?}` | the guidance state |
+| `nav.step` | `{meters?, speed?}` | the guidance state |
 | `nav.state` | — | the guidance state |
 | `nav.stop` | — | `true` |
 | `nav.overview` | — | the guidance state (fit whole route vs tracking) |
@@ -154,11 +154,11 @@ sync test fails if it drifts from the registry.
 | `nav.notification` | Return the ongoing trip notification (visible, title, body, progress 0–100, statusChip, mode) shown in the shade while navigating. |
 | `nav.overview` | Toggle the navigation overview (fit the whole route) vs tracking. |
 | `nav.pause` | Stop the camera tracking the position (guidance keeps running). |
-| `nav.position` | Inject a position sample (params: {lat, lon, heading?}). |
+| `nav.position` | Inject a position sample (params: {lat, lon, heading?, speed?}); speed is metres per second and drives the tracking-camera zoom. |
 | `nav.resume` | Re-center the camera on the current position and resume tracking. |
 | `nav.start` | Start simulated guidance (params: {index?, auto?}); requires a planned route. |
 | `nav.state` | Return the current guidance state. |
-| `nav.step` | Advance simulated guidance (params: {meters?}). |
+| `nav.step` | Advance simulated guidance (params: {meters?, speed?}); speed is metres per second and drives the tracking-camera zoom. |
 | `nav.stop` | Stop guidance. |
 | `place.bookmark` | Save/remove a place (params: {id, bookmarked?}); returns the saved state. |
 | `place.bookmarks` | List saved (bookmarked) places. |

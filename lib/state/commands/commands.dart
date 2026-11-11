@@ -1360,7 +1360,9 @@ List<Command> buildCommands(Ref ref) {
     ),
     Command(
       id: 'nav.position',
-      description: 'Inject a position sample (params: {lat, lon, heading?}).',
+      description:
+          'Inject a position sample (params: {lat, lon, heading?, speed?}); '
+          'speed is metres per second and drives the tracking-camera zoom.',
       handler: (CommandRequest request) async {
         final LatLon? point = LatLon.tryParse(
           request.params['lat'],
@@ -1375,6 +1377,7 @@ List<Command> buildCommands(Ref ref) {
               LocationSample(
                 position: point,
                 bearing: _toDouble(request.params['heading']),
+                speedMetersPerSecond: _toDouble(request.params['speed']),
               ),
             );
         return _navJson(ref.read(navigationControllerProvider));
@@ -1382,11 +1385,16 @@ List<Command> buildCommands(Ref ref) {
     ),
     Command(
       id: 'nav.step',
-      description: 'Advance simulated guidance (params: {meters?}).',
+      description:
+          'Advance simulated guidance (params: {meters?, speed?}); speed is '
+          'metres per second and drives the tracking-camera zoom.',
       handler: (CommandRequest request) async {
         ref
             .read(navigationControllerProvider.notifier)
-            .step(meters: _toDouble(request.params['meters']) ?? 40);
+            .step(
+              meters: _toDouble(request.params['meters']) ?? 40,
+              speedMetersPerSecond: _toDouble(request.params['speed']),
+            );
         return _navJson(ref.read(navigationControllerProvider));
       },
     ),
@@ -3109,6 +3117,7 @@ Map<String, Object?> _navJson(NavState nav) {
     'remainingSeconds': nav.remaining.inSeconds,
     'distanceToNextManeuver': nav.distanceToNextManeuver,
     'instruction': nav.nextManeuver?.instruction,
+    'speedMetersPerSecond': nav.speedMetersPerSecond,
     'overview': nav.overview,
     'cameraFollows': nav.cameraFollows,
     if (progress != null)

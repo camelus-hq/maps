@@ -5,6 +5,7 @@ import 'package:openmaps/data/fakes/fake_map_service.dart';
 import 'package:openmaps/domain/entities/camera.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/location_sample.dart';
+import 'package:openmaps/domain/entities/navigation_camera.dart';
 import 'package:openmaps/domain/entities/route.dart';
 import 'package:openmaps/domain/entities/transit.dart';
 import 'package:openmaps/domain/entities/travel_mode.dart';
@@ -495,6 +496,67 @@ void main() {
     expect(state.nextManeuver?.type, ManeuverType.arrive);
   });
 
+  test('the tracking camera zooms out with speed and holds at a turn', () {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    const double metersPerDegree = 111320;
+    const double startLat = 52.5200;
+    final Route route = Route(
+      legs: <Leg>[
+        Leg(
+          maneuvers: const <Maneuver>[
+            Maneuver(
+              instruction: 'Drive north',
+              type: ManeuverType.depart,
+              distanceMeters: 700,
+            ),
+            Maneuver(
+              instruction: 'Turn right',
+              type: ManeuverType.turnRight,
+              distanceMeters: 300,
+            ),
+          ],
+          distanceMeters: 1000,
+          duration: const Duration(minutes: 5),
+        ),
+      ],
+      distanceMeters: 1000,
+      duration: const Duration(minutes: 5),
+      geometry: const <LatLon>[
+        LatLon(startLat, 13.4050),
+        LatLon(startLat + 1000 / metersPerDegree, 13.4050),
+      ],
+    );
+
+    final NavigationController controller = container.read(
+      navigationControllerProvider.notifier,
+    );
+    controller.start(route, mode: TravelMode.drive);
+    final FakeMapService map =
+        container.read(mapServiceProvider) as FakeMapService;
+
+    // At rest (no speed yet) the camera stays close in.
+    expect(map.camera.zoom, NavigationCamera.baseZoom);
+
+    // Cruising with the turn still far ahead: the camera zooms out.
+    controller.step(meters: 50, speedMetersPerSecond: 25);
+    expect(
+      container.read(navigationControllerProvider).speedMetersPerSecond,
+      25,
+    );
+    expect(map.camera.zoom, lessThan(NavigationCamera.baseZoom));
+
+    // As the turn comes into range the camera holds the close-in zoom, even
+    // though we are still moving fast.
+    controller.step(meters: 450, speedMetersPerSecond: 25);
+    expect(
+      container.read(navigationControllerProvider).distanceToNextManeuver,
+      lessThanOrEqualTo(250),
+    );
+    expect(map.camera.zoom, NavigationCamera.baseZoom);
+  });
+
   test('transit guidance keeps the camera flat and detects boarding', () async {
     final ProviderContainer container = ProviderContainer();
     addTearDown(container.dispose);
@@ -516,6 +578,8 @@ void main() {
         container.read(mapServiceProvider) as FakeMapService;
     expect(map.camera.tilt, 0);
     expect(map.camera.bearing, 0);
+    // Transit tracks at one flat zoom; it never zooms with speed or turns.
+    expect(map.camera.zoom, NavigationCamera.transitZoom);
 
     expect(
       container.read(navigationControllerProvider).transitProgress?.phase,
