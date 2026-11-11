@@ -31,12 +31,16 @@ class WalkNavBottomSheet extends ConsumerWidget {
       0,
       double.infinity,
     );
+    // The trip's full length, measured from the actual start so a reroute does
+    // not shrink "Total" to just the re-planned remainder.
+    final double totalDistance =
+        nav.tripTraveledMeters.clamp(0, double.infinity) + remaining;
     final (String, String) remainingText = splitUnit(
       formatDistance(remaining, imperial: imperial),
     );
     final (String, String) timeText = splitUnit(formatDuration(nav.remaining));
     final (String, String) totalText = splitUnit(
-      formatDistance(nav.totalMeters, imperial: imperial),
+      formatDistance(totalDistance, imperial: imperial),
     );
     return NavSheet(
       nav: nav,

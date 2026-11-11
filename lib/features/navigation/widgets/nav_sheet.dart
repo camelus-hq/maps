@@ -548,6 +548,17 @@ double? currentSpeedKmh(WidgetRef ref) {
   return metersPerSecond * 3.6;
 }
 
+/// The trip's elapsed wall-clock time, measured from the session start so a
+/// reroute never restarts the clock. Zero before the trip starts.
+Duration tripElapsed(NavState nav, {DateTime? now}) {
+  final DateTime? start = nav.startedAt;
+  if (start == null) {
+    return Duration.zero;
+  }
+  final Duration elapsed = (now ?? DateTime.now()).difference(start);
+  return elapsed.isNegative ? Duration.zero : elapsed;
+}
+
 /// Splits a formatted value (e.g. "850 m", "12 min") into number and unit.
 (String, String) splitUnit(String formatted) {
   final int index = formatted.lastIndexOf(' ');

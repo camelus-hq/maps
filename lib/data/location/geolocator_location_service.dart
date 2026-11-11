@@ -28,9 +28,17 @@ class GeolocatorLocationService implements LocationService {
        _serviceStatusEvents =
            serviceStatusEvents ?? Geolocator.getServiceStatusStream;
 
-  static const LocationSettings _settings = LocationSettings(
+  // A plain `LocationSettings` sends no `timeInterval`, so the Android
+  // FusedLocationProvider falls back to its 5000 ms default — the position (and
+  // therefore the distance, speed and elapsed readouts) only refreshed every
+  // five seconds. `AndroidSettings` sets an explicit ~1 Hz interval, and
+  // `distanceFilter: 0` keeps those updates coming when stopped (and at walking
+  // pace) instead of waiting for 5 m of movement. On iOS `intervalDuration` is
+  // ignored and CoreLocation delivers continuously.
+  static final AndroidSettings _settings = AndroidSettings(
     accuracy: LocationAccuracy.bestForNavigation,
-    distanceFilter: 5,
+    distanceFilter: 0,
+    intervalDuration: const Duration(seconds: 1),
   );
 
   final Stream<Position> Function() _positionEvents;

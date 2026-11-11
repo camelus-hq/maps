@@ -109,8 +109,12 @@ class NavigationNoticeController extends Notifier<NavigationNotice> {
       0,
       double.infinity,
     );
-    final int? progress = total > 0
-        ? ((nav.traveledMeters / total) * 100).round().clamp(0, 100)
+    // Progress is measured across the whole trip (trip distance + what is
+    // left), so a reroute does not jump the bar back toward zero.
+    final double tripDone = nav.tripTraveledMeters.clamp(0, double.infinity);
+    final double tripTotal = tripDone + remaining;
+    final int? progress = tripTotal > 0
+        ? ((tripDone / tripTotal) * 100).round().clamp(0, 100)
         : null;
     final Maneuver? maneuver = nav.nextManeuver;
     final String? instruction = maneuver?.instruction;

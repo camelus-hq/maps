@@ -153,34 +153,34 @@ class _CycleNavBottomSheetState extends ConsumerState<CycleNavBottomSheet> {
     bool imperial,
     NavState nav,
   ) {
-    final double traveled = nav.traveledMeters.clamp(0, double.infinity);
     final double remaining = (nav.totalMeters - nav.traveledMeters).clamp(
       0,
       double.infinity,
     );
     final double? speedKmh = currentSpeedKmh(ref);
-    final Duration totalDuration = nav.route?.duration ?? Duration.zero;
-    final int elapsedSeconds =
-        (totalDuration.inSeconds - nav.remaining.inSeconds).clamp(
-          0,
-          totalDuration.inSeconds,
-        );
-    final double averageKmh = elapsedSeconds <= 0
+    // Trip statistics are measured from the actual start of the trip, so a
+    // reroute (which resets `traveledMeters` to the new route) never restarts
+    // the elapsed clock or the covered distance.
+    final Duration elapsed = tripElapsed(nav);
+    final double tripTraveled = nav.tripTraveledMeters.clamp(
+      0,
+      double.infinity,
+    );
+    final double totalDistance = tripTraveled + remaining;
+    final double averageKmh = elapsed.inSeconds <= 0
         ? 0
-        : (nav.traveledMeters / elapsedSeconds) * 3.6;
+        : (tripTraveled / elapsed.inSeconds) * 3.6;
 
     final (String, String) traveledText = splitUnit(
-      formatDistance(traveled, imperial: imperial),
+      formatDistance(tripTraveled, imperial: imperial),
     );
     final (String, String) remainingText = splitUnit(
       formatDistance(remaining, imperial: imperial),
     );
     final (String, String) totalText = splitUnit(
-      formatDistance(nav.totalMeters, imperial: imperial),
+      formatDistance(totalDistance, imperial: imperial),
     );
-    final (String, String) elapsedText = splitUnit(
-      formatDuration(Duration(seconds: elapsedSeconds)),
-    );
+    final (String, String) elapsedText = splitUnit(formatDuration(elapsed));
     final (String, String) leftText = splitUnit(formatDuration(nav.remaining));
     final (String, String) speedText = formatSpeed(speedKmh, imperial);
     final (String, String) averageText = formatSpeed(averageKmh, imperial);

@@ -40,6 +40,7 @@ class FakeMapService implements MapService {
   List<FriendMarker> _friendMarkers = const <FriendMarker>[];
   List<ReviewMarker> _reviewMarkers = const <ReviewMarker>[];
   List<RouteLine> _routeLines = const <RouteLine>[];
+  List<LatLon> _traveledPath = const <LatLon>[];
   List<TransitStopMarker> _transitStopMarkers = const <TransitStopMarker>[];
   BaseMapStyle _baseStyle = BaseMapStyle.standard;
   bool _traffic = false;
@@ -153,6 +154,14 @@ class FakeMapService implements MapService {
 
   @override
   List<RouteLine> get routeLines => _routeLines;
+
+  @override
+  Future<void> setTraveledPath(List<LatLon> points) async {
+    _traveledPath = List<LatLon>.unmodifiable(points);
+  }
+
+  @override
+  List<LatLon> get traveledPath => _traveledPath;
 
   @override
   Future<void> setTransitStopMarkers(List<TransitStopMarker> markers) async {

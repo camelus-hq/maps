@@ -303,6 +303,137 @@ void main() {
     );
   });
 
+  test(
+    'a reroute keeps the trip distance and clock from the real start',
+    () async {
+      final ProviderContainer container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final List<Route> routes =
+          (await container.read(requestRouteProvider)(
+            waypoints: <LatLon>[
+              const LatLon(52.5200, 13.4050),
+              const LatLon(52.5300, 13.4200),
+            ],
+            mode: TravelMode.cycle,
+          )).valueOrNull ??
+          const <Route>[];
+      expect(routes, isNotEmpty);
+
+      final NavigationController controller = container.read(
+        navigationControllerProvider.notifier,
+      );
+      controller.start(routes.first, mode: TravelMode.cycle);
+      final DateTime? startedAt = container
+          .read(navigationControllerProvider)
+          .startedAt;
+      expect(startedAt, isNotNull);
+
+      controller.step(meters: 400);
+      final double covered = container
+          .read(navigationControllerProvider)
+          .tripTraveledMeters;
+      expect(covered, greaterThan(0));
+
+      // A far-off fix reroutes from there, replacing the route.
+      await controller.handlePosition(
+        const LocationSample(position: LatLon(52.6000, 13.6000)),
+      );
+
+      final NavState after = container.read(navigationControllerProvider);
+      expect(after.status, NavStatus.navigating);
+      // The current route restarted at the fix...
+      expect(after.traveledMeters, 0);
+      // ...but the trip statistics carried over from the actual start.
+      expect(after.startedAt, startedAt);
+      expect(after.tripTraveledMeters, closeTo(covered, 1e-6));
+    },
+  );
+
+  test('the travelled path trail is drawn and survives a reroute', () async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final List<Route> routes =
+        (await container.read(requestRouteProvider)(
+          waypoints: <LatLon>[
+            const LatLon(52.5200, 13.4050),
+            const LatLon(52.5300, 13.4200),
+          ],
+          mode: TravelMode.cycle,
+        )).valueOrNull ??
+        const <Route>[];
+    expect(routes, isNotEmpty);
+
+    final NavigationController controller = container.read(
+      navigationControllerProvider.notifier,
+    );
+    controller.start(routes.first, mode: TravelMode.cycle);
+    final FakeMapService map =
+        container.read(mapServiceProvider) as FakeMapService;
+
+    controller.step(meters: 400);
+    expect(map.traveledPath.length, greaterThanOrEqualTo(2));
+    final LatLon start = map.traveledPath.first;
+
+    // The reroute replaces the drawn route, but the covered path is kept.
+    await controller.handlePosition(
+      const LocationSample(position: LatLon(52.6000, 13.6000)),
+    );
+    expect(map.traveledPath.length, greaterThanOrEqualTo(2));
+    expect(map.traveledPath.first, start);
+
+    // Ending the trip clears the trail.
+    controller.stop();
+    expect(map.traveledPath, isEmpty);
+  });
+
+  test(
+    'a fix between vertices moves the travelled distance smoothly',
+    () async {
+      final ProviderContainer container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      const double metersPerDegree = 111320;
+      final Route route = Route(
+        legs: <Leg>[
+          Leg(
+            maneuvers: const <Maneuver>[
+              Maneuver(
+                instruction: 'Ride north',
+                type: ManeuverType.depart,
+                distanceMeters: 1000,
+              ),
+            ],
+            distanceMeters: 1000,
+            duration: const Duration(minutes: 5),
+          ),
+        ],
+        distanceMeters: 1000,
+        duration: const Duration(minutes: 5),
+        geometry: <LatLon>[
+          const LatLon(52.5200, 13.4050),
+          LatLon(52.5200 + 1000 / metersPerDegree, 13.4050),
+        ],
+      );
+
+      final NavigationController controller = container.read(
+        navigationControllerProvider.notifier,
+      );
+      controller.start(route);
+
+      // A fix halfway along the single segment, offset ~20 m to the side (still
+      // on-route): the travelled distance must advance between the vertices
+      // instead of snapping to an endpoint.
+      final LatLon offMid = LatLon(52.5200 + 500 / metersPerDegree, 13.4053);
+      await controller.handlePosition(LocationSample(position: offMid));
+
+      final NavState state = container.read(navigationControllerProvider);
+      expect(state.status, NavStatus.navigating);
+      expect(state.traveledMeters, closeTo(500, 15));
+    },
+  );
+
   test('guidance announces the upcoming maneuver, not the one just passed', () {
     final ProviderContainer container = ProviderContainer();
     addTearDown(container.dispose);

@@ -3102,6 +3102,10 @@ Map<String, Object?> _navJson(NavState nav) {
     'mode': nav.mode.name,
     'traveledMeters': nav.traveledMeters,
     'totalMeters': nav.totalMeters,
+    'tripTraveledMeters': nav.tripTraveledMeters,
+    'tripElapsedSeconds': nav.startedAt == null
+        ? 0
+        : DateTime.now().difference(nav.startedAt!).inSeconds,
     'remainingSeconds': nav.remaining.inSeconds,
     'distanceToNextManeuver': nav.distanceToNextManeuver,
     'instruction': nav.nextManeuver?.instruction,

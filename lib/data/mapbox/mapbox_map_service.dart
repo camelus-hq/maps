@@ -121,6 +121,7 @@ class MapboxMapService implements MapService {
   List<FriendMarker> _friendMarkers = const <FriendMarker>[];
   List<ReviewMarker> _reviewMarkers = const <ReviewMarker>[];
   List<RouteLine> _routeLines = const <RouteLine>[];
+  List<LatLon> _traveledPath = const <LatLon>[];
   List<TransitStopMarker> _transitStops = const <TransitStopMarker>[];
   List<LatLon>? _pendingFit;
   BaseMapStyle _baseStyle = BaseMapStyle.standard;
@@ -132,6 +133,7 @@ class MapboxMapService implements MapService {
   PointAnnotationManager? _reviewPointManager;
   PointAnnotationManager? _transitStopManager;
   PolylineAnnotationManager? _lineManager;
+  PolylineAnnotationManager? _trailManager;
   Cancelable? _markerTapCancelable;
   Cancelable? _friendTapCancelable;
   Cancelable? _reviewTapCancelable;
@@ -179,6 +181,9 @@ class MapboxMapService implements MapService {
 
   @override
   List<RouteLine> get routeLines => _routeLines;
+
+  @override
+  List<LatLon> get traveledPath => _traveledPath;
 
   @override
   Stream<String> get friendMarkerTapStream => _friendMarkerTapController.stream;
@@ -306,6 +311,7 @@ class MapboxMapService implements MapService {
     // The route-preview palette is brightness-dependent, so redraw the drawn
     // lines so an alternative stays legible after a theme switch.
     unawaited(setRouteLines(_routeLines));
+    unawaited(setTraveledPath(_traveledPath));
   }
 
   Future<void> _syncTheme() async {
@@ -333,7 +339,10 @@ class MapboxMapService implements MapService {
     unawaited(setFriendMarkers(_friendMarkers));
     unawaited(setReviewMarkers(_reviewMarkers));
     unawaited(setTransitStopMarkers(_transitStops));
+    // Route lines first, then the travelled-path trail: annotation managers
+    // draw in creation order, so the trail ends up above the route.
     unawaited(setRouteLines(_routeLines));
+    unawaited(setTraveledPath(_traveledPath));
     unawaited(_syncTraffic());
     final List<LatLon>? pendingFit = _pendingFit;
     if (pendingFit != null) {
@@ -421,6 +430,7 @@ class MapboxMapService implements MapService {
     _reviewPointManager = null;
     _transitStopManager = null;
     _lineManager = null;
+    _trailManager = null;
     _interactionsAdded = false;
     _markerTapBound = false;
     _friendTapBound = false;
@@ -858,6 +868,44 @@ class MapboxMapService implements MapService {
       return _darkMode ? _routeSelectedDark : _routeSelectedLight;
     }
     return _darkMode ? _routeAlternativeDark : _routeAlternativeLight;
+  }
+
+  /// The breadcrumb-trail colours: distinct from the teal/grey route palette so
+  /// the path actually ridden is legible over the planned route.
+  static const int _trailLight = 0xFF1D6FF2;
+  static const int _trailDark = 0xFF6FA8FF;
+
+  @override
+  Future<void> setTraveledPath(List<LatLon> points) async {
+    _traveledPath = points;
+    final MapboxMap? map = _map;
+    if (map == null || !_gate.isOpen) {
+      return; // stashed; replayed by [onStyleLoaded]
+    }
+    try {
+      final PolylineAnnotationManager manager = _trailManager ??= await map
+          .annotations
+          .createPolylineAnnotationManager();
+      await manager.deleteAll();
+      if (points.length < 2) {
+        return;
+      }
+      await manager.create(
+        PolylineAnnotationOptions(
+          geometry: LineString(
+            coordinates: <Position>[
+              for (final LatLon point in points)
+                Position(point.longitude, point.latitude),
+            ],
+          ),
+          lineColor: _darkMode ? _trailDark : _trailLight,
+          lineWidth: 5,
+          lineEmissiveStrength: _darkMode ? 1.0 : null,
+        ),
+      );
+    } catch (_) {
+      // Map disposed mid-flight.
+    }
   }
 
   @override

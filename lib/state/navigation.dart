@@ -30,6 +30,8 @@ class NavState {
     this.bearing,
     this.traveledMeters = 0,
     this.totalMeters = 0,
+    this.tripTraveledMeters = 0,
+    this.startedAt,
     this.remaining = Duration.zero,
     this.nextManeuver,
     this.distanceToNextManeuver = 0,
@@ -46,8 +48,25 @@ class NavState {
   final Route? route;
   final LatLon? position;
   final double? bearing;
+
+  /// Distance covered on the route currently being followed.
   final double traveledMeters;
+
+  /// Full length of the route currently being followed.
   final double totalMeters;
+
+  /// Distance actually covered since the trip began, carried across reroutes.
+  ///
+  /// A reroute replaces [route] (and resets [traveledMeters] to the start of
+  /// the new line), so trip statistics must use this instead of
+  /// [traveledMeters] to survive a re-plan.
+  final double tripTraveledMeters;
+
+  /// When the current guidance trip started (wall clock), or `null` while
+  /// idle. The trip's elapsed time is measured from here, so a reroute never
+  /// restarts the clock.
+  final DateTime? startedAt;
+
   final Duration remaining;
   final Maneuver? nextManeuver;
   final double distanceToNextManeuver;
@@ -78,6 +97,8 @@ class NavState {
     double? bearing,
     double? traveledMeters,
     double? totalMeters,
+    double? tripTraveledMeters,
+    DateTime? startedAt,
     Duration? remaining,
     Maneuver? nextManeuver,
     double? distanceToNextManeuver,
@@ -96,6 +117,8 @@ class NavState {
     bearing: bearing ?? this.bearing,
     traveledMeters: traveledMeters ?? this.traveledMeters,
     totalMeters: totalMeters ?? this.totalMeters,
+    tripTraveledMeters: tripTraveledMeters ?? this.tripTraveledMeters,
+    startedAt: startedAt ?? this.startedAt,
     remaining: remaining ?? this.remaining,
     nextManeuver: nextManeuver ?? this.nextManeuver,
     distanceToNextManeuver:
@@ -157,6 +180,23 @@ class NavigationController extends Notifier<NavState> {
   List<double> _cumulative = const <double>[];
   List<double> _maneuverEnds = const <double>[];
 
+  /// Distance covered on route versions a reroute has since replaced. Added to
+  /// the current route's [NavState.traveledMeters] to give the trip's covered
+  /// distance, so a re-plan does not zero the trip statistics.
+  double _tripTraveledBase = 0;
+
+  /// The breadcrumb path actually covered this trip (the trail drawn in a
+  /// distinct colour under the route). Kept across reroutes; cleared on
+  /// start/stop.
+  final List<LatLon> _trail = <LatLon>[];
+
+  /// A trail point is only recorded once the traveller has moved this far, to
+  /// keep the breadcrumb smooth and the redraws cheap.
+  static const double _trailSpacingMeters = 4;
+
+  /// Cap on recorded trail points (a bounded list: guidance can run for hours).
+  static const int _trailMaxPoints = 4000;
+
   @override
   NavState build() {
     // A user gesture (drag/pinch/rotate/tilt) stops the guidance camera from
@@ -197,6 +237,8 @@ class NavigationController extends Notifier<NavState> {
     if (route.geometry.length < 2) {
       return;
     }
+    _tripTraveledBase = 0;
+    _trail.clear();
     _loadRoute(route, transit: transit);
     // Navigation owns the camera; stop follow mode so the two don't fight.
     ref.read(followModeProvider.notifier).disable();
@@ -206,7 +248,14 @@ class NavigationController extends Notifier<NavState> {
       overview: false,
       cameraFollows: true,
       clearNotice: true,
+      // The trip clock starts here and survives every later reroute.
+      startedAt: DateTime.now(),
+      tripTraveledMeters: 0,
     );
+    // Clear any trail left from a previous trip, then seed it with the start.
+    final MapService map = ref.read(mapServiceProvider);
+    unawaited(map.setTraveledPath(const <LatLon>[]));
+    _recordTrail(state.position ?? route.geometry.first);
     _timer?.cancel();
     _timer = null;
     _live = live;
@@ -247,8 +296,10 @@ class NavigationController extends Notifier<NavState> {
       return;
     }
     final LatLon point = sample.position;
-    final (int index, double deviation) = _nearestVertex(point);
-    final double traveled = _cumulative.isEmpty ? 0 : _cumulative[index];
+    final (double traveled, double deviation) = _projectOntoRoute(point);
+    // Record where the traveller actually went before any reroute branch, so
+    // the trail keeps the off-route detour too.
+    _recordTrail(point);
     // A public-transport journey is followed as-is: straying from the line
     // (GPS noise at a station, a parallel street) must not trigger a road
     // reroute — the provider's journey is not a drivable route.
@@ -262,6 +313,7 @@ class NavigationController extends Notifier<NavState> {
         status: NavStatus.arrived,
         position: point,
         traveledMeters: state.totalMeters,
+        tripTraveledMeters: _tripTraveledBase + state.totalMeters,
         remaining: Duration.zero,
         clearNotice: true,
         transitProgress: state.transit == null ? null : TransitProgress.arrived,
@@ -284,7 +336,10 @@ class NavigationController extends Notifier<NavState> {
     _fittedRideLeg = null;
     _driftStreak = 0;
     _lastReplanAt = null;
+    _tripTraveledBase = 0;
+    _trail.clear();
     state = const NavState();
+    unawaited(ref.read(mapServiceProvider).setTraveledPath(const <LatLon>[]));
   }
 
   /// Switches the travel mode of the running guidance session without touching
@@ -371,6 +426,7 @@ class NavigationController extends Notifier<NavState> {
         position: position ?? (_geometry.isEmpty ? null : _geometry.last),
         traveledMeters: total,
         totalMeters: total,
+        tripTraveledMeters: _tripTraveledBase + total,
         remaining: Duration.zero,
         maneuverIndex: _maneuverEnds.length - 1,
         clearNotice: true,
@@ -379,6 +435,8 @@ class NavigationController extends Notifier<NavState> {
       return;
     }
     final (LatLon, double?) at = _positionAndBearing(routedTraveled);
+    final LatLon resolved = position ?? at.$1;
+    _recordTrail(resolved);
     final int segment = _segmentIndex(routedTraveled);
     final List<Maneuver> maneuvers = _maneuvers(route);
     // The banner announces the maneuver *ahead*, not the one just performed:
@@ -399,10 +457,11 @@ class NavigationController extends Notifier<NavState> {
     final TransitProgress? progress = state.transit?.progressAt(routedTraveled);
     state = state.copyWith(
       status: NavStatus.navigating,
-      position: position ?? at.$1,
+      position: resolved,
       bearing: bearing ?? at.$2,
       traveledMeters: routedTraveled,
       totalMeters: total,
+      tripTraveledMeters: _tripTraveledBase + routedTraveled,
       // A transit journey is scheduled, not distance-paced: the time left is the
       // gap to the itinerary's arrival, so the ETA matches the timetable (a
       // road route is estimated from the distance covered).
@@ -596,6 +655,9 @@ class NavigationController extends Notifier<NavState> {
           return;
         }
         final Route rerouted = routes.first;
+        // Carry the distance already covered on the replaced route into the
+        // trip total, so the trip statistics survive the reroute.
+        _tripTraveledBase += state.traveledMeters;
         _loadRoute(rerouted);
         state = state.copyWith(status: NavStatus.navigating, clearNotice: true);
         // Redraw the polyline on the map (and keep the route preview in sync) so
@@ -627,6 +689,7 @@ class NavigationController extends Notifier<NavState> {
       route: route,
       totalMeters: total,
       traveledMeters: 0,
+      tripTraveledMeters: _tripTraveledBase,
       remaining: _scheduledRemaining(transit) ?? route.duration,
       position: _geometry.isEmpty ? null : _geometry.first,
       nextManeuver: nextIndex < 0 ? null : maneuvers[nextIndex],
@@ -634,6 +697,24 @@ class NavigationController extends Notifier<NavState> {
       maneuverIndex: nextIndex < 0 ? 0 : nextIndex,
       transit: transit,
       transitProgress: transit?.progressAt(0),
+    );
+  }
+
+  /// Records [point] on the trip's breadcrumb trail and redraws it, skipping
+  /// points closer than [_trailSpacingMeters] and bounding the list.
+  void _recordTrail(LatLon point) {
+    if (_trail.isNotEmpty &&
+        _trail.last.distanceTo(point) < _trailSpacingMeters) {
+      return;
+    }
+    _trail.add(point);
+    if (_trail.length > _trailMaxPoints) {
+      _trail.removeRange(0, _trail.length - _trailMaxPoints);
+    }
+    unawaited(
+      ref
+          .read(mapServiceProvider)
+          .setTraveledPath(List<LatLon>.unmodifiable(_trail)),
     );
   }
 
@@ -711,17 +792,57 @@ class NavigationController extends Notifier<NavState> {
     return Duration(milliseconds: millis.clamp(200, 2000));
   }
 
-  (int, double) _nearestVertex(LatLon point) {
-    int best = 0;
-    double bestDistance = double.infinity;
-    for (int i = 0; i < _geometry.length; i++) {
-      final double distance = _geometry[i].distanceTo(point);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        best = i;
+  /// Locates [point] on the route: the distance travelled along the polyline
+  /// (interpolated **within** a segment, so it advances with every fix rather
+  /// than snapping to the next vertex) and the perpendicular distance from the
+  /// route ([_deviationMeters] is measured against this).
+  (double, double) _projectOntoRoute(LatLon point) {
+    if (_geometry.isEmpty) {
+      return (0, double.infinity);
+    }
+    if (_geometry.length == 1) {
+      return (0, _geometry.first.distanceTo(point));
+    }
+    double bestTraveled = 0;
+    double bestDeviation = double.infinity;
+    for (int i = 0; i + 1 < _geometry.length; i++) {
+      final (double t, double deviation) = _projectOnSegment(
+        point,
+        _geometry[i],
+        _geometry[i + 1],
+      );
+      if (deviation < bestDeviation) {
+        bestDeviation = deviation;
+        bestTraveled =
+            _cumulative[i] + (_cumulative[i + 1] - _cumulative[i]) * t;
       }
     }
-    return (best, bestDistance);
+    return (bestTraveled, bestDeviation);
+  }
+
+  /// Projects [point] onto the segment [a]–[b], returning the clamped fraction
+  /// `t` from [a] to [b] and the perpendicular distance in metres. Uses a local
+  /// equirectangular projection (plenty accurate at street scale).
+  static (double, double) _projectOnSegment(LatLon point, LatLon a, LatLon b) {
+    const double metersPerDegree = 111320;
+    final double cosLat = math
+        .cos(point.latitude * math.pi / 180)
+        .abs()
+        .clamp(0.01, 1.0);
+    double x(LatLon q) =>
+        (q.longitude - point.longitude) * metersPerDegree * cosLat;
+    double y(LatLon q) => (q.latitude - point.latitude) * metersPerDegree;
+    final double ax = x(a);
+    final double ay = y(a);
+    final double dx = x(b) - ax;
+    final double dy = y(b) - ay;
+    final double lengthSquared = dx * dx + dy * dy;
+    final double t = lengthSquared <= 0
+        ? 0
+        : ((-ax * dx - ay * dy) / lengthSquared).clamp(0.0, 1.0);
+    final double px = ax + dx * t;
+    final double py = ay + dy * t;
+    return (t, math.sqrt(px * px + py * py));
   }
 
   List<double> _cumulativeDistances(List<LatLon> geometry) {

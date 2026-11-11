@@ -57,6 +57,16 @@ abstract interface class MapService {
   /// The route polylines currently drawn.
   List<RouteLine> get routeLines;
 
+  /// Draws the breadcrumb trail of the path actually covered during the
+  /// current navigation trip, on its own layer **above** the route lines (in a
+  /// distinct colour), so the part of the route already ridden reads as
+  /// progress and any off-route detour stays visible. Fewer than two points
+  /// clears it.
+  Future<void> setTraveledPath(List<LatLon> points);
+
+  /// The breadcrumb trail currently drawn.
+  List<LatLon> get traveledPath;
+
   /// Replaces the visible markers.
   Future<void> setMarkers(List<Marker> markers);
 
