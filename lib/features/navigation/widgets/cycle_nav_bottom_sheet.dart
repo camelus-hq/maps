@@ -172,13 +172,13 @@ class _CycleNavBottomSheetState extends ConsumerState<CycleNavBottomSheet> {
         : (tripTraveled / elapsed.inSeconds) * 3.6;
 
     final (String, String) traveledText = splitUnit(
-      formatDistance(tripTraveled, imperial: imperial),
+      formatDistance(tripTraveled, imperial: imperial, precise: true),
     );
     final (String, String) remainingText = splitUnit(
-      formatDistance(remaining, imperial: imperial),
+      formatDistance(remaining, imperial: imperial, precise: true),
     );
     final (String, String) totalText = splitUnit(
-      formatDistance(totalDistance, imperial: imperial),
+      formatDistance(totalDistance, imperial: imperial, precise: true),
     );
     final (String, String) elapsedText = splitUnit(formatDuration(elapsed));
     final (String, String) leftText = splitUnit(formatDuration(nav.remaining));

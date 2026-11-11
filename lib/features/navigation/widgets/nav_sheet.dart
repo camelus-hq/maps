@@ -8,6 +8,7 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format.dart';
 import '../../../domain/entities/map_style.dart';
 import '../../../domain/entities/route.dart';
+import '../../../domain/entities/travel_mode.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/location.dart';
 import '../../../state/map_layers.dart';
@@ -152,6 +153,10 @@ class NavEtaHeader extends ConsumerWidget {
     final bool gpsLost = location.lost && !arrived;
     final double remainingDistance = (nav.totalMeters - nav.traveledMeters)
         .clamp(0, double.infinity);
+    // Walking and cycling readouts change every few metres, so keep the extra
+    // decimal there; driving keeps the shorter 100 m-step form.
+    final bool precise =
+        nav.mode == TravelMode.walk || nav.mode == TravelMode.cycle;
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
@@ -180,7 +185,11 @@ class NavEtaHeader extends ConsumerWidget {
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       Text(
-                        formatDistance(nav.totalMeters, imperial: imperial),
+                        formatDistance(
+                          nav.totalMeters,
+                          imperial: imperial,
+                          precise: precise,
+                        ),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
@@ -206,7 +215,7 @@ class NavEtaHeader extends ConsumerWidget {
                         ],
                       ),
                       Text(
-                        '${formatDistance(remainingDistance, imperial: imperial)}'
+                        '${formatDistance(remainingDistance, imperial: imperial, precise: precise)}'
                         ' • Arrives ${arrivalLabel(context, nav.remaining)}',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),

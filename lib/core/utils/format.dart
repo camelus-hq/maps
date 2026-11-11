@@ -2,17 +2,26 @@
 library;
 
 /// Distance in metres → "850 m" / "5.4 km" (metric) or "0.5 mi" (imperial).
-String formatDistance(double meters, {bool imperial = false}) {
+///
+/// Pass [precise] for the active-travel modes (walking/cycling), where the
+/// readout changes every few metres: above a kilometre it keeps two decimals
+/// (10 m steps) instead of one (100 m steps), so the number visibly moves as
+/// you go.
+String formatDistance(
+  double meters, {
+  bool imperial = false,
+  bool precise = false,
+}) {
   if (imperial) {
     final double miles = meters / 1609.344;
     if (miles < 0.19) {
       return '${(meters * 3.28084).round()} ft';
     }
-    return '${miles.toStringAsFixed(1)} mi';
+    return '${miles.toStringAsFixed(precise ? 2 : 1)} mi';
   }
   return meters < 1000
       ? '${meters.round()} m'
-      : '${(meters / 1000).toStringAsFixed(1)} km';
+      : '${(meters / 1000).toStringAsFixed(precise ? 2 : 1)} km';
 }
 
 /// A duration → "12 min" / "1 h 5 min".

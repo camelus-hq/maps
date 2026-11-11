@@ -36,11 +36,11 @@ class WalkNavBottomSheet extends ConsumerWidget {
     final double totalDistance =
         nav.tripTraveledMeters.clamp(0, double.infinity) + remaining;
     final (String, String) remainingText = splitUnit(
-      formatDistance(remaining, imperial: imperial),
+      formatDistance(remaining, imperial: imperial, precise: true),
     );
     final (String, String) timeText = splitUnit(formatDuration(nav.remaining));
     final (String, String) totalText = splitUnit(
-      formatDistance(totalDistance, imperial: imperial),
+      formatDistance(totalDistance, imperial: imperial, precise: true),
     );
     return NavSheet(
       nav: nav,

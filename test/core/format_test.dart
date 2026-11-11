@@ -9,6 +9,14 @@ void main() {
     expect(formatDistance(5000, imperial: true), '3.1 mi');
   });
 
+  test('formatDistance precise keeps a second decimal above a kilometre', () {
+    expect(formatDistance(1430, precise: true), '1.43 km');
+    expect(formatDistance(1430), '1.4 km');
+    // Sub-kilometre distances are whole metres either way.
+    expect(formatDistance(850, precise: true), '850 m');
+    expect(formatDistance(5000, imperial: true, precise: true), '3.11 mi');
+  });
+
   test('formatDuration compacts hours', () {
     expect(formatDuration(const Duration(minutes: 12)), '12 min');
     expect(formatDuration(const Duration(minutes: 65)), '1 h 5 min');

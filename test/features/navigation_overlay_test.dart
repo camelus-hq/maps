@@ -81,6 +81,32 @@ Route _turnRoute({
   );
 }
 
+/// A straight ~1.43 km route, for exercising kilometre-precision readouts.
+Route _longRoute({double meters = 1430}) {
+  const double metersPerDegree = 111320;
+  return Route(
+    legs: <Leg>[
+      Leg(
+        maneuvers: <Maneuver>[
+          Maneuver(
+            instruction: 'Ride on',
+            type: ManeuverType.depart,
+            distanceMeters: meters,
+          ),
+        ],
+        distanceMeters: meters,
+        duration: const Duration(minutes: 6),
+      ),
+    ],
+    distanceMeters: meters,
+    duration: const Duration(minutes: 6),
+    geometry: <LatLon>[
+      const LatLon(52.5200, 13.4050),
+      LatLon(52.5200 + meters / metersPerDegree, 13.4050),
+    ],
+  );
+}
+
 /// A route whose elevation profile climbs steeply right from the start, so the
 /// cycling sheet's "climb ahead" auto-switch fires.
 Route _hillRoute() {
@@ -369,6 +395,29 @@ void main() {
     expect(find.text('Speed'), findsOneWidget);
     expect(find.text('To end'), findsOneWidget);
     expect(find.text('Average speed'), findsOneWidget);
+  });
+
+  testWidgets('walk/cycle distances keep a second decimal; drive keeps one', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+    await _pumpApp(tester, container);
+
+    final NavigationController controller = container.read(
+      navigationControllerProvider.notifier,
+    );
+    controller.start(_longRoute(), mode: TravelMode.cycle);
+    await tester.pump();
+
+    // 1430 m reads as 1.43 km in the ETA header for cycling...
+    expect(find.textContaining('1.43 km'), findsWidgets);
+
+    // ...but driving keeps the shorter one-decimal form.
+    controller.setMode(TravelMode.drive);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('1.43 km'), findsNothing);
+    expect(find.textContaining('1.4 km'), findsWidgets);
   });
 
   testWidgets('the cycling ride stats swipe horizontally through pages', (
