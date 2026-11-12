@@ -448,6 +448,13 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
       rows.add(
         const _InfoRow(icon: Icons.accessible, text: 'Wheelchair accessible'),
       );
+    } else if (place.wheelchairAccessible == false) {
+      rows.add(
+        const _InfoRow(
+          icon: Icons.not_accessible,
+          text: 'Not wheelchair accessible',
+        ),
+      );
     }
     final String? wheelchairDescription = place.wheelchairDescription;
     if (wheelchairDescription != null) {
@@ -462,9 +469,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
       );
     }
     final List<OsmPaymentMethod> payments = place.paymentMethods;
-    if (payments.isNotEmpty) {
-      rows.add(OsmPaymentMethods(methods: payments));
-    }
+    rows.add(OsmPaymentMethods(methods: payments, tags: place.osmTags));
     final String? paymentDescription = place.paymentDescription;
     if (paymentDescription != null) {
       rows.add(_InfoRow(icon: Icons.notes_outlined, text: paymentDescription));

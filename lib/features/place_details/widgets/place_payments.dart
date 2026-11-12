@@ -17,20 +17,36 @@ String osmPaymentTooltip(OsmPaymentMethod method) {
   return '${method.label} · ${method.value}';
 }
 
-/// The Overview "Payment" section: every accepted `payment:*` method as an icon
-/// with a tooltip. Only the methods the place takes are shown.
+/// The Overview "Payment" section: accepted `payment:*` methods as icons, or a
+/// note when OpenStreetMap has no accepted methods listed.
 class OsmPaymentMethods extends StatelessWidget {
-  const OsmPaymentMethods({super.key, required this.methods});
+  const OsmPaymentMethods({
+    super.key,
+    required this.methods,
+    required this.tags,
+  });
 
   final List<OsmPaymentMethod> methods;
+  final Map<String, String> tags;
+
+  static const Map<String, String> _cardMethodLabels = <String, String>{
+    'payment:cards': 'Cards',
+    'payment:credit_cards': 'Credit cards',
+    'payment:debit_cards': 'Debit cards',
+  };
 
   @override
   Widget build(BuildContext context) {
-    if (methods.isEmpty) {
-      return const SizedBox.shrink();
-    }
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
+    final List<String> notAcceptedCards = _cardMethodLabels.entries
+        .where(
+          (MapEntry<String, String> entry) =>
+              tags.containsKey(entry.key) &&
+              !OsmPaymentCatalog.isAccepted(tags[entry.key]),
+        )
+        .map((MapEntry<String, String> entry) => entry.value)
+        .toList(growable: false);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: Column(
@@ -50,15 +66,60 @@ class OsmPaymentMethods extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          Padding(
-            padding: const EdgeInsets.only(left: AppSpacing.md + 20),
-            child: Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: <Widget>[
-                for (final OsmPaymentMethod method in methods)
-                  _PaymentIcon(method: method),
-              ],
+          if (methods.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: AppSpacing.md + 20),
+              child: Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: <Widget>[
+                  for (final OsmPaymentMethod method in methods)
+                    _PaymentIcon(method: method),
+                ],
+              ),
+            )
+          else if (notAcceptedCards.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: AppSpacing.md + 20),
+              child: Text(
+                'Payment options not listed',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          if (notAcceptedCards.isNotEmpty)
+            _NotAcceptedCardMethods(methods: notAcceptedCards),
+        ],
+      ),
+    );
+  }
+}
+
+class _NotAcceptedCardMethods extends StatelessWidget {
+  const _NotAcceptedCardMethods({required this.methods});
+
+  final List<String> methods;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final ColorScheme scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(
+        left: AppSpacing.md + 20,
+        top: AppSpacing.sm,
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(Icons.credit_card_off, size: 18, color: scheme.onSurfaceVariant),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              'Not accepted: ${methods.join(', ')}',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
             ),
           ),
         ],

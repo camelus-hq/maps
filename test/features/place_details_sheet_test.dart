@@ -195,6 +195,31 @@ void main() {
     expect(external.calls, <String>['030 53166994']);
   });
 
+  testWidgets('shows explicit unavailable wheelchair and payment states', (
+    WidgetTester tester,
+  ) async {
+    osm.seed(
+      unreviewed.id,
+      const Place(
+        id: 'node/111',
+        name: 'Willow Park',
+        position: LatLon(52.5150, 13.4030),
+        wheelchairAccessible: false,
+        osmTags: <String, String>{'payment:cash': 'no'},
+      ),
+    );
+    final ProviderContainer c = container();
+    addTearDown(c.dispose);
+    await pump(tester, c, unreviewed);
+    await expand(tester);
+
+    expect(find.text('Not wheelchair accessible'), findsOneWidget);
+    expect(find.byIcon(Icons.not_accessible), findsOneWidget);
+    expect(find.text('Payment'), findsOneWidget);
+    expect(find.text('Payment options not listed'), findsOneWidget);
+    expect(find.byTooltip('Cash'), findsNothing);
+  });
+
   testWidgets('the Call pill is disabled without a phone number', (
     WidgetTester tester,
   ) async {
@@ -298,6 +323,36 @@ void main() {
     expect(find.byTooltip('Girocard (only)'), findsOneWidget);
     // Declined methods are never shown.
     expect(find.byTooltip('American Express'), findsNothing);
+  });
+
+  testWidgets('shows card methods explicitly marked as not accepted', (
+    WidgetTester tester,
+  ) async {
+    osm.seed(
+      unreviewed.id,
+      const Place(
+        id: 'node/111',
+        name: 'Willow Park',
+        position: LatLon(52.5150, 13.4030),
+        osmTags: <String, String>{
+          'payment:cards': 'no',
+          'payment:credit_cards': 'no',
+          'payment:debit_cards': 'no',
+          'payment:visa': 'yes',
+        },
+      ),
+    );
+    final ProviderContainer c = container();
+    addTearDown(c.dispose);
+    await pump(tester, c, unreviewed);
+    await expand(tester);
+
+    expect(find.byTooltip('Visa'), findsOneWidget);
+    expect(
+      find.text('Not accepted: Cards, Credit cards, Debit cards'),
+      findsOneWidget,
+    );
+    expect(find.byIcon(Icons.credit_card_off), findsOneWidget);
   });
 
   testWidgets('promotes Lightning and Cashu below the review', (
