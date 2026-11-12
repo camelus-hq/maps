@@ -971,17 +971,41 @@ bool isTransitStopPlace(Place place) {
 }
 
 /// [routes] without the long-distance rail lines (high-speed / intercity /
-/// night), so a main station's line list is the local and regional network
-/// rather than every long-distance train number. Falls back to the full list
-/// when a stop is served only by long-distance trains.
+/// night) or long-distance coaches, so a main station's line list is the local
+/// and regional network rather than every long-distance train number. Falls back
+/// to the full list when a stop is served only by long-distance services.
+///
+/// The result is ordered by mode importance (S-Bahn / regional rail, then
+/// subway, tram and bus), so when a mega-interchange is capped the useful lines
+/// are the ones shown first.
 List<TransitStopRoute> localStopRoutes(Iterable<TransitStopRoute> routes) {
   final List<TransitStopRoute> all = routes.toList(growable: false);
   final List<TransitStopRoute> local = <TransitStopRoute>[
     for (final TransitStopRoute route in all)
       if (!route.mode.isLongDistance) route,
   ];
-  return local.isEmpty ? all : local;
+  final List<TransitStopRoute> ordered = local.isEmpty ? all : local;
+  final List<TransitStopRoute> sorted = ordered.toList()
+    ..sort((TransitStopRoute a, TransitStopRoute b) {
+      final int byRank = _modeRank(a.mode).compareTo(_modeRank(b.mode));
+      return byRank != 0 ? byRank : a.lineLabel.compareTo(b.lineLabel);
+    });
+  return List<TransitStopRoute>.unmodifiable(sorted);
 }
+
+/// Display order for the lines serving a stop: the trunk rail network first,
+/// then rapid transit, trams and buses.
+int _modeRank(TransitMode mode) => switch (mode) {
+  TransitMode.suburbanRail => 0,
+  TransitMode.regionalRail => 1,
+  TransitMode.rail => 2,
+  TransitMode.subway || TransitMode.metro => 3,
+  TransitMode.tram => 4,
+  TransitMode.trolleybus => 5,
+  TransitMode.bus || TransitMode.regionalBus => 6,
+  TransitMode.ferry => 7,
+  _ => 8,
+};
 
 /// A present, trimmed, lower-cased OSM tag value, or `null`.
 String? _tagValue(Map<String, String> tags, String key) {
