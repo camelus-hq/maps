@@ -41,6 +41,12 @@ abstract final class MotisPlanDto {
     return List<TransitItinerary>.unmodifiable(itineraries);
   }
 
+  /// Maps a single `/trip` response (an [Itinerary] object, not wrapped in an
+  /// `itineraries` list) to a domain [TransitItinerary], or `null` when the
+  /// payload carries no usable legs.
+  static TransitItinerary? itineraryFromResponse(Object? raw) =>
+      _itinerary(raw);
+
   static TransitItinerary? _itinerary(Object? raw) {
     if (raw is! Map) {
       return null;

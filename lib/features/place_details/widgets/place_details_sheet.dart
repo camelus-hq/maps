@@ -11,25 +11,44 @@ import '../../../domain/entities/lat_lon.dart';
 import '../../../domain/entities/place.dart';
 import '../../../domain/entities/review_place.dart';
 import '../../../domain/entities/review_summary.dart';
+import '../../../domain/entities/transit.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/place.dart';
 import '../../../state/reviews.dart';
 import '../../../state/route.dart';
 import '../../../state/search.dart';
 import '../../../state/settings.dart';
+import '../../../state/transit_stop_board.dart';
 import '../../../state/usecases.dart';
 import '../../common/map_sheet.dart';
 import '../../reviews/widgets/place_reviews_section.dart';
 import '../../reviews/widgets/star_rating.dart';
+import 'place_departures_tab.dart';
 import 'place_hours_line.dart';
 import 'place_osm_tags.dart';
 import 'place_payments.dart';
 import 'place_photos.dart';
 import 'place_weekly_hours.dart';
 
-/// The three panes of the place sheet, like the reference app: the summary
-/// facts, the reviews, and our own photos.
-enum _PlaceTab { overview, reviews, photos }
+/// The panes of the place sheet. **Departures** is only shown for a
+/// public-transport stop/station and always comes first (before Overview), like
+/// the reference app.
+enum _PlaceTab { departures, overview, reviews, photos }
+
+/// The panes shown for a non-transit place.
+const List<_PlaceTab> _baseTabs = <_PlaceTab>[
+  _PlaceTab.overview,
+  _PlaceTab.reviews,
+  _PlaceTab.photos,
+];
+
+/// Every pane, in order, for a transit stop.
+const List<_PlaceTab> _transitTabs = <_PlaceTab>[
+  _PlaceTab.departures,
+  _PlaceTab.overview,
+  _PlaceTab.reviews,
+  _PlaceTab.photos,
+];
 
 /// Draggable bottom sheet for the selected place.
 ///
@@ -49,7 +68,7 @@ class PlaceDetailsSheet extends ConsumerStatefulWidget {
 }
 
 class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   /// The default half height and the full height.
   static const double _half = 0.5;
   static const double _full = 0.9;
@@ -68,15 +87,33 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
 
   /// Drives the real Material [TabBar] (animated indicator) and the animated
   /// body switch below it.
-  late final TabController _tabs = TabController(
-    length: _PlaceTab.values.length,
-    vsync: this,
-  );
+  late TabController _tabs;
+
+  /// The panes currently shown (3, or 4 with Departures for a transit stop).
+  List<_PlaceTab> _visibleTabs = _baseTabs;
+
+  /// Whether [_visibleTabs] currently includes the Departures pane.
+  bool _showingTransitTabs = false;
+
+  /// Whether the stop board has been opened for this place (so the async OSM
+  /// lookup flipping the place to "transit" opens it exactly once).
+  bool _boardRequested = false;
+
+  /// The board notifier, captured so [dispose] can close the board without
+  /// touching `ref` (which is unsafe once the widget is deactivated).
+  late final TransitStopBoardController _board;
 
   @override
   void initState() {
     super.initState();
-    _tabs.addListener(_onTabChanged);
+    _board = ref.read(transitStopBoardProvider.notifier);
+    // A station opens on its Departures tab; the OSM lookup may flip a place to
+    // "transit" later and `_syncTransitTabs` re-selects it then.
+    final bool transit = isTransitStopPlace(widget.place);
+    _showingTransitTabs = transit;
+    _visibleTabs = transit ? _transitTabs : _baseTabs;
+    _tabs = TabController(length: _visibleTabs.length, vsync: this)
+      ..addListener(_onTabChanged);
   }
 
   @override
@@ -84,6 +121,10 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     _tabs
       ..removeListener(_onTabChanged)
       ..dispose();
+    // Closing the sheet clears the stop board and the lines it drew — but not
+    // when another place sheet (with a different place) has already replaced it
+    // under the sheet switcher and opened its own board.
+    _board.closeFor(widget.place.id);
     super.dispose();
   }
 
@@ -92,6 +133,56 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
       // Rebuild once the indicator has settled on the new tab.
       setState(() {});
     }
+  }
+
+  /// The sheet index of [tab] within the currently visible panes.
+  int _tabIndex(_PlaceTab tab) {
+    final int index = _visibleTabs.indexOf(tab);
+    return index < 0 ? 0 : index;
+  }
+
+  /// Switches the pane set when the place turns out to be a transit stop (the
+  /// OSM element lookup can land after the sheet opens). Done after the frame so
+  /// the ticker is never rebuilt during build.
+  void _syncTransitTabs(bool transit) {
+    if (transit == _showingTransitTabs) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || transit == _showingTransitTabs) {
+        return;
+      }
+      setState(() {
+        final _PlaceTab current =
+            _visibleTabs[_tabs.index.clamp(0, _visibleTabs.length - 1)];
+        _visibleTabs = transit ? _transitTabs : _baseTabs;
+        _showingTransitTabs = transit;
+        _tabs
+          ..removeListener(_onTabChanged)
+          ..dispose();
+        _tabs = TabController(
+          length: _visibleTabs.length,
+          // A station opens straight on its departures.
+          initialIndex: transit
+              ? _tabIndex(_PlaceTab.departures)
+              : _tabIndex(current),
+          vsync: this,
+        )..addListener(_onTabChanged);
+      });
+    });
+  }
+
+  /// Opens the stop board (departures + map lines) once for a transit place.
+  void _openBoardIfTransit(Place place) {
+    if (_boardRequested || !isTransitStopPlace(place)) {
+      return;
+    }
+    _boardRequested = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _board.openFromPlace(place);
+      }
+    });
   }
 
   /// Re-measures the summary after layout and updates the peek if it changed.
@@ -138,6 +229,12 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     final double peek = (_peekFraction ?? _peekFallback).clamp(0.1, 0.45);
     WidgetsBinding.instance.addPostFrameCallback((_) => _measurePeek(viewport));
 
+    // A transit stop gets a Departures tab first and its lines drawn on the map;
+    // both can switch on when the OSM lookup lands.
+    final bool transit = isTransitStopPlace(place);
+    _syncTransitTabs(transit);
+    _openBoardIfTransit(place);
+
     return MapSheet(
       initialChildSize: _half,
       minChildSize: peek,
@@ -179,6 +276,9 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
                     OsmCryptoBadges(methods: place.promotedPayments),
                   const SizedBox(height: AppSpacing.xs),
                   _subtitle(context, place),
+                  // The lines serving a tapped transit stop, in their own
+                  // colours, like the other transit screens.
+                  if (transit) const PlaceStopLines(),
                   PlaceHoursLine(hours: place.openingHours),
                   const SizedBox(height: AppSpacing.md),
                   _actions(context, place),
@@ -257,7 +357,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
       );
     }
     return InkWell(
-      onTap: () => _tabs.animateTo(_PlaceTab.reviews.index),
+      onTap: () => _tabs.animateTo(_tabIndex(_PlaceTab.reviews)),
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
@@ -339,7 +439,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     );
   }
 
-  /// The real Material tab bar (animated indicator) for the three panes.
+  /// The real Material tab bar (animated indicator) for the visible panes.
   Widget _tabBar(BuildContext context) {
     final ColorScheme scheme = Theme.of(context).colorScheme;
     return TabBar(
@@ -351,16 +451,24 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
       labelStyle: const TextStyle(fontWeight: FontWeight.w600),
       unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500),
       dividerColor: scheme.outlineVariant,
-      tabs: const <Widget>[
-        Tab(text: 'Overview'),
-        Tab(text: 'Reviews'),
-        Tab(text: 'Photos'),
+      tabs: <Widget>[
+        for (final _PlaceTab tab in _visibleTabs) Tab(text: _tabLabel(tab)),
       ],
     );
   }
 
+  static String _tabLabel(_PlaceTab tab) => switch (tab) {
+    _PlaceTab.departures => 'Departures',
+    _PlaceTab.overview => 'Overview',
+    _PlaceTab.reviews => 'Reviews',
+    _PlaceTab.photos => 'Photos',
+  };
+
   Widget _tabBody(BuildContext context, Place place, ReviewSummary summary) {
-    final Widget body = switch (_PlaceTab.values[_tabs.index]) {
+    final _PlaceTab tab =
+        _visibleTabs[_tabs.index.clamp(0, _visibleTabs.length - 1)];
+    final Widget body = switch (tab) {
+      _PlaceTab.departures => const PlaceDeparturesTab(),
       _PlaceTab.overview => _overview(context, place),
       _PlaceTab.reviews => PlaceReviewsSection(
         place: place,
@@ -377,10 +485,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
       switchOutCurve: Curves.easeIn,
       transitionBuilder: (Widget child, Animation<double> animation) =>
           FadeTransition(opacity: animation, child: child),
-      child: KeyedSubtree(
-        key: ValueKey<_PlaceTab>(_PlaceTab.values[_tabs.index]),
-        child: body,
-      ),
+      child: KeyedSubtree(key: ValueKey<_PlaceTab>(tab), child: body),
     );
   }
 

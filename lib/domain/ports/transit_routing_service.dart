@@ -16,4 +16,15 @@ abstract interface class TransitRoutingService {
   /// empty list when the provider knows of none; failures surface as
   /// [AppException]s, never an untyped error.
   Future<List<TransitStopDeparture>> departures(TransitDeparturesQuery query);
+
+  /// The static information for one stop: its canonical id/name/position and
+  /// the lines (routes) that serve it, without a time-based query. Used for the
+  /// line chips on a station sheet. Failures surface as [AppException]s.
+  Future<TransitStopInfo> stopInfo(TransitStopQuery query);
+
+  /// The full shape of one trip (one vehicle run of a line): its geometry and
+  /// every stop along it, so the whole line can be drawn on the map for a
+  /// tapped stop. `tripId` comes from a [TransitStopDeparture]. Failures surface
+  /// as [AppException]s.
+  Future<TransitItinerary> trip(String tripId);
 }

@@ -8,6 +8,7 @@ import '../../domain/entities/lat_lon.dart';
 import '../../domain/entities/transit.dart';
 import '../../domain/ports/transit_routing_service.dart';
 import '../dto/motis_plan_dto.dart';
+import '../dto/motis_stop_dto.dart';
 import '../dto/motis_stoptimes_dto.dart';
 
 /// [TransitRoutingService] backed by the Transitous (MOTIS 2) HTTP API.
@@ -61,25 +62,117 @@ class TransitousTransitRoutingService implements TransitRoutingService {
   Future<List<TransitStopDeparture>> departures(
     TransitDeparturesQuery query,
   ) async {
-    final String stopId = query.stopId.trim();
-    if (stopId.isEmpty) {
-      throw const ValidationException('A stop id is required');
+    final String? stopId = query.stopId?.trim();
+    final bool hasId = stopId != null && stopId.isNotEmpty;
+    if (!hasId && query.position == null) {
+      throw const ValidationException('A stop id or a coordinate is required');
     }
-    final Uri uri =
-        Uri.parse('${baseUrl.replaceFirst(RegExp(r'/+$'), '')}/v1/stoptimes')
-            .replace(
-              queryParameters: <String, String>{
-                'stopId': stopId,
-                'n': query.limit.clamp(1, 40).toString(),
-                if (query.time != null) 'time': _formatTime(query.time!),
-              },
-            );
+    final Uri uri = Uri.parse('$_base/v6/stoptimes').replace(
+      queryParameters: <String, String>{
+        if (hasId) 'stopId': stopId,
+        if (!hasId && query.position != null) 'center': _place(query.position!),
+        if (!hasId && query.position != null)
+          'radius': query.radiusMeters.clamp(1, 2000).toString(),
+        'n': query.limit.clamp(1, 40).toString(),
+        if (query.time != null) 'time': _formatTime(query.time!),
+        'direction': query.direction == TransitDeparturesDirection.earlier
+            ? 'EARLIER'
+            : 'LATER',
+      },
+    );
     final Object? decoded = await _getJson(
       uri,
       what: 'Loading departures failed',
     );
     return MotisStoptimesDto.departuresFromResponse(decoded);
   }
+
+  @override
+  Future<TransitStopInfo> stopInfo(TransitStopQuery query) async {
+    final String? stopId = query.stopId?.trim();
+    final bool hasId = stopId != null && stopId.isNotEmpty;
+    final LatLon? position = query.position;
+    if (!hasId && position == null) {
+      throw const ValidationException('A stop id or a coordinate is required');
+    }
+    // With only a coordinate, resolve the canonical stop first (so the sheet
+    // shows the provider's own stop name and the lines are complete), falling
+    // back to a radius query when nothing resolves.
+    String? resolvedId = hasId ? stopId : null;
+    resolvedId ??= position == null
+        ? null
+        : await _reverseGeocodeStopId(position);
+    final Uri uri = Uri.parse('$_base/v6/stop').replace(
+      queryParameters: <String, String>{
+        'stopId': ?resolvedId,
+        if (resolvedId == null && position != null) 'center': _place(position),
+        if (resolvedId == null && position != null)
+          'radius': query.radiusMeters.clamp(1, 2000).toString(),
+      },
+    );
+    final Object? decoded = await _getJson(
+      uri,
+      what: 'Loading the stop failed',
+    );
+    final TransitStopInfo? info = MotisStopDto.stopInfoFromResponse(decoded);
+    if (info == null) {
+      throw const NotFoundException('Stop not found');
+    }
+    return info;
+  }
+
+  /// Resolves a coordinate to the nearest stop's canonical id through MOTIS
+  /// reverse geocoding (`type=STOP`); `null` when nothing resolves.
+  Future<String?> _reverseGeocodeStopId(LatLon point) async {
+    final Uri uri = Uri.parse('$_base/v1/reverse-geocode').replace(
+      queryParameters: <String, String>{
+        'place': _place(point),
+        'type': 'STOP',
+        'numResults': '1',
+      },
+    );
+    final Object? decoded = await _getJson(
+      uri,
+      what: 'Resolving the stop failed',
+    );
+    if (decoded is! List) {
+      return null;
+    }
+    for (final Object? entry in decoded) {
+      if (entry is Map) {
+        final Object? id = entry['id'];
+        if (id is String && id.trim().isNotEmpty) {
+          return id.trim();
+        }
+      }
+    }
+    return null;
+  }
+
+  @override
+  Future<TransitItinerary> trip(String tripId) async {
+    final String id = tripId.trim();
+    if (id.isEmpty) {
+      throw const ValidationException('A trip id is required');
+    }
+    final Uri uri = Uri.parse('$_base/v6/trip').replace(
+      queryParameters: <String, String>{'tripId': id, 'detailedLegs': 'true'},
+    );
+    final Object? decoded = await _getJson(
+      uri,
+      what: 'Loading the line failed',
+    );
+    final TransitItinerary? itinerary = MotisPlanDto.itineraryFromResponse(
+      decoded,
+    );
+    if (itinerary == null) {
+      throw const NotFoundException('Line not found');
+    }
+    return itinerary;
+  }
+
+  /// The API base URL without a trailing slash.
+  String get _base => baseUrl.replaceFirst(RegExp(r'/+$'), '');
 
   /// Plans a multi-stop journey by chaining segments; each next segment departs
   /// when the previous one arrives.

@@ -24,17 +24,22 @@ class FakeTransitRoutingService implements TransitRoutingService {
   ) async {
     final DateTime base = (query.time ?? now ?? DateTime.now()).toUtc();
     final int count = query.limit.clamp(1, 12);
+    final bool earlier = query.direction == TransitDeparturesDirection.earlier;
     return List<TransitStopDeparture>.unmodifiable(<TransitStopDeparture>[
       for (int i = 0; i < count; i++)
         TransitStopDeparture(
           mode: i.isEven ? TransitMode.suburbanRail : TransitMode.subway,
-          departure: base.add(Duration(minutes: i * 5)),
-          scheduledDeparture: base.add(Duration(minutes: i * 5)),
+          departure: earlier
+              ? base.subtract(Duration(minutes: (i + 1) * 5))
+              : base.add(Duration(minutes: i * 5)),
+          scheduledDeparture: earlier
+              ? base.subtract(Duration(minutes: (i + 1) * 5))
+              : base.add(Duration(minutes: i * 5)),
           headsign: i.isEven ? 'S+U Gesundbrunnen Bhf' : 'S+U Alexanderplatz',
           track: '${(i % 4) + 1}',
           routeShortName: i.isEven ? 'S41' : 'U8',
           routeLongName: i.isEven ? 'Ringbahn S 41' : 'U8',
-          tripId: 'fake-departure-$i',
+          tripId: 'fake-departure-${i.isEven ? 's41' : 'u8'}',
           agencyName: 'City Transit',
           routeColor: i.isEven ? 0xFFCB6418 : 0xFF5B4CC4,
           realTime: i.isOdd,
@@ -42,6 +47,74 @@ class FakeTransitRoutingService implements TransitRoutingService {
           bikesAllowed: i.isEven,
         ),
     ]);
+  }
+
+  @override
+  Future<TransitStopInfo> stopInfo(TransitStopQuery query) async {
+    final LatLon position = query.position ?? const LatLon(52.5216, 13.41114);
+    return TransitStopInfo(
+      stopId: (query.stopId?.trim().isNotEmpty ?? false)
+          ? query.stopId!.trim()
+          : 'fake:stop',
+      name: 'Fake interchange',
+      position: position,
+      routes: const <TransitStopRoute>[
+        TransitStopRoute(
+          mode: TransitMode.suburbanRail,
+          routeId: 'fake-s41',
+          routeShortName: 'S41',
+          routeLongName: 'Ringbahn S 41',
+          agencyName: 'City Transit',
+          routeColor: 0xFFCB6418,
+        ),
+        TransitStopRoute(
+          mode: TransitMode.subway,
+          routeId: 'fake-u8',
+          routeShortName: 'U8',
+          routeLongName: 'U8',
+          agencyName: 'City Transit',
+          routeColor: 0xFF5B4CC4,
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<TransitItinerary> trip(String tripId) async {
+    final bool ring = tripId.contains('s41');
+    final LatLon center = const LatLon(52.5216, 13.41114);
+    final TransitMode mode = ring
+        ? TransitMode.suburbanRail
+        : TransitMode.subway;
+    final int color = ring ? 0xFFCB6418 : 0xFF5B4CC4;
+    final String label = ring ? 'S41' : 'U8';
+    final LatLon from = _along(center, const LatLon(52.53, 13.42), 0.2);
+    final LatLon to = _along(center, const LatLon(52.51, 13.40), 0.8);
+    final DateTime base = (now ?? DateTime.now()).toUtc();
+    return TransitItinerary(
+      id: tripId,
+      startTime: base,
+      endTime: base.add(const Duration(minutes: 20)),
+      legs: <TransitLeg>[
+        TransitLeg(
+          mode: mode,
+          from: TransitStop(name: 'Fake interchange', position: from),
+          to: TransitStop(name: 'Fake terminus', position: to),
+          startTime: base,
+          endTime: base.add(const Duration(minutes: 20)),
+          duration: const Duration(minutes: 20),
+          distanceMeters: from.distanceTo(to),
+          geometry: _line(from, to),
+          routeShortName: label,
+          routeColor: color,
+          headsign: 'Fake terminus',
+          agencyName: 'City Transit',
+          intermediateStops: <TransitStop>[
+            TransitStop(name: 'Fake middle', position: _along(from, to, 0.5)),
+          ],
+        ),
+      ],
+    );
   }
 
   @override

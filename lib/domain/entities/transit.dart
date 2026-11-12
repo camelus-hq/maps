@@ -1,5 +1,6 @@
 import '../../core/utils/format.dart';
 import 'lat_lon.dart';
+import 'place.dart';
 import 'route.dart';
 
 /// A public-transport or street mode.
@@ -735,22 +736,222 @@ int transitModeColor(TransitMode mode) => switch (mode) {
   _ => 0xFF4A6B63,
 };
 
-/// A request for the next departures from one stop (the "Departures" board).
+/// Which side of [TransitDeparturesQuery.time] a departures request pages:
+/// departures before it (the "load earlier" button) or after it (the "load
+/// later" button, the default).
+enum TransitDeparturesDirection { earlier, later }
+
+/// A request for a page of departures from one stop (the "Departures" board).
+///
+/// The stop is identified either by its provider [stopId] or — when all we have
+/// is the tapped coordinate — by [position] within [radiusMeters]. At least one
+/// of the two is required; the adapter rejects a request with neither.
 class TransitDeparturesQuery {
   const TransitDeparturesQuery({
-    required this.stopId,
+    this.stopId,
+    this.position,
+    this.radiusMeters = 250,
     this.time,
     this.limit = 12,
+    this.direction = TransitDeparturesDirection.later,
   });
 
   /// The provider's stop id (MOTIS `stopId`).
-  final String stopId;
+  final String? stopId;
 
-  /// Don't return departures before this time; `null` means "now".
+  /// A coordinate to resolve the stop from, when the id is unknown.
+  final LatLon? position;
+
+  /// The search radius used with [position], in metres.
+  final int radiusMeters;
+
+  /// The anchor time: departures before it ([TransitDeparturesDirection.earlier])
+  /// or after it ([TransitDeparturesDirection.later]); `null` means "now".
   final DateTime? time;
 
   /// The maximum number of departures to return (bounded by the adapter).
   final int limit;
+
+  /// Which side of [time] to return.
+  final TransitDeparturesDirection direction;
+
+  /// Whether the request names a stop at all.
+  bool get isResolved =>
+      (stopId?.trim().isNotEmpty ?? false) || position != null;
+}
+
+/// A lookup of one stop's static information (its id, name and the routes /
+/// lines that serve it), without a time-based query.
+class TransitStopQuery {
+  const TransitStopQuery({this.stopId, this.position, this.radiusMeters = 250});
+
+  /// The provider's stop id (MOTIS `stopId`), when known.
+  final String? stopId;
+
+  /// A coordinate to resolve the stop from, when the id is unknown.
+  final LatLon? position;
+
+  /// The search radius used with [position], in metres.
+  final int radiusMeters;
+
+  bool get isResolved =>
+      (stopId?.trim().isNotEmpty ?? false) || position != null;
+}
+
+/// A line (route) that serves a stop: the transport mode, the line's label and
+/// the operator's own colour. Used for the line chips on a station sheet.
+class TransitStopRoute {
+  const TransitStopRoute({
+    required this.mode,
+    this.routeId,
+    this.routeShortName,
+    this.routeLongName,
+    this.agencyName,
+    this.routeColor,
+    this.routeTextColor,
+  });
+
+  final TransitMode mode;
+  final String? routeId;
+
+  /// The line's short name as shown on the vehicle (e.g. "S41", "U8").
+  final String? routeShortName;
+  final String? routeLongName;
+  final String? agencyName;
+
+  /// The operator's line colour / text colour as ARGB, when provided.
+  final int? routeColor;
+  final int? routeTextColor;
+
+  /// The label drawn on the chip ("U7", "Bus 100", …).
+  String get lineLabel {
+    final String? short = _nonEmpty(routeShortName);
+    if (short != null) {
+      return short;
+    }
+    return _nonEmpty(routeLongName) ?? mode.label;
+  }
+
+  /// The operator's own colour, else our mode fallback.
+  int get displayColor => routeColor ?? transitModeColor(mode);
+
+  /// A stable key for de-duplicating the lines serving a stop: the same line
+  /// (label + mode) is one chip, even when the provider lists it once per
+  /// direction or network section.
+  String get key => '$lineLabel|${mode.name}';
+}
+
+/// A stop's static information: who it is and which lines serve it.
+class TransitStopInfo {
+  const TransitStopInfo({
+    required this.stopId,
+    required this.name,
+    this.position,
+    this.routes = const <TransitStopRoute>[],
+  });
+
+  final String stopId;
+  final String name;
+  final LatLon? position;
+  final List<TransitStopRoute> routes;
+}
+
+/// One line drawn on the map for a tapped stop: the line's identity, its shape
+/// and every stop along it (so the whole line is visible, not just the tap).
+class TransitStopLine {
+  const TransitStopLine({
+    required this.route,
+    required this.geometry,
+    required this.stops,
+  });
+
+  final TransitStopRoute route;
+  final List<LatLon> geometry;
+  final List<TransitStop> stops;
+}
+
+/// The OSM `railway` values that mark a passenger stop/station.
+const Set<String> _railwayStops = <String>{
+  'station',
+  'halt',
+  'tram_stop',
+  'subway_entrance',
+};
+
+/// The OSM `public_transport` values that mark a passenger stop/station.
+const Set<String> _publicTransportStops = <String>{
+  'station',
+  'stop_position',
+  'platform',
+};
+
+/// The OSM `amenity` values that mark a transit interchange.
+const Set<String> _amenityStops = <String>{'bus_station', 'ferry_terminal'};
+
+/// The Mapbox POI category tokens that mark a transit stop/station (maki/class
+/// values such as `rail`, `bus`, `ferry`, `transit`).
+const Set<String> _transitCategoryTokens = <String>{
+  'rail',
+  'railway',
+  'train',
+  'bus',
+  'tram',
+  'subway',
+  'metro',
+  'ferry',
+  'transit',
+  'halt',
+  'stop',
+  'bus_stop',
+  'bus_station',
+  'tram_stop',
+  'station',
+};
+
+/// Whether a map/search [Place] is a public-transport stop or station that has
+/// departures: a bus/tram/subway stop, a railway station or halt, a long-distance
+/// rail station or a ferry terminal.
+///
+/// The Mapbox POI category is read first (it is available the moment the map is
+/// tapped), then the OpenStreetMap tags once the element lookup has landed. A
+/// plain address, shop or restaurant is never mistaken for a stop.
+bool isTransitStopPlace(Place place) {
+  final Map<String, String> tags = place.osmTags;
+  final String? railway = _tagValue(tags, 'railway');
+  if (railway != null && _railwayStops.contains(railway)) {
+    return true;
+  }
+  final String? publicTransport = _tagValue(tags, 'public_transport');
+  if (publicTransport != null &&
+      _publicTransportStops.contains(publicTransport)) {
+    return true;
+  }
+  final String? amenity = _tagValue(tags, 'amenity');
+  if (amenity != null && _amenityStops.contains(amenity)) {
+    return true;
+  }
+  if (_tagValue(tags, 'highway') == 'bus_stop') {
+    return true;
+  }
+  final String? category = place.category?.trim().toLowerCase();
+  if (category == null || category.isEmpty) {
+    return false;
+  }
+  for (final String token in category.split(RegExp(r'[\s_\-/]+'))) {
+    if (_transitCategoryTokens.contains(token)) {
+      return true;
+    }
+  }
+  return category.contains('station') ||
+      category.contains('transit') ||
+      category.contains('railway');
+}
+
+/// A present, trimmed, lower-cased OSM tag value, or `null`.
+String? _tagValue(Map<String, String> tags, String key) {
+  final String? raw = tags[key];
+  final String? value = raw?.trim().toLowerCase();
+  return value == null || value.isEmpty ? null : value;
 }
 
 /// One departure from a stop: a line, where it goes, when it leaves and — with

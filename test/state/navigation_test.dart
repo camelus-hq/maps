@@ -731,4 +731,12 @@ class _ReplanTransit implements TransitRoutingService {
   Future<List<TransitStopDeparture>> departures(
     TransitDeparturesQuery query,
   ) async => const <TransitStopDeparture>[];
+
+  @override
+  Future<TransitStopInfo> stopInfo(TransitStopQuery query) async =>
+      TransitStopInfo(stopId: 'stop', name: 'Stop');
+
+  @override
+  Future<TransitItinerary> trip(String tripId) async =>
+      _transitJourney(base: DateTime.now(), tag: tag);
 }

@@ -28,6 +28,14 @@ class _FixedDepartures implements TransitRoutingService {
   Future<List<TransitStopDeparture>> departures(
     TransitDeparturesQuery query,
   ) async => rows;
+
+  @override
+  Future<TransitStopInfo> stopInfo(TransitStopQuery query) async =>
+      TransitStopInfo(stopId: query.stopId ?? 'stop', name: 'Stop');
+
+  @override
+  Future<TransitItinerary> trip(String tripId) async =>
+      throw const NotFoundException('no trip');
 }
 
 class _Failing implements TransitRoutingService {
@@ -39,6 +47,16 @@ class _Failing implements TransitRoutingService {
   Future<List<TransitStopDeparture>> departures(
     TransitDeparturesQuery query,
   ) async {
+    throw const OfflineException('no network');
+  }
+
+  @override
+  Future<TransitStopInfo> stopInfo(TransitStopQuery query) async {
+    throw const OfflineException('no network');
+  }
+
+  @override
+  Future<TransitItinerary> trip(String tripId) async {
     throw const OfflineException('no network');
   }
 }
@@ -57,9 +75,17 @@ class _Controllable implements TransitRoutingService {
   Future<List<TransitStopDeparture>> departures(TransitDeparturesQuery query) {
     final Completer<List<TransitStopDeparture>> completer =
         Completer<List<TransitStopDeparture>>();
-    pending[query.stopId] = completer;
+    pending[query.stopId ?? ''] = completer;
     return completer.future;
   }
+
+  @override
+  Future<TransitStopInfo> stopInfo(TransitStopQuery query) async =>
+      TransitStopInfo(stopId: query.stopId ?? 'stop', name: 'Stop');
+
+  @override
+  Future<TransitItinerary> trip(String tripId) async =>
+      throw const NotFoundException('no trip');
 }
 
 void main() {

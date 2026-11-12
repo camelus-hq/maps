@@ -223,7 +223,7 @@ void main() {
 
       expect(departures, hasLength(1));
       expect(departures.first.lineLabel, 'S41');
-      expect(captured.url.path, '/api/v1/stoptimes');
+      expect(captured.url.path, '/api/v6/stoptimes');
       expect(captured.url.queryParameters['stopId'], 'de:1');
       expect(captured.url.queryParameters['n'], '4');
       expect(captured.headers['User-Agent'], 'OpenMaps/0.1 (test)');
@@ -242,5 +242,162 @@ void main() {
       service.departures(const TransitDeparturesQuery(stopId: '  ')),
       throwsA(isA<ValidationException>()),
     );
+  });
+
+  test(
+    'departures by coordinate send center/radius and the direction',
+    () async {
+      late http.Request captured;
+      final TransitousTransitRoutingService service =
+          TransitousTransitRoutingService(
+            client: MockClient((http.Request request) async {
+              captured = request;
+              return http.Response('{"stopTimes":[]}', 200);
+            }),
+            baseUrl: 'https://api.example.org/api',
+          );
+
+      await service.departures(
+        const TransitDeparturesQuery(
+          position: LatLon(52.5216, 13.41114),
+          direction: TransitDeparturesDirection.earlier,
+          limit: 8,
+        ),
+      );
+
+      final Map<String, String> params = captured.url.queryParameters;
+      expect(params['center'], '52.521600,13.411140');
+      expect(params['radius'], '250');
+      expect(params['direction'], 'EARLIER');
+      expect(params.containsKey('stopId'), isFalse);
+    },
+  );
+
+  test('stopInfo requests /v6/stop and parses the lines', () async {
+    late http.Request captured;
+    final TransitousTransitRoutingService service =
+        TransitousTransitRoutingService(
+          client: MockClient((http.Request request) async {
+            captured = request;
+            return http.Response(
+              jsonEncode(<String, Object?>{
+                'place': <String, Object?>{
+                  'name': 'S+U Alexanderplatz',
+                  'stopId': 'de:1',
+                  'lat': 52.5216,
+                  'lon': 13.41114,
+                },
+                'routes': <Object?>[
+                  <String, Object?>{
+                    'mode': 'SUBURBAN',
+                    'routeShortName': 'S41',
+                    'routeColor': 'cb6418',
+                  },
+                  <String, Object?>{'mode': 'SUBWAY', 'routeShortName': 'U8'},
+                ],
+              }),
+              200,
+            );
+          }),
+          baseUrl: 'https://api.example.org/api',
+        );
+
+    final TransitStopInfo info = await service.stopInfo(
+      const TransitStopQuery(stopId: 'de:1'),
+    );
+
+    expect(captured.url.path, '/api/v6/stop');
+    expect(captured.url.queryParameters['stopId'], 'de:1');
+    expect(info.name, 'S+U Alexanderplatz');
+    expect(
+      info.routes.map((TransitStopRoute r) => r.lineLabel).toList(),
+      <String>['S41', 'U8'],
+    );
+    expect(info.routes.first.displayColor, 0xFFCB6418);
+  });
+
+  test('stopInfo resolves a coordinate via reverse-geocode first', () async {
+    final List<Uri> requests = <Uri>[];
+    final TransitousTransitRoutingService service =
+        TransitousTransitRoutingService(
+          client: MockClient((http.Request request) async {
+            requests.add(request.url);
+            if (request.url.path.endsWith('/v1/reverse-geocode')) {
+              return http.Response(
+                jsonEncode(<Object?>[
+                  <String, Object?>{'type': 'STOP', 'id': 'de:42'},
+                ]),
+                200,
+              );
+            }
+            return http.Response(
+              jsonEncode(<String, Object?>{
+                'place': <String, Object?>{'name': 'Hbf', 'stopId': 'de:42'},
+                'routes': <Object?>[
+                  <String, Object?>{
+                    'mode': 'REGIONAL_RAIL',
+                    'routeShortName': 'RB14',
+                  },
+                ],
+              }),
+              200,
+            );
+          }),
+          baseUrl: 'https://api.example.org/api',
+        );
+
+    final TransitStopInfo info = await service.stopInfo(
+      const TransitStopQuery(position: LatLon(52.5, 13.4)),
+    );
+
+    expect(requests, hasLength(2));
+    expect(requests.first.path, '/api/v1/reverse-geocode');
+    expect(requests.first.queryParameters['type'], 'STOP');
+    expect(requests.last.path, '/api/v6/stop');
+    expect(requests.last.queryParameters['stopId'], 'de:42');
+    expect(info.stopId, 'de:42');
+    expect(info.routes.single.lineLabel, 'RB14');
+  });
+
+  test('trip requests /v6/trip and parses the leg', () async {
+    late http.Request captured;
+    final TransitousTransitRoutingService service =
+        TransitousTransitRoutingService(
+          client: MockClient((http.Request request) async {
+            captured = request;
+            return http.Response(
+              jsonEncode(<String, Object?>{
+                'startTime': '2026-11-12T10:00:00Z',
+                'endTime': '2026-11-12T10:20:00Z',
+                'legs': <Object?>[
+                  <String, Object?>{
+                    'mode': 'SUBURBAN',
+                    'startTime': '2026-11-12T10:00:00Z',
+                    'endTime': '2026-11-12T10:20:00Z',
+                    'routeShortName': 'S41',
+                    'from': <String, Object?>{
+                      'name': 'A',
+                      'lat': 52.52,
+                      'lon': 13.41,
+                    },
+                    'to': <String, Object?>{
+                      'name': 'B',
+                      'lat': 52.53,
+                      'lon': 13.42,
+                    },
+                  },
+                ],
+              }),
+              200,
+            );
+          }),
+          baseUrl: 'https://api.example.org/api',
+        );
+
+    final TransitItinerary itinerary = await service.trip('trip 1');
+    expect(captured.url.path, '/api/v6/trip');
+    expect(captured.url.queryParameters['tripId'], 'trip 1');
+    expect(captured.url.queryParameters['detailedLegs'], 'true');
+    expect(itinerary.legs.first.routeShortName, 'S41');
   });
 }

@@ -6,7 +6,7 @@ import '../../../../domain/entities/transit.dart';
 import '../../../../state/commands/commands_provider.dart';
 import '../../../../state/transit_departures.dart';
 import '../../../common/error_text.dart';
-import 'transit_common.dart';
+import 'transit_departure_row.dart';
 
 /// The "Departures" board — the next departures from a stop, opened by tapping a
 /// station on a journey timeline. It floats over whatever sheet is showing (the
@@ -153,136 +153,8 @@ class TransitDeparturesSheet extends ConsumerWidget {
         }
         return <Widget>[
           for (final TransitStopDeparture departure in state.departures)
-            _DepartureRow(departure: departure),
+            TransitDepartureRow(departure: departure),
         ];
     }
-  }
-}
-
-/// One departure: the line badge, where it is headed and when it leaves.
-class _DepartureRow extends StatelessWidget {
-  const _DepartureRow({required this.departure});
-
-  final TransitStopDeparture departure;
-
-  @override
-  Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    final String status = transitDepartureStatus(departure);
-    final bool bad = departure.cancelled;
-    final DateTime when = departure.displayDeparture.toLocal();
-    final DateTime now = DateTime.now();
-    final bool past = when.isBefore(now);
-    final String? relative = relativeTimeLabel(when, now: now);
-    final String? track = departure.displayTrack;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.sm,
-        AppSpacing.md,
-        AppSpacing.sm,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          _DepartureBadge(departure: departure),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  departure.headsign ?? departure.routeLongName ?? '—',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall
-                      ?.copyWith(color: past ? scheme.outline : null),
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: <Widget>[
-                    Flexible(
-                      child: Text(
-                        <String>[
-                          status,
-                          transitClock(context, when),
-                          ?relative,
-                          if (track != null) 'Platform $track',
-                        ].join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: bad
-                              ? scheme.error
-                              : past
-                              ? scheme.outline
-                              : (departure.realTime
-                                    ? scheme.primary
-                                    : scheme.outline),
-                        ),
-                      ),
-                    ),
-                    if (departure.realTime && !bad && !past) ...<Widget>[
-                      const SizedBox(width: 6),
-                      const TransitLiveBadge(),
-                    ],
-                  ],
-                ),
-                if (departure.agencyName != null)
-                  Text(
-                    departure.agencyName!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall
-                        ?.copyWith(color: scheme.outline),
-                  ),
-              ],
-            ),
-          ),
-          if (departure.wheelchairAccessible || departure.bikesAllowed)
-            Padding(
-              padding: const EdgeInsets.only(left: AppSpacing.sm),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  if (departure.wheelchairAccessible)
-                    Icon(Icons.accessible, size: 16, color: scheme.outline),
-                  if (departure.bikesAllowed)
-                    Icon(Icons.pedal_bike, size: 16, color: scheme.outline),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A coloured line badge for a departure row.
-class _DepartureBadge extends StatelessWidget {
-  const _DepartureBadge({required this.departure});
-
-  final TransitStopDeparture departure;
-
-  @override
-  Widget build(BuildContext context) {
-    final int background = departure.displayColor;
-    final int foreground =
-        departure.routeTextColor ??
-        (Color(background).computeLuminance() > 0.5 ? 0xFF10161A : 0xFFFFFFFF);
-    return Container(
-      constraints: const BoxConstraints(minWidth: 34),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: Color(background),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        departure.lineLabel,
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.labelMedium
-            ?.copyWith(color: Color(foreground), fontWeight: FontWeight.w600),
-      ),
-    );
   }
 }

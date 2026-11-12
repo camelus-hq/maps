@@ -6,7 +6,9 @@ import '../domain/usecases/load_reviews.dart';
 import '../domain/usecases/publish_review.dart';
 import '../domain/usecases/request_route.dart';
 import '../domain/usecases/request_stop_departures.dart';
+import '../domain/usecases/request_stop_info.dart';
 import '../domain/usecases/request_transit_route.dart';
+import '../domain/usecases/request_transit_trip.dart';
 import '../domain/usecases/search_places.dart';
 import '../domain/usecases/toggle_bookmark.dart';
 import '../domain/usecases/watch_location.dart';
@@ -39,6 +41,18 @@ final Provider<RequestStopDepartures> requestStopDeparturesProvider =
     Provider<RequestStopDepartures>(
       (Ref ref) =>
           RequestStopDepartures(ref.watch(transitRoutingServiceProvider)),
+    );
+
+/// Reads one stop's static information (id, name, lines) for a station sheet.
+final Provider<RequestStopInfo> requestStopInfoProvider =
+    Provider<RequestStopInfo>(
+      (Ref ref) => RequestStopInfo(ref.watch(transitRoutingServiceProvider)),
+    );
+
+/// Reads one trip's full shape (line drawing on the map).
+final Provider<RequestTransitTrip> requestTransitTripProvider =
+    Provider<RequestTransitTrip>(
+      (Ref ref) => RequestTransitTrip(ref.watch(transitRoutingServiceProvider)),
     );
 
 final Provider<WatchLocation> watchLocationProvider = Provider<WatchLocation>(

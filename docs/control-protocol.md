@@ -232,6 +232,10 @@ sync test fails if it drifts from the registry.
 | `transit.plan` | Plan a public-transport journey and show it in Transit mode (params: {origin:{lat,lon}, destination:{lat,lon}, stops?:[{lat,lon}], time? (ISO-8601), arriveBy?, modes?:[bus,tram,subway,train,ferry], fewerTransfers?, lessWalking?}). Returns the itineraries. |
 | `transit.pref` | Set transit preferences (params: {modes?:[bus,tram,subway,train,ferry], fewerTransfers?, lessWalking?}); re-plans. Returns the itineraries. |
 | `transit.select` | Select a public-transport journey by index (params: {index}). |
+| `transit.stop.close` | Close the stop Departures tab and clear its map lines. |
+| `transit.stop.earlier` | Load the departures before the earliest one shown for the open stop. |
+| `transit.stop.later` | Load the departures after the latest one shown for the open stop. |
+| `transit.stop.open` | Open the station sheet's Departures tab for a stop (params: {id?, name?, lat?, lon?}; uses the selected transit place when no coordinate is given). Draws the stop's lines on the map. Returns the board state. |
 | `transit.time` | Set when the transit journey departs or arrives (params: {mode: now\|depart\|arrive, time? (ISO-8601)}); re-plans. |
 | `ui.back` | Synthesise the system back gesture. |
 | `ui.screenshot` | Capture the app window to a PNG file (params: path?). |

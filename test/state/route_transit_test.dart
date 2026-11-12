@@ -23,6 +23,16 @@ class _AlwaysFailingTransit implements TransitRoutingService {
   ) async {
     throw const TransitFailure();
   }
+
+  @override
+  Future<TransitStopInfo> stopInfo(TransitStopQuery query) async {
+    throw const TransitFailure();
+  }
+
+  @override
+  Future<TransitItinerary> trip(String tripId) async {
+    throw const TransitFailure();
+  }
 }
 
 class TransitFailure implements Exception {

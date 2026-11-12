@@ -62,6 +62,7 @@ import '../search.dart';
 import '../settings.dart';
 import '../social.dart';
 import '../transit_departures.dart';
+import '../transit_stop_board.dart';
 import '../update.dart';
 import '../usecases.dart';
 import 'command.dart';
@@ -1293,6 +1294,68 @@ List<Command> buildCommands(Ref ref) {
       description: 'Close the departures board.',
       handler: (CommandRequest request) async {
         ref.read(transitDeparturesProvider.notifier).close();
+        return true;
+      },
+    ),
+    Command(
+      id: 'transit.stop.open',
+      description:
+          'Open the station sheet\'s Departures tab for a stop (params: '
+          '{id?, name?, lat?, lon?}; uses the selected transit place when no '
+          'coordinate is given). Draws the stop\'s lines on the map. Returns '
+          'the board state.',
+      handler: (CommandRequest request) async {
+        final LatLon? point = LatLon.tryParse(
+          request.params['lat'],
+          request.params['lon'],
+        );
+        final String? rawId = request.params['id'] is String
+            ? request.params['id'] as String
+            : null;
+        final String? rawName = request.params['name'] is String
+            ? request.params['name'] as String
+            : null;
+        if (point != null) {
+          await ref
+              .read(transitStopBoardProvider.notifier)
+              .openAt(position: point, name: rawName);
+          return _stopBoardJson(ref.read(transitStopBoardProvider));
+        }
+        final Place? selected = ref.read(selectedPlaceProvider);
+        if (selected == null || (rawId != null && selected.id != rawId)) {
+          throw const CommandException(
+            'no_stop',
+            'Give "lat"/"lon" or select a transit stop first',
+          );
+        }
+        await ref
+            .read(transitStopBoardProvider.notifier)
+            .openFromPlace(selected);
+        return _stopBoardJson(ref.read(transitStopBoardProvider));
+      },
+    ),
+    Command(
+      id: 'transit.stop.earlier',
+      description: 'Load the departures before the earliest one shown for the open stop.',
+      handler: (CommandRequest request) async {
+        await ref.read(transitStopBoardProvider.notifier).loadEarlier();
+        return _stopBoardJson(ref.read(transitStopBoardProvider));
+      },
+    ),
+    Command(
+      id: 'transit.stop.later',
+      description:
+          'Load the departures after the latest one shown for the open stop.',
+      handler: (CommandRequest request) async {
+        await ref.read(transitStopBoardProvider.notifier).loadLater();
+        return _stopBoardJson(ref.read(transitStopBoardProvider));
+      },
+    ),
+    Command(
+      id: 'transit.stop.close',
+      description: 'Close the stop Departures tab and clear its map lines.',
+      handler: (CommandRequest request) async {
+        ref.read(transitStopBoardProvider.notifier).close();
         return true;
       },
     ),
@@ -2992,6 +3055,44 @@ Map<String, Object?> _departuresJson(
       },
   ],
 };
+
+/// The stop-board state (its status, resolved stop, lines and rows) for
+/// agents/tests.
+Map<String, Object?> _stopBoardJson(TransitStopBoardState state) =>
+    <String, Object?>{
+      'status': state.status.name,
+      'placeId': state.placeId,
+      'stopId': state.stopId,
+      'stopName': state.stopName,
+      'lat': state.position?.latitude,
+      'lon': state.position?.longitude,
+      'loadingEarlier': state.loadingEarlier,
+      'loadingLater': state.loadingLater,
+      'canLoadEarlier': state.canLoadEarlier,
+      'canLoadLater': state.canLoadLater,
+      'lines': <Map<String, Object?>>[
+        for (final TransitStopRoute route in state.routes)
+          <String, Object?>{
+            'line': route.lineLabel,
+            'mode': route.mode.name,
+            'agency': route.agencyName,
+            'color': route.displayColor,
+          },
+      ],
+      'drawnLines': state.lines.length,
+      'departures': <Map<String, Object?>>[
+        for (final TransitStopDeparture departure in state.departures)
+          <String, Object?>{
+            'line': departure.lineLabel,
+            'headsign': departure.headsign,
+            'mode': departure.mode.name,
+            'departure': departure.displayDeparture.toIso8601String(),
+            'track': departure.displayTrack,
+            'realTime': departure.realTime,
+            'cancelled': departure.cancelled,
+          },
+      ],
+    };
 
 /// A [Place] for a transit endpoint picked by coordinate.
 Place _transitPlace(String id, LatLon position, {String? name}) => Place(

@@ -13,8 +13,10 @@ class RequestStopDepartures {
   Future<Result<List<TransitStopDeparture>>> call(
     TransitDeparturesQuery query,
   ) async {
-    if (query.stopId.trim().isEmpty) {
-      return const Err(ValidationException('A stop id is required'));
+    if (!query.isResolved) {
+      return const Err(
+        ValidationException('A stop id or a coordinate is required'),
+      );
     }
     try {
       final List<TransitStopDeparture> departures = await _service.departures(
