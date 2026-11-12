@@ -88,6 +88,16 @@ enum TransitMode {
       this == TransitMode.walk ||
       this == TransitMode.bike ||
       this == TransitMode.car;
+
+  /// Whether this is a long-distance mode (high-speed / intercity / night train
+  /// or long-distance coach). A station's line list is filtered to the
+  /// local/regional network — otherwise a main station lists every
+  /// long-distance train number and the overview becomes noise.
+  bool get isLongDistance =>
+      this == TransitMode.highSpeedRail ||
+      this == TransitMode.longDistanceRail ||
+      this == TransitMode.nightRail ||
+      this == TransitMode.coach;
 }
 
 /// A quick preference filter over [TransitMode] (the "Prefer" chips).
@@ -174,6 +184,8 @@ class TransitStop {
     this.position,
     this.track,
     this.scheduledTrack,
+    this.arrival,
+    this.departure,
     this.cancelled = false,
   });
 
@@ -191,6 +203,13 @@ class TransitStop {
   /// The planned platform/track.
   final String? scheduledTrack;
 
+  /// The scheduled/realtime time the vehicle arrives at this stop (on a trip's
+  /// stop list), when the provider reports it.
+  final DateTime? arrival;
+
+  /// The scheduled/realtime time the vehicle leaves this stop.
+  final DateTime? departure;
+
   final bool cancelled;
 
   /// The track to show: the live one when known, else the scheduled one.
@@ -201,6 +220,10 @@ class TransitStop {
     final String? value = displayTrack;
     return value != null && value.trim().isNotEmpty;
   }
+
+  /// The time to show for this stop on a trip timetable: the departure for an
+  /// intermediate/boarding stop, else the arrival.
+  DateTime? get displayTime => departure ?? arrival;
 }
 
 /// One leg of a [TransitItinerary]: a street walk/bike/car leg or a ride on a
@@ -945,6 +968,19 @@ bool isTransitStopPlace(Place place) {
   return category.contains('station') ||
       category.contains('transit') ||
       category.contains('railway');
+}
+
+/// [routes] without the long-distance rail lines (high-speed / intercity /
+/// night), so a main station's line list is the local and regional network
+/// rather than every long-distance train number. Falls back to the full list
+/// when a stop is served only by long-distance trains.
+List<TransitStopRoute> localStopRoutes(Iterable<TransitStopRoute> routes) {
+  final List<TransitStopRoute> all = routes.toList(growable: false);
+  final List<TransitStopRoute> local = <TransitStopRoute>[
+    for (final TransitStopRoute route in all)
+      if (!route.mode.isLongDistance) route,
+  ];
+  return local.isEmpty ? all : local;
 }
 
 /// A present, trimmed, lower-cased OSM tag value, or `null`.

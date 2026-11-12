@@ -76,4 +76,46 @@ void main() {
       isTrue,
     );
   });
+
+  test('isLongDistance flags only the intercity/night/high-speed modes', () {
+    expect(TransitMode.highSpeedRail.isLongDistance, isTrue);
+    expect(TransitMode.longDistanceRail.isLongDistance, isTrue);
+    expect(TransitMode.nightRail.isLongDistance, isTrue);
+    expect(TransitMode.regionalRail.isLongDistance, isFalse);
+    expect(TransitMode.suburbanRail.isLongDistance, isFalse);
+    expect(TransitMode.subway.isLongDistance, isFalse);
+    expect(TransitMode.bus.isLongDistance, isFalse);
+    expect(TransitMode.coach.isLongDistance, isTrue);
+  });
+
+  test(
+    'localStopRoutes drops long-distance lines, falling back when alone',
+    () {
+      const TransitStopRoute ice = TransitStopRoute(
+        mode: TransitMode.highSpeedRail,
+        routeShortName: 'ICE 10',
+      );
+      const TransitStopRoute en = TransitStopRoute(
+        mode: TransitMode.nightRail,
+        routeShortName: 'EN',
+      );
+      const TransitStopRoute s3 = TransitStopRoute(
+        mode: TransitMode.suburbanRail,
+        routeShortName: 'S3',
+      );
+      const TransitStopRoute u8 = TransitStopRoute(
+        mode: TransitMode.subway,
+        routeShortName: 'U8',
+      );
+
+      expect(
+        localStopRoutes(<TransitStopRoute>[ice, s3, en, u8])
+            .map((TransitStopRoute r) => r.lineLabel)
+            .toList(),
+        <String>['S3', 'U8'],
+      );
+      // A long-distance-only station keeps everything.
+      expect(localStopRoutes(<TransitStopRoute>[ice, en]).length, 2);
+    },
+  );
 }

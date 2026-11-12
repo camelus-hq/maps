@@ -236,6 +236,8 @@ sync test fails if it drifts from the registry.
 | `transit.stop.earlier` | Load the departures before the earliest one shown for the open stop. |
 | `transit.stop.later` | Load the departures after the latest one shown for the open stop. |
 | `transit.stop.open` | Open the station sheet's Departures tab for a stop (params: {id?, name?, lat?, lon?}; uses the selected transit place when no coordinate is given). Draws the stop's lines on the map. Returns the board state. |
+| `transit.stop.trip` | Open one train's detail (its whole stop list) and show only that line on the map (params: {tripId}). Returns the board state. |
+| `transit.stop.trip.close` | Close the train detail and restore the stop's lines on the map. |
 | `transit.time` | Set when the transit journey departs or arrives (params: {mode: now\|depart\|arrive, time? (ISO-8601)}); re-plans. |
 | `ui.back` | Synthesise the system back gesture. |
 | `ui.screenshot` | Capture the app window to a PNG file (params: path?). |

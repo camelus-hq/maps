@@ -146,6 +146,8 @@ abstract final class MotisPlanDto {
       position: position,
       track: _string(raw['track'], _maxLineLength),
       scheduledTrack: _string(raw['scheduledTrack'], _maxLineLength),
+      arrival: _time(raw['arrival']) ?? _time(raw['scheduledArrival']),
+      departure: _time(raw['departure']) ?? _time(raw['scheduledDeparture']),
       cancelled: raw['cancelled'] == true,
     );
   }

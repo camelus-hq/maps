@@ -98,8 +98,16 @@ class FakeTransitRoutingService implements TransitRoutingService {
       legs: <TransitLeg>[
         TransitLeg(
           mode: mode,
-          from: TransitStop(name: 'Fake interchange', position: from),
-          to: TransitStop(name: 'Fake terminus', position: to),
+          from: TransitStop(
+            name: 'Fake interchange',
+            position: from,
+            departure: base,
+          ),
+          to: TransitStop(
+            name: 'Fake terminus',
+            position: to,
+            arrival: base.add(const Duration(minutes: 20)),
+          ),
           startTime: base,
           endTime: base.add(const Duration(minutes: 20)),
           duration: const Duration(minutes: 20),
@@ -110,7 +118,11 @@ class FakeTransitRoutingService implements TransitRoutingService {
           headsign: 'Fake terminus',
           agencyName: 'City Transit',
           intermediateStops: <TransitStop>[
-            TransitStop(name: 'Fake middle', position: _along(from, to, 0.5)),
+            TransitStop(
+              name: 'Fake middle',
+              position: _along(from, to, 0.5),
+              departure: base.add(const Duration(minutes: 10)),
+            ),
           ],
         ),
       ],

@@ -9,6 +9,7 @@ import 'package:openmaps/data/fakes/fake_review_service.dart';
 import 'package:openmaps/data/fakes/fake_social_service.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/place.dart';
+import 'package:openmaps/features/directions/widgets/transit/transit_departure_row.dart';
 import 'package:openmaps/features/place_details/widgets/place_details_sheet.dart';
 import 'package:openmaps/state/place.dart';
 import 'package:openmaps/state/ports.dart';
@@ -100,6 +101,33 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('tapping a departure opens the train detail and back returns', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer c = container();
+    addTearDown(c.dispose);
+    await pump(tester, c, station);
+    await expand(tester);
+
+    await tester.tap(find.text('Departures'));
+    await tester.pumpAndSettle();
+
+    final Finder row = find.byType(TransitDepartureRow).first;
+    await tester.ensureVisible(row);
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+
+    // The train's detail: a back control and its stop list.
+    expect(find.text('Back to departures'), findsOneWidget);
+    expect(find.text('Fake terminus'), findsWidgets);
+    expect(find.textContaining('stops'), findsWidgets);
+
+    await tester.tap(find.text('Back to departures'));
+    await tester.pumpAndSettle();
+    expect(find.text('Back to departures'), findsNothing);
+    expect(find.text('Later departures'), findsOneWidget);
+  });
 
   testWidgets('a non-transit place has no Departures tab', (
     WidgetTester tester,

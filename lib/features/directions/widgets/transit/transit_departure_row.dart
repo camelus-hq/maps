@@ -10,9 +10,13 @@ import 'transit_line_chip.dart';
 /// Shared by the floating "Departures" board (opened from a journey timeline or
 /// a live trip) and the station sheet's Departures tab.
 class TransitDepartureRow extends StatelessWidget {
-  const TransitDepartureRow({super.key, required this.departure});
+  const TransitDepartureRow({super.key, required this.departure, this.onTap});
 
   final TransitStopDeparture departure;
+
+  /// Invoked when the row is tapped (opens the train detail); when `null` the
+  /// row is not tappable.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +28,7 @@ class TransitDepartureRow extends StatelessWidget {
     final bool past = when.isBefore(now);
     final String? relative = relativeTimeLabel(when, now: now);
     final String? track = departure.displayTrack;
-    return Padding(
+    final Widget content = Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
         AppSpacing.sm,
@@ -108,5 +112,9 @@ class TransitDepartureRow extends StatelessWidget {
         ],
       ),
     );
+    if (onTap == null) {
+      return content;
+    }
+    return InkWell(onTap: onTap, child: content);
   }
 }

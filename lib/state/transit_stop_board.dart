@@ -10,6 +10,7 @@ import '../domain/entities/route_line.dart';
 import '../domain/entities/transit.dart';
 import '../domain/entities/transit_stop_marker.dart';
 import '../domain/ports/map_service.dart';
+import 'place.dart';
 import 'ports.dart';
 import 'route.dart';
 import 'usecases.dart';
@@ -33,6 +34,10 @@ class TransitStopBoardState {
     this.loadingLater = false,
     this.canLoadEarlier = true,
     this.canLoadLater = true,
+    this.selectedDeparture,
+    this.tripDetail,
+    this.tripLoading = false,
+    this.tripError,
     this.error,
   });
 
@@ -63,6 +68,19 @@ class TransitStopBoardState {
   final bool loadingLater;
   final bool canLoadEarlier;
   final bool canLoadLater;
+
+  /// The departure whose train detail is open, if any.
+  final TransitStopDeparture? selectedDeparture;
+
+  /// The open train's full detail (line, shape, every stop with its time).
+  final TransitStopLine? tripDetail;
+
+  /// Whether the train detail is loading.
+  final bool tripLoading;
+
+  /// A failure loading the train detail.
+  final AppException? tripError;
+
   final AppException? error;
 
   /// Whether the board is active (a stop is selected).
@@ -73,6 +91,10 @@ class TransitStopBoardState {
   bool get hasEarlier => canLoadEarlier && departures.isNotEmpty;
 
   bool get hasLater => canLoadLater && departures.isNotEmpty;
+
+  /// Whether a single train's detail is showing.
+  bool get hasTripDetail =>
+      selectedDeparture != null || tripDetail != null || tripLoading;
 
   TransitStopBoardState copyWith({
     StopBoardStatus? status,
@@ -87,8 +109,13 @@ class TransitStopBoardState {
     bool? loadingLater,
     bool? canLoadEarlier,
     bool? canLoadLater,
+    TransitStopDeparture? selectedDeparture,
+    TransitStopLine? tripDetail,
+    bool? tripLoading,
+    AppException? tripError,
     AppException? error,
     bool clearError = false,
+    bool clearTrip = false,
   }) {
     return TransitStopBoardState(
       status: status ?? this.status,
@@ -103,6 +130,12 @@ class TransitStopBoardState {
       loadingLater: loadingLater ?? this.loadingLater,
       canLoadEarlier: canLoadEarlier ?? this.canLoadEarlier,
       canLoadLater: canLoadLater ?? this.canLoadLater,
+      selectedDeparture: clearTrip
+          ? null
+          : (selectedDeparture ?? this.selectedDeparture),
+      tripDetail: clearTrip ? null : (tripDetail ?? this.tripDetail),
+      tripLoading: clearTrip ? false : (tripLoading ?? this.tripLoading),
+      tripError: clearTrip ? null : (tripError ?? this.tripError),
       error: clearError ? null : (error ?? this.error),
     );
   }
@@ -137,7 +170,20 @@ class TransitStopBoardController extends Notifier<TransitStopBoardState> {
   bool _drewMap = false;
 
   @override
-  TransitStopBoardState build() => const TransitStopBoardState();
+  TransitStopBoardState build() {
+    // The board lives with the selected place: deselecting it (or selecting
+    // another place) closes the board and clears the lines it drew, so they
+    // never linger after the station sheet is closed.
+    ref.listen<Place?>(selectedPlaceProvider, (Place? _, Place? next) {
+      if (!state.isOpen) {
+        return;
+      }
+      if (next == null || next.id != state.placeId) {
+        close();
+      }
+    });
+    return const TransitStopBoardState();
+  }
 
   /// Opens the board for a transit [place] (a map POI or a search result),
   /// resolving the stop and drawing its lines.
@@ -319,22 +365,33 @@ class TransitStopBoardController extends Notifier<TransitStopBoardState> {
   }
 
   /// Fetches one representative trip per line and draws the whole line on the
-  /// map (shape + every stop), like the public-transport journey drawing.
+  /// map (shape + every stop), like the public-transport journey drawing. Only
+  /// the local/regional lines are drawn (a main station's long-distance numbers
+  /// would be noise); if the stop is served only by long-distance trains, all
+  /// lines are drawn.
   Future<void> _loadLines(
     int request,
     List<TransitStopDeparture> departures,
   ) async {
+    final List<TransitStopDeparture> local = <TransitStopDeparture>[
+      for (final TransitStopDeparture departure in departures)
+        if (!departure.mode.isLongDistance) departure,
+    ];
+    final List<TransitStopDeparture> chosen = local.isEmpty
+        ? departures
+        : local;
+
     final Map<String, ({TransitStopDeparture departure, String tripId})>
     byLine = <String, ({TransitStopDeparture departure, String tripId})>{};
-    for (final TransitStopDeparture departure in departures) {
+    for (final TransitStopDeparture departure in chosen) {
       final String tripId = departure.tripId?.trim() ?? '';
       if (tripId.isEmpty) {
         continue;
       }
-      final String key =
-          '${departure.routeShortName ?? departure.routeLongName ?? ''}'
-          '|${departure.mode.name}';
-      byLine.putIfAbsent(key, () => (departure: departure, tripId: tripId));
+      byLine.putIfAbsent(
+        _lineKey(departure),
+        () => (departure: departure, tripId: tripId),
+      );
     }
 
     final List<TransitStopLine> lines = <TransitStopLine>[];
@@ -346,32 +403,13 @@ class TransitStopBoardController extends Notifier<TransitStopBoardState> {
       if (request != _requestId || !ref.mounted) {
         return;
       }
-      final TransitItinerary? itinerary = result.valueOrNull;
-      if (itinerary == null) {
-        continue;
-      }
-      final List<TransitLeg> transitLegs = itinerary.transitLegs;
-      final TransitLeg? leg = transitLegs.isNotEmpty
-          ? transitLegs.first
-          : (itinerary.legs.isNotEmpty ? itinerary.legs.first : null);
-      if (leg == null || leg.geometry.length < 2) {
-        continue;
-      }
-      final TransitStopDeparture departure = entry.departure;
-      lines.add(
-        TransitStopLine(
-          route: TransitStopRoute(
-            mode: leg.mode,
-            routeShortName: leg.routeShortName ?? departure.routeShortName,
-            routeLongName: leg.routeLongName ?? departure.routeLongName,
-            agencyName: leg.agencyName ?? departure.agencyName,
-            routeColor: leg.routeColor ?? departure.routeColor,
-            routeTextColor: leg.routeTextColor ?? departure.routeTextColor,
-          ),
-          geometry: leg.geometry,
-          stops: <TransitStop>[leg.from, ...leg.intermediateStops, leg.to],
-        ),
+      final TransitStopLine? line = _lineFromItinerary(
+        result.valueOrNull,
+        entry.departure,
       );
+      if (line != null) {
+        lines.add(line);
+      }
     }
     if (request != _requestId || !ref.mounted) {
       return;
@@ -380,14 +418,108 @@ class TransitStopBoardController extends Notifier<TransitStopBoardState> {
     await _drawLines();
   }
 
+  /// Builds a drawable line (shape + every stop) from a `/trip` itinerary,
+  /// using the departure as the fallback for the line's identity.
+  static TransitStopLine? _lineFromItinerary(
+    TransitItinerary? itinerary,
+    TransitStopDeparture departure,
+  ) {
+    if (itinerary == null) {
+      return null;
+    }
+    final List<TransitLeg> transitLegs = itinerary.transitLegs;
+    final TransitLeg? leg = transitLegs.isNotEmpty
+        ? transitLegs.first
+        : (itinerary.legs.isNotEmpty ? itinerary.legs.first : null);
+    if (leg == null || leg.geometry.length < 2) {
+      return null;
+    }
+    return TransitStopLine(
+      route: TransitStopRoute(
+        mode: leg.mode,
+        routeShortName: leg.routeShortName ?? departure.routeShortName,
+        routeLongName: leg.routeLongName ?? departure.routeLongName,
+        agencyName: leg.agencyName ?? departure.agencyName,
+        routeColor: leg.routeColor ?? departure.routeColor,
+        routeTextColor: leg.routeTextColor ?? departure.routeTextColor,
+      ),
+      geometry: leg.geometry,
+      stops: <TransitStop>[leg.from, ...leg.intermediateStops, leg.to],
+    );
+  }
+
+  /// Opens the detail for one departure's train: loads its full shape and stop
+  /// list and draws **only** that line on the map.
+  Future<void> openTrip(TransitStopDeparture departure) async {
+    final String tripId = departure.tripId?.trim() ?? '';
+    if (tripId.isEmpty) {
+      return;
+    }
+    state = state.copyWith(
+      selectedDeparture: departure,
+      tripLoading: true,
+      clearTrip: false,
+      tripError: null,
+    );
+    final Result<TransitItinerary> result = await ref.read(
+      requestTransitTripProvider,
+    )(tripId);
+    if (!ref.mounted) {
+      return;
+    }
+    final TransitStopDeparture? current = state.selectedDeparture;
+    if (current == null || (current.tripId ?? '') != tripId) {
+      return; // superseded by another tap / closed
+    }
+    final TransitStopLine? line = _lineFromItinerary(
+      result.valueOrNull,
+      departure,
+    );
+    if (line == null) {
+      state = state.copyWith(
+        tripLoading: false,
+        tripError: result.errorOrNull ?? const NotFoundException('No train'),
+      );
+      return;
+    }
+    state = state.copyWith(tripDetail: line, tripLoading: false);
+    await _drawLines(only: line);
+  }
+
+  /// Opens the train detail by trip id, looking the departure up in the loaded
+  /// rows.
+  Future<void> openTripById(String tripId) async {
+    final String id = tripId.trim();
+    if (id.isEmpty) {
+      return;
+    }
+    for (final TransitStopDeparture departure in state.departures) {
+      if ((departure.tripId ?? '').trim() == id) {
+        await openTrip(departure);
+        return;
+      }
+    }
+  }
+
+  /// Closes the train detail and restores the stop's lines on the map.
+  void closeTrip() {
+    if (!state.hasTripDetail) {
+      return;
+    }
+    state = state.copyWith(clearTrip: true);
+    unawaited(_drawLines());
+  }
+
   bool get _mapIsFree =>
       ref.read(routeControllerProvider).status == RouteStatus.idle;
 
-  Future<void> _drawLines() async {
+  Future<void> _drawLines({TransitStopLine? only}) async {
     if (!_mapIsFree) {
       return; // a planned route owns the map lines
     }
-    final List<TransitStopLine> lines = state.lines;
+    final List<TransitStopLine> lines = only != null
+        ? <TransitStopLine>[only]
+        : state.lines;
     final MapService map = ref.read(mapServiceProvider);
     final List<RouteLine> routeLines = <RouteLine>[
       for (final TransitStopLine line in lines)
@@ -395,7 +527,8 @@ class TransitStopBoardController extends Notifier<TransitStopBoardState> {
           RouteLine(
             points: line.geometry,
             color: line.route.displayColor,
-            width: 6,
+            width: only != null ? 8 : 6,
+            primary: only != null,
           ),
     ];
 
@@ -461,6 +594,12 @@ class TransitStopBoardController extends Notifier<TransitStopBoardState> {
   static String _rowKey(TransitStopDeparture row) =>
       '${row.tripId ?? ''}|${row.routeShortName ?? ''}|'
       '${row.displayDeparture.millisecondsSinceEpoch}';
+
+  /// The distinct-line key for a departure (label + mode), matching the line
+  /// chips so one line is drawn once.
+  static String _lineKey(TransitStopDeparture departure) =>
+      '${departure.routeShortName ?? departure.routeLongName ?? ''}'
+      '|${departure.mode.name}';
 }
 
 final NotifierProvider<TransitStopBoardController, TransitStopBoardState>

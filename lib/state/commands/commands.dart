@@ -1352,6 +1352,30 @@ List<Command> buildCommands(Ref ref) {
       },
     ),
     Command(
+      id: 'transit.stop.trip',
+      description:
+          'Open one train\'s detail (its whole stop list) and show only that '
+          'line on the map (params: {tripId}). Returns the board state.',
+      handler: (CommandRequest request) async {
+        final Object? raw = request.params['tripId'];
+        final String tripId = raw is String ? raw.trim() : '';
+        if (tripId.isEmpty) {
+          throw const CommandException('bad_params', '"tripId" is required');
+        }
+        await ref.read(transitStopBoardProvider.notifier).openTripById(tripId);
+        return _stopBoardJson(ref.read(transitStopBoardProvider));
+      },
+    ),
+    Command(
+      id: 'transit.stop.trip.close',
+      description:
+          'Close the train detail and restore the stop\'s lines on the map.',
+      handler: (CommandRequest request) async {
+        ref.read(transitStopBoardProvider.notifier).closeTrip();
+        return _stopBoardJson(ref.read(transitStopBoardProvider));
+      },
+    ),
+    Command(
       id: 'transit.stop.close',
       description: 'Close the stop Departures tab and clear its map lines.',
       handler: (CommandRequest request) async {
@@ -3058,41 +3082,53 @@ Map<String, Object?> _departuresJson(
 
 /// The stop-board state (its status, resolved stop, lines and rows) for
 /// agents/tests.
-Map<String, Object?> _stopBoardJson(TransitStopBoardState state) =>
-    <String, Object?>{
-      'status': state.status.name,
-      'placeId': state.placeId,
-      'stopId': state.stopId,
-      'stopName': state.stopName,
-      'lat': state.position?.latitude,
-      'lon': state.position?.longitude,
-      'loadingEarlier': state.loadingEarlier,
-      'loadingLater': state.loadingLater,
-      'canLoadEarlier': state.canLoadEarlier,
-      'canLoadLater': state.canLoadLater,
-      'lines': <Map<String, Object?>>[
-        for (final TransitStopRoute route in state.routes)
-          <String, Object?>{
-            'line': route.lineLabel,
-            'mode': route.mode.name,
-            'agency': route.agencyName,
-            'color': route.displayColor,
+Map<String, Object?> _stopBoardJson(TransitStopBoardState state) {
+  final TransitStopLine? trip = state.tripDetail;
+  return <String, Object?>{
+    'status': state.status.name,
+    'placeId': state.placeId,
+    'stopId': state.stopId,
+    'stopName': state.stopName,
+    'lat': state.position?.latitude,
+    'lon': state.position?.longitude,
+    'loadingEarlier': state.loadingEarlier,
+    'loadingLater': state.loadingLater,
+    'canLoadEarlier': state.canLoadEarlier,
+    'canLoadLater': state.canLoadLater,
+    'lines': <Map<String, Object?>>[
+      for (final TransitStopRoute route in state.routes)
+        <String, Object?>{
+          'line': route.lineLabel,
+          'mode': route.mode.name,
+          'agency': route.agencyName,
+          'color': route.displayColor,
+        },
+    ],
+    'drawnLines': state.lines.length,
+    'trip': trip == null
+        ? null
+        : <String, Object?>{
+            'line': trip.route.lineLabel,
+            'lineName': trip.route.routeLongName,
+            'stops': <String>[
+              for (final TransitStop stop in trip.stops) stop.name,
+            ],
           },
-      ],
-      'drawnLines': state.lines.length,
-      'departures': <Map<String, Object?>>[
-        for (final TransitStopDeparture departure in state.departures)
-          <String, Object?>{
-            'line': departure.lineLabel,
-            'headsign': departure.headsign,
-            'mode': departure.mode.name,
-            'departure': departure.displayDeparture.toIso8601String(),
-            'track': departure.displayTrack,
-            'realTime': departure.realTime,
-            'cancelled': departure.cancelled,
-          },
-      ],
-    };
+    'departures': <Map<String, Object?>>[
+      for (final TransitStopDeparture departure in state.departures)
+        <String, Object?>{
+          'line': departure.lineLabel,
+          'headsign': departure.headsign,
+          'mode': departure.mode.name,
+          'departure': departure.displayDeparture.toIso8601String(),
+          'tripId': departure.tripId,
+          'track': departure.displayTrack,
+          'realTime': departure.realTime,
+          'cancelled': departure.cancelled,
+        },
+    ],
+  };
+}
 
 /// A [Place] for a transit endpoint picked by coordinate.
 Place _transitPlace(String id, LatLon position, {String? name}) => Place(

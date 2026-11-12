@@ -6,15 +6,17 @@ import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/place.dart';
 import 'package:openmaps/domain/entities/transit.dart';
 import 'package:openmaps/domain/ports/transit_routing_service.dart';
+import 'package:openmaps/state/place.dart';
 import 'package:openmaps/state/ports.dart';
 import 'package:openmaps/state/transit_stop_board.dart';
 
 /// A deterministic transit service for the board tests: it generates
 /// departures around the requested anchor so paging can be exercised.
 class _BoardService implements TransitRoutingService {
-  _BoardService({this.fail = false});
+  _BoardService({this.fail = false, this.longDistanceFirst = false});
 
   final bool fail;
+  final bool longDistanceFirst;
   final List<TransitDeparturesQuery> queries = <TransitDeparturesQuery>[];
   int tripCalls = 0;
 
@@ -52,6 +54,21 @@ class _BoardService implements TransitRoutingService {
     }
     final DateTime base = (query.time ?? DateTime.utc(2026, 1, 1, 9)).toUtc();
     final bool earlier = query.direction == TransitDeparturesDirection.earlier;
+    if (longDistanceFirst) {
+      return <TransitStopDeparture>[
+        for (int i = 0; i < 3; i++)
+          TransitStopDeparture(
+            mode: i == 2 ? TransitMode.suburbanRail : TransitMode.highSpeedRail,
+            departure: earlier
+                ? base.subtract(Duration(minutes: (i + 1) * 5))
+                : base.add(Duration(minutes: i * 5)),
+            routeShortName: i == 2 ? 'S41' : 'ICE 10',
+            tripId:
+                'trip-${(earlier ? base.subtract(Duration(minutes: (i + 1) * 5)) : base.add(Duration(minutes: i * 5))).millisecondsSinceEpoch}',
+            headsign: 'Terminus',
+          ),
+      ];
+    }
     return <TransitStopDeparture>[
       for (int i = 0; i < 3; i++)
         TransitStopDeparture(
@@ -232,5 +249,94 @@ void main() {
     expect(state.departures, isEmpty);
     expect(state.error, isA<OfflineException>());
     expect(map.routeLines, isEmpty);
+  });
+
+  test(
+    'tapping a departure shows its train and draws only that line',
+    () async {
+      final _BoardService service = _BoardService();
+      final FakeMapService map = FakeMapService();
+      final ProviderContainer container = ProviderContainer(
+        overrides: [
+          transitRoutingServiceProvider.overrideWithValue(service),
+          mapServiceProvider.overrideWithValue(map),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container
+          .read(transitStopBoardProvider.notifier)
+          .openFromPlace(_station);
+      expect(map.routeLines, hasLength(2));
+
+      final TransitStopDeparture departure = container
+          .read(transitStopBoardProvider)
+          .departures
+          .first;
+      await container
+          .read(transitStopBoardProvider.notifier)
+          .openTrip(departure);
+
+      final TransitStopBoardState detail = container.read(
+        transitStopBoardProvider,
+      );
+      expect(detail.selectedDeparture, isNotNull);
+      expect(detail.tripDetail, isNotNull);
+      expect(detail.tripDetail!.stops, hasLength(3));
+      // Only the tapped train's line is on the map.
+      expect(map.routeLines, hasLength(1));
+      expect(map.routeLines.single.width, 8);
+
+      container.read(transitStopBoardProvider.notifier).closeTrip();
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(transitStopBoardProvider).tripDetail, isNull);
+      expect(map.routeLines, hasLength(2));
+    },
+  );
+
+  test('deselecting the place closes the board and clears the map', () async {
+    final _BoardService service = _BoardService();
+    final FakeMapService map = FakeMapService();
+    final ProviderContainer container = ProviderContainer(
+      overrides: [
+        transitRoutingServiceProvider.overrideWithValue(service),
+        mapServiceProvider.overrideWithValue(map),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    container.read(selectedPlaceProvider.notifier).select(_station);
+    await container
+        .read(transitStopBoardProvider.notifier)
+        .openFromPlace(_station);
+    expect(map.routeLines, isNotEmpty);
+
+    // Closing the sheet clears the selected place.
+    container.read(selectedPlaceProvider.notifier).clear();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(container.read(transitStopBoardProvider).isOpen, isFalse);
+    expect(map.routeLines, isEmpty);
+    expect(map.transitStopMarkers, isEmpty);
+  });
+
+  test('long-distance departures are not drawn on the map', () async {
+    final _BoardService service = _BoardService(longDistanceFirst: true);
+    final FakeMapService map = FakeMapService();
+    final ProviderContainer container = ProviderContainer(
+      overrides: [
+        transitRoutingServiceProvider.overrideWithValue(service),
+        mapServiceProvider.overrideWithValue(map),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(transitStopBoardProvider.notifier)
+        .openFromPlace(_station);
+
+    // The ICE/EN lines are dropped; only the local ones are drawn.
+    expect(map.routeLines, hasLength(1));
+    expect(container.read(transitStopBoardProvider).lines, hasLength(1));
   });
 }
