@@ -469,7 +469,13 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
       );
     }
     final List<OsmPaymentMethod> payments = place.paymentMethods;
-    rows.add(OsmPaymentMethods(methods: payments, tags: place.osmTags));
+    final OsmPaymentMethods paymentSection = OsmPaymentMethods(
+      methods: payments,
+      tags: place.osmTags,
+    );
+    if (paymentSection.hasContent) {
+      rows.add(paymentSection);
+    }
     final String? paymentDescription = place.paymentDescription;
     if (paymentDescription != null) {
       rows.add(_InfoRow(icon: Icons.notes_outlined, text: paymentDescription));

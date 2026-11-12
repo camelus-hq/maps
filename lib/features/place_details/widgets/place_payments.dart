@@ -29,24 +29,31 @@ class OsmPaymentMethods extends StatelessWidget {
   final List<OsmPaymentMethod> methods;
   final Map<String, String> tags;
 
+  bool get hasContent => methods.isNotEmpty || _notAcceptedCards.isNotEmpty;
+
   static const Map<String, String> _cardMethodLabels = <String, String>{
     'payment:cards': 'Cards',
     'payment:credit_cards': 'Credit cards',
     'payment:debit_cards': 'Debit cards',
   };
 
+  List<String> get _notAcceptedCards => _cardMethodLabels.entries
+      .where(
+        (MapEntry<String, String> entry) =>
+            tags.containsKey(entry.key) &&
+            !OsmPaymentCatalog.isAccepted(tags[entry.key]),
+      )
+      .map((MapEntry<String, String> entry) => entry.value)
+      .toList(growable: false);
+
   @override
   Widget build(BuildContext context) {
+    if (!hasContent) {
+      return const SizedBox.shrink();
+    }
     final ThemeData theme = Theme.of(context);
     final ColorScheme scheme = theme.colorScheme;
-    final List<String> notAcceptedCards = _cardMethodLabels.entries
-        .where(
-          (MapEntry<String, String> entry) =>
-              tags.containsKey(entry.key) &&
-              !OsmPaymentCatalog.isAccepted(tags[entry.key]),
-        )
-        .map((MapEntry<String, String> entry) => entry.value)
-        .toList(growable: false);
+    final List<String> notAcceptedCards = _notAcceptedCards;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: Column(

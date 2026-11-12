@@ -215,8 +215,7 @@ void main() {
 
     expect(find.text('Not wheelchair accessible'), findsOneWidget);
     expect(find.byIcon(Icons.not_accessible), findsOneWidget);
-    expect(find.text('Payment'), findsOneWidget);
-    expect(find.text('Payment options not listed'), findsOneWidget);
+    expect(find.text('Payment'), findsNothing);
     expect(find.byTooltip('Cash'), findsNothing);
   });
 
@@ -338,7 +337,6 @@ void main() {
           'payment:cards': 'no',
           'payment:credit_cards': 'no',
           'payment:debit_cards': 'no',
-          'payment:visa': 'yes',
         },
       ),
     );
@@ -347,7 +345,6 @@ void main() {
     await pump(tester, c, unreviewed);
     await expand(tester);
 
-    expect(find.byTooltip('Visa'), findsOneWidget);
     expect(
       find.text('Not accepted: Cards, Credit cards, Debit cards'),
       findsOneWidget,
