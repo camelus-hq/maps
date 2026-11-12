@@ -81,8 +81,8 @@ abstract final class OverpassPlaceMapper {
         'mobile',
       ], 40),
       website: _contact(tags, const <String>[
-        'contact:website',
         'website',
+        'contact:website',
         'url',
       ], 300),
       wheelchairAccessible: _wheelchair(tags),

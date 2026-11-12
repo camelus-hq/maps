@@ -68,6 +68,30 @@ void main() {
       expect(place!.category, 'supermarket');
     });
 
+    test('prefers website over contact:website and supports either tag', () {
+      Place? from(Map<String, Object?> tags) =>
+          OverpassPlaceMapper.fromElement(<String, Object?>{
+            'type': 'node',
+            'id': 1,
+            'lat': 52.5,
+            'lon': 13.4,
+            'tags': <String, Object?>{'name': 'Cafe', ...tags},
+          });
+
+      expect(
+        from(<String, Object?>{
+          'website': 'https://website.example',
+          'contact:website': 'https://contact.example',
+        })!.website,
+        'https://website.example',
+      );
+      expect(
+        from(<String, Object?>{'contact:website': 'https://contact.example'})!
+            .website,
+        'https://contact.example',
+      );
+    });
+
     test('drops an element with no position or no usable id', () {
       expect(
         OverpassPlaceMapper.fromElement(<String, Object?>{

@@ -209,6 +209,31 @@ void main() {
     expect(external.calls, isEmpty);
   });
 
+  testWidgets('the Website pill opens the place website instead of Nearby', (
+    WidgetTester tester,
+  ) async {
+    osm.seed(
+      unreviewed.id,
+      const Place(
+        id: 'node/111',
+        name: 'Willow Park',
+        position: LatLon(52.5150, 13.4030),
+        website: 'https://willow.example',
+      ),
+    );
+    final ProviderContainer c = container();
+    addTearDown(c.dispose);
+    await pump(tester, c, unreviewed);
+
+    expect(find.text('Website'), findsOneWidget);
+    expect(find.text('Nearby'), findsNothing);
+    await tester.ensureVisible(find.text('Website'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Website'));
+    await tester.pumpAndSettle();
+    expect(external.websites, <String>['https://willow.example']);
+  });
+
   testWidgets('a 24/7 place reads as "Open now"', (WidgetTester tester) async {
     osm.seed(
       unreviewed.id,

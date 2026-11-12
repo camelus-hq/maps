@@ -19,7 +19,6 @@ import '../../../state/search.dart';
 import '../../../state/settings.dart';
 import '../../../state/usecases.dart';
 import '../../common/map_sheet.dart';
-import '../../common/navigation.dart';
 import '../../reviews/widgets/place_reviews_section.dart';
 import '../../reviews/widgets/star_rating.dart';
 import 'place_hours_line.dart';
@@ -307,7 +306,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     );
   }
 
-  /// The primary action pills: Directions, Call, Nearby.
+  /// The primary action pills: Directions, Call, Website.
   Widget _actions(BuildContext context, Place place) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -330,9 +329,10 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
           ),
           const SizedBox(width: AppSpacing.sm),
           _ActionPill(
-            icon: Icons.travel_explore,
-            label: 'Nearby',
-            onTap: () => unawaited(_nearby(place)),
+            icon: Icons.language,
+            label: 'Website',
+            enabled: place.website?.trim().isNotEmpty ?? false,
+            onTap: () => unawaited(_openWebsite()),
           ),
         ],
       ),
@@ -567,17 +567,6 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     if (mounted) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Share text copied')));
-    }
-  }
-
-  Future<void> _nearby(Place place) async {
-    await ref.read(commandRegistryProvider).dispatch(
-      'place.nearby',
-      <String, Object?>{'id': place.id},
-    );
-    if (mounted) {
-      // Show the nearby results over the map, as a route so back returns here.
-      openCategory(context);
     }
   }
 }

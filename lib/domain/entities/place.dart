@@ -41,7 +41,7 @@ class Place {
   /// `mobile`), when OSM publishes one.
   final String? phone;
 
-  /// Website (`contact:website` / `website` / `url`), when OSM publishes one.
+  /// Website (`website` / `contact:website` / `url`), when OSM publishes one.
   final String? website;
 
   /// `wheelchair=yes` / `designated` → true, `no` → false, unknown → null
