@@ -211,6 +211,24 @@ class MapboxMapService implements MapService {
     MapboxOptions.setAccessToken(accessToken);
   }
 
+  /// A rasterised PNG of the current map (its camera, style and annotations),
+  /// or `null` when the map is not attached or cannot be captured.
+  ///
+  /// Used to put the map into a screenshot: the platform view is a hole in
+  /// Flutter's own capture, so the map is composited in from here instead.
+  Future<Uint8List?> snapshotPng() async {
+    final MapboxMap? map = _map;
+    if (map == null) {
+      return null;
+    }
+    try {
+      return await map.snapshot();
+    } catch (_) {
+      // A shot is a nicety; never let it throw into the screenshot path.
+      return null;
+    }
+  }
+
   /// Hands the live [MapboxMap] to the service once the widget is ready.
   void attach(MapboxMap map) {
     _map = map;

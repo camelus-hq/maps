@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/fakes/fake_app_installer.dart';
 import '../data/fakes/fake_app_version_source.dart';
 import '../data/fakes/fake_external_actions.dart';
+import '../data/fakes/fake_feedback_service.dart';
 import '../data/fakes/fake_live_share_notifications.dart';
 import '../data/fakes/fake_live_share_store.dart';
 import '../data/fakes/fake_location_service.dart';
@@ -22,6 +23,7 @@ import '../domain/ports/app_database.dart';
 import '../domain/ports/app_installer.dart';
 import '../domain/ports/app_version_source.dart';
 import '../domain/ports/external_actions.dart';
+import '../domain/ports/feedback_service.dart';
 import '../domain/ports/live_share_notifications.dart';
 import '../domain/ports/live_share_store.dart';
 import '../domain/ports/location_service.dart';
@@ -94,6 +96,12 @@ final Provider<SocialService> socialServiceProvider = Provider<SocialService>((
   ref.onDispose(service.dispose);
   return service;
 });
+
+/// In-app feedback (private NIP-17 messages + an encrypted screenshot). The
+/// keyless default records what would be sent; `lib/app/di.dart` swaps in the
+/// NDK adapter when a Nostr client and a recipient are configured.
+final Provider<FeedbackService> feedbackServiceProvider =
+    Provider<FeedbackService>((Ref ref) => FakeFeedbackService());
 
 final Provider<LiveShareStore> liveShareStoreProvider =
     Provider<LiveShareStore>((Ref ref) => FakeLiveShareStore());

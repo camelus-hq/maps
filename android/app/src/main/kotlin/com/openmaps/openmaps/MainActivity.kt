@@ -3,7 +3,12 @@ package app.camelus.maps
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.view.PixelCopy
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -12,6 +17,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.io.ByteArrayOutputStream
 import java.io.File
 
 /**
@@ -89,6 +95,14 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "requestPermission" -> result.success(requestNotificationPermission())
+                    else -> result.notImplemented()
+                }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SCREENSHOT_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "capture" -> captureWindow(result)
                     else -> result.notImplemented()
                 }
             }
@@ -247,6 +261,122 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    /**
+     * Captures the whole app window as a PNG, platform views included.
+     *
+     * `PixelCopy` composites the real window, so the Mapbox map is in the
+     * image; Flutter's own repaint boundary cannot see the platform view. The
+     * listener runs on the main looper, which is where a `MethodChannel.Result`
+     * must be completed. On API < 26 the `Window` variant is unavailable and we
+     * fall back to drawing the view hierarchy (the map may be blank there).
+     */
+    private fun captureWindow(result: MethodChannel.Result) {
+        val currentWindow = window
+        if (currentWindow == null) {
+            result.error("no_window", "The app window is not available", null)
+            return
+        }
+        val decor = currentWindow.decorView
+        val width = decor.width
+        val height = decor.height
+        if (width <= 0 || height <= 0) {
+            result.error("no_window", "The app window has no size yet", null)
+            return
+        }
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                PixelCopy.request(
+                    currentWindow,
+                    bitmap,
+                    { copyResult ->
+                        if (copyResult == PixelCopy.SUCCESS && !looksBlank(bitmap)) {
+                            result.success(encodePng(bitmap))
+                        } else {
+                            // A blank read-back (transparent or all-black) means
+                            // the compositor handed us nothing useful — Dart then
+                            // falls back to the Flutter repaint boundary.
+                            result.error("capture_blank", "The window capture was empty", null)
+                        }
+                        bitmap.recycle()
+                    },
+                    Handler(Looper.getMainLooper()),
+                )
+            } catch (error: Exception) {
+                bitmap.recycle()
+                result.error("capture_failed", error.message ?: "Screenshot failed", null)
+            }
+        } else {
+            try {
+                decor.draw(Canvas(bitmap))
+                if (looksBlank(bitmap)) {
+                    result.error("capture_blank", "The window capture was empty", null)
+                } else {
+                    result.success(encodePng(bitmap))
+                }
+            } catch (error: Exception) {
+                result.error("capture_failed", error.message ?: "Screenshot failed", null)
+            } finally {
+                bitmap.recycle()
+            }
+        }
+    }
+
+    /**
+     * Whether [bitmap] is unusable: an (almost) empty frame — the compositor
+     * read back nothing — or a single transparent/black frame. A capture with a
+     * transparent region is fine: that is the platform-view hole, which Dart
+     * fills with a Mapbox snapshot. A uniform white/grey image is treated as
+     * real, so a genuinely blank screen is still captured. Dart falls back to the
+     * Flutter repaint boundary when this returns true.
+     */
+    private fun looksBlank(bitmap: Bitmap): Boolean {
+        val width = bitmap.width
+        val height = bitmap.height
+        if (width <= 0 || height <= 0) {
+            return true
+        }
+        val stepX = (width / 16).coerceAtLeast(1)
+        val stepY = (height / 16).coerceAtLeast(1)
+        var samples = 0
+        var opaque = 0
+        var first = 0
+        var uniform = true
+        var x = 0
+        while (x < width) {
+            var y = 0
+            while (y < height) {
+                val pixel = bitmap.getPixel(x, y)
+                if (samples == 0) {
+                    first = pixel
+                } else if (pixel != first) {
+                    uniform = false
+                }
+                if (((pixel ushr 24) and 0xFF) != 0) {
+                    opaque++
+                }
+                samples++
+                y += stepY
+            }
+            x += stepX
+        }
+        if (samples == 0) {
+            return true
+        }
+        if (opaque.toDouble() / samples < 0.05) {
+            return true
+        }
+        val alpha = (first ushr 24) and 0xFF
+        val rgb = first and 0x00FFFFFF
+        return uniform && (alpha == 0 || rgb == 0)
+    }
+
+    private fun encodePng(bitmap: Bitmap): ByteArray {
+        val stream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+        return stream.toByteArray()
+    }
+
     private fun installApk(path: String?, result: MethodChannel.Result) {
         if (path.isNullOrBlank()) {
             result.error("bad_args", "Missing APK path", null)
@@ -278,6 +408,7 @@ class MainActivity : FlutterActivity() {
         const val INSTALLER_CHANNEL = "openmaps/installer"
         const val NAVIGATION_CHANNEL = "openmaps/navigation"
         const val LIVE_SHARE_CHANNEL = "openmaps/live_share"
+        const val SCREENSHOT_CHANNEL = "openmaps/screenshot"
         const val REQUEST_NOTIFICATIONS = 7102
         const val APK_MIME_TYPE = "application/vnd.android.package-archive"
     }

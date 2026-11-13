@@ -1,8 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/directions/screens/endpoint_picker_screen.dart';
+import '../features/feedback/screens/feedback_screen.dart';
 import '../features/map_home/screens/category_results_screen.dart';
 import '../features/map_home/screens/map_home_screen.dart';
 import '../features/saved/screens/saved_screen.dart';
@@ -170,6 +173,16 @@ GoRouter buildAppRouter() {
         path: '/settings',
         pageBuilder: (BuildContext context, GoRouterState state) =>
             _page(state, const SettingsScreen()),
+      ),
+      GoRoute(
+        path: '/feedback',
+        pageBuilder: (BuildContext context, GoRouterState state) {
+          final Object? extra = state.extra;
+          return _page(
+            state,
+            FeedbackScreen(screenshot: extra is Uint8List ? extra : null),
+          );
+        },
       ),
       GoRoute(
         path: '/friends',

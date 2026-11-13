@@ -17,6 +17,7 @@ class AppConfig {
     this.transitBaseUrl = defaultTransitBaseUrl,
     this.transitUserAgent = defaultTransitUserAgent,
     this.updateManifestUrl = defaultUpdateManifestUrl,
+    this.feedbackPubkey = '',
     this.nostrNsec = '',
     this.camelusApiToken = '',
     this.camelusPhotonBaseUrl = defaultCamelusPhotonBaseUrl,
@@ -42,8 +43,8 @@ class AppConfig {
   static const List<String> defaultLiveShareRelays = <String>[
     'wss://relay.primal.net',
     'wss://relay.snort.social',
-    'wss://relay.nos.social',
-    'wss://nostr.mom',
+    'wss://relay.camelus.app',
+    'wss://relay.map.camelus.app',
   ];
 
   /// Relays that carry public place reviews (kind 31987).
@@ -60,6 +61,7 @@ class AppConfig {
     'wss://relay.primal.net',
     'wss://relay.snort.social',
     'wss://nostr.mom',
+    'wss://relay.map.camelus.app',
   ];
 
   /// Blossom servers review photos upload to (BUD-02). Public, free hosts by
@@ -158,6 +160,16 @@ class AppConfig {
   /// URL of the self-update manifest (see [defaultUpdateManifestUrl]).
   final String updateManifestUrl;
 
+  /// The Nostr public key (`npub…` or 64-char hex) that in-app feedback is sent
+  /// to, supplied with `--dart-define=FEEDBACK_PUBKEY=…`.
+  ///
+  /// Feedback leaves the app as a private (NIP-17 gift-wrapped) direct message
+  /// with an AES-GCM-encrypted screenshot attached, so the recipient reads it in
+  /// any NIP-17 client (Amethyst and friends). Empty disables sending: the alpha
+  /// banner still opens the feedback screen, which then explains that this build
+  /// has no recipient configured rather than silently doing nothing.
+  final String feedbackPubkey;
+
   /// A Nostr private key (`nsec…`) supplied at build time
   /// (`--dart-define=NOSTR_NSEC=…`) so a **development** build signs in
   /// automatically instead of showing the login screen. Never committed.
@@ -186,6 +198,9 @@ class AppConfig {
   final String camelusTransitBaseUrl;
 
   bool get hasCamelusToken => camelusApiToken.trim().isNotEmpty;
+
+  /// Whether feedback has a recipient configured (see [feedbackPubkey]).
+  bool get hasFeedbackPubkey => feedbackPubkey.trim().isNotEmpty;
 
   bool get hasNostrKey => nostrNsec.trim().isNotEmpty;
 
@@ -264,6 +279,7 @@ class AppConfig {
       const String.fromEnvironment('UPDATE_MANIFEST_URL'),
       defaultUpdateManifestUrl,
     ),
+    feedbackPubkey: const String.fromEnvironment('FEEDBACK_PUBKEY').trim(),
     // Development-only convenience: the automatic sign-in key is compiled out
     // of a production build (a release APK never carries or uses it), so the
     // `NOSTR_NSEC` define is harmless if it is left in a release command.

@@ -174,4 +174,5 @@ These are standard, not proposals:
 | Profile metadata (`kind: 0`) | Friend names and avatars |
 | NIP-44 + NIP-59 | Encryption and gift wrap used by live share and DMs |
 | NIP-17 | Private, gift-wrapped direct messages between friends (message rumor `kind: 14`, DM relay list `kind: 10050`) |
+| NIP-17 file messages (`kind: 15`, AES-256-GCM) | In-app feedback: the screenshot is encrypted (fresh key + nonce, the Amethyst convention) before it is uploaded to Blossom and sent as a gift-wrapped file message |
 | Blossom (BUD-02) | Photo uploads for reviews; `kind: 24242` auth event |

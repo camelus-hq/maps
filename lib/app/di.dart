@@ -16,6 +16,7 @@ import '../data/location/geolocator_location_service.dart';
 import '../data/mapbox/mapbox_map_service.dart';
 import '../data/mapbox/mapbox_map_view.dart';
 import '../data/mapbox/mapbox_search_service.dart';
+import '../data/nostr/ndk_feedback_service.dart';
 import '../data/nostr/ndk_review_service.dart';
 import '../data/nostr/ndk_social_service.dart';
 import '../data/notifications/local_live_share_notifications.dart';
@@ -36,6 +37,7 @@ import '../domain/ports/search_service.dart';
 import '../state/config.dart';
 import '../state/map_view.dart';
 import '../state/ports.dart';
+import '../state/screenshot.dart';
 import '../state/settings.dart';
 import '../state/social.dart';
 
@@ -163,6 +165,15 @@ List<Override> buildAppOverrides(
       relays: config.reviewRelays,
       blossomServers: config.blossomServers,
     );
+    final NdkFeedbackService feedback = NdkFeedbackService(
+      ndk: ndk,
+      recipientPubkey: config.feedbackPubkey,
+      // The proven live-share relays: they accept gift wraps. (See the
+      // NdkFeedbackService default, which is only used when no relays are
+      // passed.)
+      relays: config.liveShareRelays,
+      blossomServers: config.blossomServers,
+    );
     overrides
       ..add(
         socialServiceProvider.overrideWith((Ref ref) {
@@ -171,6 +182,7 @@ List<Override> buildAppOverrides(
         }),
       )
       ..add(reviewServiceProvider.overrideWithValue(reviews))
+      ..add(feedbackServiceProvider.overrideWithValue(feedback))
       ..add(ndkFlutterProvider.overrideWithValue(ndkFlutter));
   }
 
@@ -192,7 +204,9 @@ List<Override> buildAppOverrides(
         mapViewBuilderProvider.overrideWithValue(
           (BuildContext context) => MapboxMapView(service: mapService),
         ),
-      );
+      )
+      // Lets a screenshot composite the live map into the platform-view hole.
+      ..add(mapSnapshotProvider.overrideWithValue(mapService.snapshotPng));
   }
 
   // Valhalla is wired when a `VALHALLA_URL` is configured, or via the Camelus

@@ -10,6 +10,7 @@ import '../domain/usecases/request_stop_info.dart';
 import '../domain/usecases/request_transit_route.dart';
 import '../domain/usecases/request_transit_trip.dart';
 import '../domain/usecases/search_places.dart';
+import '../domain/usecases/send_feedback.dart';
 import '../domain/usecases/toggle_bookmark.dart';
 import '../domain/usecases/watch_location.dart';
 import 'ports.dart';
@@ -66,6 +67,12 @@ final Provider<ToggleBookmark> toggleBookmarkProvider =
 
 final Provider<PublishReview> publishReviewProvider = Provider<PublishReview>(
   (Ref ref) => PublishReview(ref.watch(reviewServiceProvider)),
+);
+
+/// Validates and sends an in-app feedback report (private Nostr message with an
+/// encrypted screenshot).
+final Provider<SendFeedback> sendFeedbackProvider = Provider<SendFeedback>(
+  (Ref ref) => SendFeedback(ref.watch(feedbackServiceProvider)),
 );
 
 final Provider<LoadPlaceReviews> loadPlaceReviewsProvider =

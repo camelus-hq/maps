@@ -45,6 +45,7 @@ import '../../domain/ports/app_database.dart';
 import '../../domain/ports/map_service.dart';
 import '../../domain/ports/settings_repository.dart';
 import '../config.dart';
+import '../feedback.dart';
 import '../follow.dart';
 import '../home.dart';
 import '../location.dart';
@@ -2467,7 +2468,7 @@ List<Command> buildCommands(Ref ref) {
         final String path = rawPath is String && rawPath.trim().isNotEmpty
             ? rawPath.trim()
             : '${Directory.systemTemp.path}/openmaps-screenshot.png';
-        final Uint8List bytes = await captureRootPng();
+        final Uint8List bytes = await ref.read(screenshotCaptureProvider)();
         final File file = File(path);
         try {
           await file.parent.create(recursive: true);
@@ -2479,6 +2480,67 @@ List<Command> buildCommands(Ref ref) {
           );
         }
         return <String, Object?>{'path': file.path, 'bytes': bytes.length};
+      },
+    ),
+    Command(
+      id: 'feedback.open',
+      description:
+          'Capture the current screen and open the feedback form (the same '
+          'thing tapping the alpha banner does).',
+      handler: (CommandRequest request) async {
+        final BuildContext? context = rootNavigatorKey.currentContext;
+        if (context == null) {
+          throw const CommandException('no_view', 'App view is not mounted');
+        }
+        final Uint8List screenshot = await ref.read(
+          screenshotCaptureProvider,
+        )();
+        if (!context.mounted) {
+          throw const CommandException('no_view', 'App view is not mounted');
+        }
+        unawaited(context.push('/feedback', extra: screenshot));
+        return true;
+      },
+    ),
+    Command(
+      id: 'feedback.send',
+      description:
+          'Send a feedback report with a screenshot of the current screen '
+          '(params: {text}).',
+      handler: (CommandRequest request) async {
+        final Object? rawText = request.params['text'];
+        if (rawText is! String || rawText.trim().isEmpty) {
+          throw const CommandException(
+            'bad_params',
+            '"text" must be a non-empty string',
+          );
+        }
+        final Uint8List screenshot = await ref.read(
+          screenshotCaptureProvider,
+        )();
+        await ref
+            .read(feedbackControllerProvider.notifier)
+            .send(message: rawText, screenshot: screenshot);
+        final FeedbackState state = ref.read(feedbackControllerProvider);
+        final String? error = state.error;
+        if (error != null) {
+          throw CommandException('send_failed', error);
+        }
+        return <String, Object?>{'sent': state.isSent};
+      },
+    ),
+    Command(
+      id: 'feedback.state',
+      description:
+          'Report the feedback configuration and the last send status.',
+      handler: (CommandRequest request) async {
+        final FeedbackState state = ref.read(feedbackControllerProvider);
+        return <String, Object?>{
+          'configured': ref.read(appConfigProvider).hasFeedbackPubkey,
+          'signedIn': ref.read(feedbackServiceProvider).isSignedIn,
+          'status': state.status.name,
+          'error': state.error,
+        };
       },
     ),
   ];

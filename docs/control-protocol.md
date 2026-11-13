@@ -130,6 +130,9 @@ sync test fails if it drifts from the registry.
 | `app.update.dismiss` | Decline the offered update (hides the startup prompt for it); returns the state. |
 | `app.update.install` | Download and install the offered update; returns the state. |
 | `app.update.state` | Return the self-update state (installed version, offered release, progress). |
+| `feedback.open` | Capture the current screen and open the feedback form (the same thing tapping the alpha banner does). |
+| `feedback.send` | Send a feedback report with a screenshot of the current screen (params: {text}). |
+| `feedback.state` | Report the feedback configuration and the last send status. |
 | `map.camera.get` | Return the current map camera. |
 | `map.camera.set` | Move the map camera (params: lat, lon, zoom?, bearing?, tilt?). |
 | `map.fitFriends` | Frame every friend who is sharing their location: fit them all, or centre one friend when only they are live. Returns how many were framed. |

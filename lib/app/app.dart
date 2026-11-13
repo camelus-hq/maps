@@ -5,6 +5,7 @@ import 'package:ndk_flutter/l10n/app_localizations.dart' as ndk_l10n;
 
 import '../core/theme/app_theme.dart';
 import '../domain/entities/app_settings.dart';
+import '../features/feedback/widgets/alpha_banner.dart';
 import '../features/update/widgets/update_prompt.dart';
 import '../state/screenshot.dart';
 import '../state/settings.dart';
@@ -50,8 +51,9 @@ class _OpenMapsAppState extends State<OpenMapsApp> {
                 ndk_l10n.AppLocalizations.localizationsDelegates,
             supportedLocales: ndk_l10n.AppLocalizations.supportedLocales,
             routerConfig: _router,
-            builder: (BuildContext context, Widget? child) =>
-                UpdatePromptHost(child: child ?? const SizedBox.shrink()),
+            builder: (BuildContext context, Widget? child) => AlphaBannerHost(
+              child: UpdatePromptHost(child: child ?? const SizedBox.shrink()),
+            ),
           );
         },
       ),
