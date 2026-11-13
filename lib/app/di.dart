@@ -16,6 +16,7 @@ import '../data/location/geolocator_location_service.dart';
 import '../data/mapbox/mapbox_map_service.dart';
 import '../data/mapbox/mapbox_map_view.dart';
 import '../data/mapbox/mapbox_search_service.dart';
+import '../data/nostr/ndk_anonymous_identity.dart';
 import '../data/nostr/ndk_feedback_service.dart';
 import '../data/nostr/ndk_review_service.dart';
 import '../data/nostr/ndk_social_service.dart';
@@ -165,15 +166,6 @@ List<Override> buildAppOverrides(
       relays: config.reviewRelays,
       blossomServers: config.blossomServers,
     );
-    final NdkFeedbackService feedback = NdkFeedbackService(
-      ndk: ndk,
-      recipientPubkey: config.feedbackPubkey,
-      // The proven live-share relays: they accept gift wraps. (See the
-      // NdkFeedbackService default, which is only used when no relays are
-      // passed.)
-      relays: config.liveShareRelays,
-      blossomServers: config.blossomServers,
-    );
     overrides
       ..add(
         socialServiceProvider.overrideWith((Ref ref) {
@@ -182,7 +174,30 @@ List<Override> buildAppOverrides(
         }),
       )
       ..add(reviewServiceProvider.overrideWithValue(reviews))
-      ..add(feedbackServiceProvider.overrideWithValue(feedback))
+      // The persistent anonymous identity lives in the local database, so it is
+      // generated once and reused for every anonymous action (feedback now).
+      ..add(
+        anonymousIdentityProvider.overrideWith(
+          (Ref ref) =>
+              NdkAnonymousIdentity(database: ref.watch(appDatabaseProvider)),
+        ),
+      )
+      // Feedback uses the signed-in account when there is one and the anonymous
+      // identity otherwise. Built lazily so it can read the two providers.
+      ..add(
+        feedbackServiceProvider.overrideWith((Ref ref) {
+          return NdkFeedbackService(
+            ndk: ndk,
+            recipientPubkey: config.feedbackPubkey,
+            anonymousIdentity: ref.watch(anonymousIdentityProvider),
+            // The proven live-share relays: they accept gift wraps. (See the
+            // NdkFeedbackService default, which is only used when no relays are
+            // passed.)
+            relays: config.liveShareRelays,
+            blossomServers: config.blossomServers,
+          );
+        }),
+      )
       ..add(ndkFlutterProvider.overrideWithValue(ndkFlutter));
   }
 

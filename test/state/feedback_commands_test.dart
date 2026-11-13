@@ -38,6 +38,7 @@ void main() {
 
       expect(state['configured'], isTrue);
       expect(state['signedIn'], isTrue);
+      expect(state['sender'], FakeFeedbackService.userPubkey);
       expect(state['status'], 'idle');
       expect(state['error'], isNull);
     },

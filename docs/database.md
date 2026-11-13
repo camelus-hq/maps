@@ -56,6 +56,13 @@ keys, so a new entry needs no schema change. It copies the pre-database
 `openmaps.recent_queries` / `openmaps.bookmarks` values in once, the same way the
 settings do.
 
+The **persistent anonymous Nostr identity** (see
+[`docs/nostr-nips.md`](nostr-nips.md)) is a JSON value under the
+`identity.anonymous` key: a key pair generated once on first use and reused, so
+feedback — and any future anonymous feature — keeps one stable key without a
+schema change. It is local-only and its private key never leaves the device
+except as the NIP-17 encrypted payload.
+
 ## Migrations — the checklist
 
 Everything hinges on one integer, `kAppDatabaseSchemaVersion` in

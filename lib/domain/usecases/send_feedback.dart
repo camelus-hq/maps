@@ -8,6 +8,10 @@ import '../ports/feedback_service.dart';
 /// The message rules live here (not in the widget) so the screen, the alpha
 /// banner and the control channel share one behaviour: a non-empty, bounded
 /// message and a screenshot that is actually a PNG.
+///
+/// Sending does **not** require an account: the service signs as the signed-in
+/// user when there is one and as the app's persistent anonymous identity
+/// otherwise.
 class SendFeedback {
   const SendFeedback(this._service);
 
@@ -35,9 +39,6 @@ class SendFeedback {
     }
     if (screenshot.length < _minScreenshotBytes) {
       throw const ValidationException('The screenshot could not be captured');
-    }
-    if (!_service.isSignedIn) {
-      throw const ValidationException('Sign in to send feedback');
     }
     final String? trimmedContext = context?.trim();
     await _service.sendFeedback(

@@ -65,12 +65,9 @@ void main() {
     expect(service.sent, isEmpty);
   });
 
-  test('refuses to send while signed out', () async {
+  test('sends while signed out (from the anonymous identity)', () async {
     final FakeFeedbackService service = FakeFeedbackService(signedIn: false);
-    await expectLater(
-      SendFeedback(service)(message: 'hi', screenshot: png()),
-      throwsA(isA<ValidationException>()),
-    );
-    expect(service.sent, isEmpty);
+    await SendFeedback(service)(message: 'hi', screenshot: png());
+    expect(service.sent.single.key, 'hi');
   });
 }

@@ -2538,6 +2538,7 @@ List<Command> buildCommands(Ref ref) {
         return <String, Object?>{
           'configured': ref.read(appConfigProvider).hasFeedbackPubkey,
           'signedIn': ref.read(feedbackServiceProvider).isSignedIn,
+          'sender': await ref.read(feedbackServiceProvider).senderPubkey(),
           'status': state.status.name,
           'error': state.error,
         };

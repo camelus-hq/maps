@@ -16,7 +16,9 @@ import '../../common/navigation.dart';
 
 /// The feedback screen (`/feedback`): shows the screenshot the banner captured
 /// and a text field, then sends both as one private, end-to-end encrypted Nostr
-/// message to the configured maintainer key.
+/// message to the configured maintainer key. A signed-in user sends as their
+/// own account; otherwise the report goes out from the app's persistent
+/// anonymous identity, so signing in is optional.
 class FeedbackScreen extends ConsumerStatefulWidget {
   const FeedbackScreen({this.screenshot, super.key});
 
@@ -110,7 +112,6 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
 
     final bool canSend =
         configured &&
-        signedIn &&
         _screenshot != null &&
         !state.isSending &&
         _controller.text.trim().isNotEmpty;
@@ -177,8 +178,10 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
             ] else if (!signedIn) ...<Widget>[
               const SizedBox(height: AppSpacing.sm),
               _Notice(
-                icon: Icons.person_outline,
-                text: 'Sign in with Nostr to send feedback.',
+                icon: Icons.visibility_off_outlined,
+                text:
+                    'You are not signed in, so this report is sent from an '
+                    'anonymous identity.',
                 action: TextButton(
                   onPressed: () => context.push('/profile'),
                   child: const Text('Sign in'),

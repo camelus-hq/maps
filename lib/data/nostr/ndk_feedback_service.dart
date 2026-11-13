@@ -5,6 +5,8 @@ import 'package:ndk/entities.dart' show NdkFile, RelayBroadcastResponse;
 import 'package:ndk/ndk.dart';
 
 import '../../core/errors/app_exception.dart';
+import '../../domain/entities/nostr_identity.dart';
+import '../../domain/ports/anonymous_identity.dart';
 import '../../domain/ports/feedback_service.dart';
 
 /// [FeedbackService] backed by Nostr through the NDK client.
@@ -14,6 +16,11 @@ import '../../domain/ports/feedback_service.dart';
 /// bytes are **AES-256-GCM encrypted** (a fresh key + 16-byte nonce, the
 /// convention Amethyst uses), so the image is unreadable on the Blossom host and
 /// on every relay. Only the recipient's key can decrypt it.
+///
+/// The sender is the **signed-in account** when there is one, and otherwise the
+/// app's persistent **anonymous identity** (see [AnonymousIdentity]) — so
+/// feedback works without asking the user to sign in, while a signed-in user
+/// still sends as themselves.
 ///
 /// Delivery goes through `ndk.giftWrap` directly (the same path live-location
 /// shares take): each rumor is sealed and gift-wrapped (NIP-59) for the
@@ -26,9 +33,12 @@ class NdkFeedbackService implements FeedbackService {
   NdkFeedbackService({
     required this.ndk,
     required this.recipientPubkey,
+    // Supplies the persistent anonymous identity used when no user is signed
+    // in. `null` keeps the old "sign in to send" behaviour (tests).
+    this.anonymousIdentity,
     // Relays the gift-wrapped messages are broadcast to. The app passes the
     // proven live-share set from `lib/app/di.dart`; this is only the fallback
-    // not to accept the gift-wrap broadcast in testing.)
+    // used by tests, which do not accept the gift-wrap broadcast.
     List<String> relays = const <String>[],
     List<String> blossomServers = const <String>[],
   }) : _relays = _cleanRelays(relays),
@@ -52,11 +62,17 @@ class NdkFeedbackService implements FeedbackService {
   /// The raw `FEEDBACK_PUBKEY` define (`npub…` or hex).
   final String recipientPubkey;
 
+  /// Supplies the persistent anonymous identity used when no user is signed in.
+  final AnonymousIdentity? anonymousIdentity;
+
   final List<String> _relays;
   final List<String> _blossomServers;
 
   @override
   bool get isSignedIn => ndk.accounts.isLoggedIn;
+
+  @override
+  Future<String?> senderPubkey() async => (await _resolveSender())?.pubkey;
 
   @override
   Future<void> sendFeedback({
@@ -70,12 +86,8 @@ class NdkFeedbackService implements FeedbackService {
         'This build has no feedback recipient configured.',
       );
     }
-    final Account? account = ndk.accounts.getLoggedAccount();
-    if (account == null || !account.signer.canSign()) {
-      throw const ValidationException('Sign in to send feedback');
-    }
-    final String? me = ndk.accounts.getPublicKey();
-    if (me == null) {
+    final _Sender? sender = await _resolveSender();
+    if (sender == null) {
       throw const ValidationException('Sign in to send feedback');
     }
 
@@ -88,7 +100,7 @@ class NdkFeedbackService implements FeedbackService {
       throw UnknownException('Could not encrypt the screenshot', cause: error);
     }
 
-    final String url = await _uploadEncrypted(encrypted);
+    final String url = await _uploadEncrypted(encrypted, sender);
     final Nip17FileMetadata metadata = Nip17FileMetadata.fromEncryptedFile(
       url: Uri.parse(url),
       mimeType: 'image/png',
@@ -97,16 +109,14 @@ class NdkFeedbackService implements FeedbackService {
 
     // The text first, then the image, as two messages in the same thread.
     await _sendMessage(
-      me: me,
-      account: account,
+      sender: sender,
       recipient: recipient,
       content: _composeText(message, context),
       kind: _textKind,
       extraTags: const <List<String>>[],
     );
     await _sendMessage(
-      me: me,
-      account: account,
+      sender: sender,
       recipient: recipient,
       content: metadata.url.toString(),
       kind: _fileKind,
@@ -114,8 +124,41 @@ class NdkFeedbackService implements FeedbackService {
     );
   }
 
+  /// The identity a report goes out as: the signed-in account when there is a
+  /// signing one, otherwise the persistent anonymous identity. `null` when
+  /// neither can sign.
+  Future<_Sender?> _resolveSender() async {
+    final Account? account = ndk.accounts.getLoggedAccount();
+    if (account != null && account.signer.canSign()) {
+      return _Sender(account: account, pubkey: account.pubkey);
+    }
+    final AnonymousIdentity? anonymous = anonymousIdentity;
+    if (anonymous == null) {
+      return null;
+    }
+    final NostrIdentity? identity = await anonymous.current();
+    if (identity == null || !identity.canSign) {
+      return null;
+    }
+    final Bip340EventSigner signer = Bip340EventSigner(
+      privateKey: identity.privateKey,
+      publicKey: identity.pubkey,
+    );
+    return _Sender(
+      account: Account(
+        type: AccountType.privateKey,
+        pubkey: identity.pubkey,
+        signer: signer,
+      ),
+      pubkey: identity.pubkey,
+    );
+  }
+
   /// Uploads the ciphertext to Blossom and returns its public URL.
-  Future<String> _uploadEncrypted(Nip17EncryptedFile encrypted) async {
+  Future<String> _uploadEncrypted(
+    Nip17EncryptedFile encrypted,
+    _Sender sender,
+  ) async {
     final List<BlobUploadResult> results;
     try {
       results = await ndk.files
@@ -126,7 +169,7 @@ class NdkFeedbackService implements FeedbackService {
               size: encrypted.size,
             ),
             serverUrls: _blossomServers.isEmpty ? null : _blossomServers,
-            auth: _blossomAuth,
+            auth: AuthPolicy.require(sender.account),
           )
           .timeout(_uploadTimeout);
     } catch (error) {
@@ -146,12 +189,13 @@ class NdkFeedbackService implements FeedbackService {
 
   /// Gift-wraps one NIP-17 rumor for [recipient] and broadcasts the wrap.
   ///
-  /// A fresh throwaway key per message hides the sender, and only the recipient
-  /// can unwrap it. Throws an [AppException] when the rumor cannot be prepared
-  /// or no relay accepted the event.
+  /// The seal is signed by [sender]'s signer (the user's account, or the
+  /// anonymous identity), while the outer wrap uses a fresh throwaway key per
+  /// message to hide the sender; only the recipient can unwrap it. Throws an
+  /// [AppException] when the rumor cannot be prepared or no relay accepted the
+  /// event.
   Future<void> _sendMessage({
-    required String me,
-    required Account account,
+    required _Sender sender,
     required String recipient,
     required String content,
     required int kind,
@@ -160,7 +204,7 @@ class NdkFeedbackService implements FeedbackService {
     final Nip01Event rumor;
     try {
       rumor = await ndk.giftWrap.createRumor(
-        customPubkey: me,
+        customPubkey: sender.pubkey,
         kind: kind,
         content: content,
         tags: <List<String>>[
@@ -178,12 +222,13 @@ class NdkFeedbackService implements FeedbackService {
       final Nip01Event wrap = await ndk.giftWrap.toGiftWrap(
         rumor: rumor,
         recipientPubkey: recipient,
+        customSigner: sender.account.signer,
       );
       final List<RelayBroadcastResponse> responses = await ndk.broadcast
           .broadcast(
             nostrEvent: wrap,
             specificRelays: _relays.isEmpty ? null : _relays,
-            auth: AuthPolicy.allow(account),
+            auth: AuthPolicy.allow(sender.account),
           )
           .broadcastDoneFuture
           .timeout(
@@ -213,17 +258,6 @@ class NdkFeedbackService implements FeedbackService {
       return trimmed;
     }
     return '$trimmedContext\n\n$trimmed';
-  }
-
-  /// The auth policy for Blossom uploads: the signed-in account signs the
-  /// kind-24242 event up front (several public servers answer 400, not 401,
-  /// without it).
-  AuthPolicy? get _blossomAuth {
-    final Account? account = ndk.accounts.getLoggedAccount();
-    if (account == null || !account.signer.canSign()) {
-      return null;
-    }
-    return AuthPolicy.require(account);
   }
 
   /// Normalises the `FEEDBACK_PUBKEY` define (`npub1…`, `nostr:npub…` or
@@ -282,4 +316,13 @@ class NdkFeedbackService implements FeedbackService {
     }
     return cleaned;
   }
+}
+
+/// The identity one report is sent from: the NDK [account] whose signer seals
+/// the rumors and authenticates to relays, plus its [pubkey].
+class _Sender {
+  const _Sender({required this.account, required this.pubkey});
+
+  final Account account;
+  final String pubkey;
 }

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/fakes/fake_anonymous_identity.dart';
 import '../data/fakes/fake_app_installer.dart';
 import '../data/fakes/fake_app_version_source.dart';
 import '../data/fakes/fake_external_actions.dart';
@@ -19,6 +20,7 @@ import '../data/fakes/fake_settings_repository.dart';
 import '../data/fakes/fake_social_service.dart';
 import '../data/fakes/fake_transit_routing_service.dart';
 import '../data/fakes/in_memory_app_database.dart';
+import '../domain/ports/anonymous_identity.dart';
 import '../domain/ports/app_database.dart';
 import '../domain/ports/app_installer.dart';
 import '../domain/ports/app_version_source.dart';
@@ -102,6 +104,13 @@ final Provider<SocialService> socialServiceProvider = Provider<SocialService>((
 /// NDK adapter when a Nostr client and a recipient are configured.
 final Provider<FeedbackService> feedbackServiceProvider =
     Provider<FeedbackService>((Ref ref) => FakeFeedbackService());
+
+/// The app's persistent, anonymous Nostr identity, used when a feature needs to
+/// sign without a user account (feedback first). The keyless/test default is an
+/// in-memory fake that generates a real key pair; `lib/app/di.dart` swaps in the
+/// database-backed adapter so the identity survives restarts.
+final Provider<AnonymousIdentity> anonymousIdentityProvider =
+    Provider<AnonymousIdentity>((Ref ref) => FakeAnonymousIdentity());
 
 final Provider<LiveShareStore> liveShareStoreProvider =
     Provider<LiveShareStore>((Ref ref) => FakeLiveShareStore());

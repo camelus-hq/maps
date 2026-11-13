@@ -135,18 +135,26 @@ void main() {
     expect(button.onPressed, isNull);
   });
 
-  testWidgets('a signed-out visitor is asked to sign in', (
+  testWidgets('a signed-out visitor can still send, anonymously', (
     WidgetTester tester,
   ) async {
-    await pumpFeedback(tester, signedIn: false);
+    final FakeFeedbackService service = FakeFeedbackService(signedIn: false);
+    await pumpFeedback(tester, signedIn: false, service: service);
 
-    expect(find.text('Sign in with Nostr to send feedback.'), findsOneWidget);
+    expect(
+      find.textContaining('sent from an anonymous identity'),
+      findsOneWidget,
+    );
     await tester.enterText(find.byType(TextField), 'hello');
     await tester.pumpAndSettle();
     final FilledButton button = tester.widget<FilledButton>(
       find.byType(FilledButton),
     );
-    expect(button.onPressed, isNull);
+    expect(button.onPressed, isNotNull);
+
+    await tester.tap(find.text('Send'));
+    await tester.pumpAndSettle();
+    expect(service.sent.single.key, 'hello');
   });
 
   testWidgets('a failed send shows the error and keeps the form', (
