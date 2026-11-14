@@ -24,7 +24,10 @@ releases:
             export-method: app-store
             # Same config file (gitignored) the local/Android builds use.
             dart-define-from-file: .dart-define.json
-            obfuscate: ''
+            # Must be a YAML boolean (not `''`): fastforge 0.6.14 forwards an
+            # empty string as a stray positional argument, which Flutter then
+            # treats as the build target (`Target file "" not found`).
+            obfuscate: true
             split-debug-info: build/ios/symbols
         publish:
           target: appstore
