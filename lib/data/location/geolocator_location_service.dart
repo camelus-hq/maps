@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_device_compass/flutter_device_compass.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -33,13 +34,46 @@ class GeolocatorLocationService implements LocationService {
   // therefore the distance, speed and elapsed readouts) only refreshed every
   // five seconds. `AndroidSettings` sets an explicit ~1 Hz interval, and
   // `distanceFilter: 0` keeps those updates coming when stopped (and at walking
-  // pace) instead of waiting for 5 m of movement. On iOS `intervalDuration` is
-  // ignored and CoreLocation delivers continuously.
-  static final AndroidSettings _settings = AndroidSettings(
-    accuracy: LocationAccuracy.bestForNavigation,
-    distanceFilter: 0,
-    intervalDuration: const Duration(seconds: 1),
+  // pace) instead of waiting for 5 m of movement.
+  //
+  // On iOS `intervalDuration` does not exist and CoreLocation delivers
+  // continuously, so `AppleSettings` is used instead: it turns on background
+  // updates (matching the Android location foreground service, and backed by
+  // the `location` value in `UIBackgroundModes` in `ios/Runner/Info.plist`) so
+  // guidance and a live-location share keep receiving fixes while the app is
+  // backgrounded, and it stops CoreLocation from pausing fixes when the device
+  // looks stationary.
+  static final LocationSettings _settings = buildLocationSettings(
+    platform: defaultTargetPlatform,
+    isWeb: kIsWeb,
   );
+
+  /// The location settings to use for [platform] (and [isWeb]).
+  ///
+  /// Both branches keep `accuracy: bestForNavigation` and `distanceFilter: 0`
+  /// so every fix is delivered; see the class comment above. Exposed (rather
+  /// than private) so tests can assert the per-platform choice without a
+  /// device.
+  @visibleForTesting
+  static LocationSettings buildLocationSettings({
+    required TargetPlatform platform,
+    bool isWeb = false,
+  }) {
+    if (!isWeb && platform == TargetPlatform.iOS) {
+      return AppleSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 0,
+        pauseLocationUpdatesAutomatically: false,
+        showBackgroundLocationIndicator: true,
+        allowBackgroundLocationUpdates: true,
+      );
+    }
+    return AndroidSettings(
+      accuracy: LocationAccuracy.bestForNavigation,
+      distanceFilter: 0,
+      intervalDuration: const Duration(seconds: 1),
+    );
+  }
 
   final Stream<Position> Function() _positionEvents;
   final Stream<CompassEvent>? _compassEvents;

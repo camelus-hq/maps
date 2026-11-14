@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show TargetPlatform;
 import 'package:flutter_device_compass/flutter_device_compass.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
@@ -172,5 +173,41 @@ void main() {
 
     await positionSub.cancel();
     await availabilitySub.cancel();
+  });
+
+  group('buildLocationSettings', () {
+    test('iOS uses AppleSettings with background updates enabled', () {
+      final LocationSettings settings =
+          GeolocatorLocationService.buildLocationSettings(
+            platform: TargetPlatform.iOS,
+          );
+      expect(settings, isA<AppleSettings>());
+      final AppleSettings apple = settings as AppleSettings;
+      expect(apple.accuracy, LocationAccuracy.bestForNavigation);
+      expect(apple.distanceFilter, 0);
+      expect(apple.allowBackgroundLocationUpdates, isTrue);
+      expect(apple.pauseLocationUpdatesAutomatically, isFalse);
+    });
+
+    test('Android uses AndroidSettings with a 1 Hz interval', () {
+      final LocationSettings settings =
+          GeolocatorLocationService.buildLocationSettings(
+            platform: TargetPlatform.android,
+          );
+      expect(settings, isA<AndroidSettings>());
+      final AndroidSettings android = settings as AndroidSettings;
+      expect(android.accuracy, LocationAccuracy.bestForNavigation);
+      expect(android.distanceFilter, 0);
+      expect(android.intervalDuration, const Duration(seconds: 1));
+    });
+
+    test('the web never selects the iOS-only AppleSettings', () {
+      final LocationSettings settings =
+          GeolocatorLocationService.buildLocationSettings(
+            platform: TargetPlatform.iOS,
+            isWeb: true,
+          );
+      expect(settings, isA<AndroidSettings>());
+    });
   });
 }

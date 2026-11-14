@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
@@ -134,25 +136,30 @@ List<Override> buildAppOverrides(
         userAgent: config.transitUserAgent,
       );
     }),
-    // Self-update: the installed version comes from the platform metadata, the
-    // release from the published JSON manifest, and the install from the
-    // Android installer. Key-less, so it is wired for every build.
+    // Self-update: the installed version comes from the platform metadata (on
+    // every platform, so the settings screen can show it), while the release
+    // manifest and the download are **Android-only** — the self-updater
+    // installs an APK, which iOS/the web cannot do (the stores handle updates
+    // there). On other platforms the keyless defaults advertise no release, so
+    // no update prompt ever appears.
     appVersionSourceProvider.overrideWith(
       (Ref ref) => const PackageInfoAppVersionSource(),
     ),
-    releaseSourceProvider.overrideWith((Ref ref) {
-      final http.Client client = http.Client();
-      ref.onDispose(client.close);
-      return HttpReleaseSource(
-        client: client,
-        manifestUrl: config.updateManifestUrl,
-      );
-    }),
-    appInstallerProvider.overrideWith((Ref ref) {
-      final http.Client client = http.Client();
-      ref.onDispose(client.close);
-      return AndroidAppInstaller(client: client);
-    }),
+    if (_supportsSelfUpdate) ...<Override>[
+      releaseSourceProvider.overrideWith((Ref ref) {
+        final http.Client client = http.Client();
+        ref.onDispose(client.close);
+        return HttpReleaseSource(
+          client: client,
+          manifestUrl: config.updateManifestUrl,
+        );
+      }),
+      appInstallerProvider.overrideWith((Ref ref) {
+        final http.Client client = http.Client();
+        ref.onDispose(client.close);
+        return AndroidAppInstaller(client: client);
+      }),
+    ],
   ];
 
   if (ndk != null && ndkFlutter != null) {
@@ -245,6 +252,12 @@ List<Override> buildAppOverrides(
 
   return overrides;
 }
+
+/// Whether the in-app self-updater can run: it downloads and installs an APK,
+/// which only Android supports. iOS and the web get the keyless default (no
+/// advertised release), so no Android update prompt ever shows there.
+bool get _supportsSelfUpdate =>
+    !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
 /// Whether the Camelus service set is selected **and** has a key, so callers
 /// only redirect to `*.map.camelus.app` when it can actually authenticate.
