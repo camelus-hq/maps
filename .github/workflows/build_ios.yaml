@@ -3,12 +3,12 @@ name: Build iOS IPA
 # Builds a signed App Store .ipa with fastforge and uploads it to App Store
 # Connect (TestFlight). See docs/ios.md §"Continuous integration".
 #
-# Signing: the Runner target uses "Automatically manage signing" with the team
-# set (DEVELOPMENT_TEAM in project.pbxproj). `flutter build ipa` never passes an
-# App Store Connect API key to xcodebuild, so the build needs the real signing
-# assets installed locally: an Apple Distribution certificate (.p12) and an
-# App Store provisioning profile (.mobileprovision). The API key is used only by
-# the fastforge `altool` upload.
+# Signing: the Xcode project uses manual code signing for the Release/Profile
+# configurations (Apple Distribution identity + the "maps" App Store profile).
+# `flutter build ipa` otherwise archives with automatic signing, which needs an
+# Apple ID account on the runner (and it never passes an App Store Connect API
+# key to xcodebuild), so this workflow imports the .p12 + .mobileprovision. The
+# API key is used only by the fastforge `altool` upload.
 #
 # Required repository secrets (Settings → Secrets and variables → Actions):
 #   MAPBOX_DOWNLOADS_TOKEN            Mapbox secret token, scope Downloads:Read
@@ -40,7 +40,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2

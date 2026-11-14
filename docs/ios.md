@@ -95,17 +95,27 @@ base64 < AuthKey_XXXXXXXXXX.p8     | tr -d '\n'   # → APP_STORE_CONNECT_API_KE
 
 ### Signing
 
-The build needs the real signing assets installed on the runner: an **Apple
-Distribution** certificate (`.p12`, in the keychain) and an **App Store
-provisioning profile** (`.mobileprovision`, in
-`~/Library/MobileDevice/Provisioning Profiles`). The Runner target keeps
-`CODE_SIGN_STYLE = Automatic` + `DEVELOPMENT_TEAM`; with the assets present,
-Xcode's automatic signing uses them.
+The Xcode project is committed with **manual** signing for the `Release` and
+`Profile` configurations:
 
-> An App Store Connect API key alone is **not** enough for the build. Flutter's
-> `flutter build ipa` runs `xcodebuild` with `-allowProvisioningUpdates` but never
-> passes `-authenticationKeyPath/-ID/-IssuerID`, so a `.p8` in `~/private_keys` is
-> only used by the `xcrun altool` upload, not by the archive/codesign step.
+| Setting | Value |
+|---|---|
+| `CODE_SIGN_STYLE` | `Manual` (Release + Profile; `Debug` stays `Automatic` for `flutter run`) |
+| `CODE_SIGN_IDENTITY[sdk=iphoneos*]` | `Apple Distribution` |
+| `PROVISIONING_PROFILE_SPECIFIER` | `maps` (the App Store profile's name) |
+| `DEVELOPMENT_TEAM` | `5H4429Z686` |
+
+The runner only needs the matching assets installed: the **Apple Distribution**
+certificate (`.p12`, imported into the keychain) and the App Store profile
+(`.mobileprovision`, installed in `~/Library/MobileDevice/Provisioning Profiles`).
+Flutter then detects manual signing and generates the matching
+`ExportOptions.plist` for the App Store export. No Apple ID account is needed.
+
+> Automatic signing can't be used here: `flutter build ipa` runs `xcodebuild`
+> with `-allowProvisioningUpdates`, which requires an Apple ID account on the
+> runner ("No Accounts: Add a new account"), and Flutter never passes an App Store
+> Connect API key (`-authenticationKeyPath/-ID/-IssuerID`) to `xcodebuild`. The
+> `.p8` in `~/private_keys` is only used by the `xcrun altool` upload.
 
 How to obtain the two files (Apple Developer portal → Certificates, Identifiers
 & Profiles, team `5H4429Z686`):
