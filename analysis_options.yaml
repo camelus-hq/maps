@@ -16,6 +16,7 @@ analyzer:
     # are not held to the project's lints.
     - "**/*.g.dart"
     - "**/*.drift.dart"
+    - ios/**
 
 linter:
   rules:
