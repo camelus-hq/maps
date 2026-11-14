@@ -107,9 +107,16 @@ The Xcode project is committed with **manual** signing for the `Release` and
 
 The runner only needs the matching assets installed: the **Apple Distribution**
 certificate (`.p12`, imported into the keychain) and the App Store profile
-(`.mobileprovision`, installed in `~/Library/MobileDevice/Provisioning Profiles`).
-Flutter then detects manual signing and generates the matching
-`ExportOptions.plist` for the App Store export. No Apple ID account is needed.
+(`.mobileprovision`). The profile is copied to **both** directories, because
+`xcodebuild` and Flutter look in different places:
+
+- `~/Library/MobileDevice/Provisioning Profiles` — used by `xcodebuild` (archive).
+- `~/Library/Developer/Xcode/UserData/Provisioning Profiles` — scanned by
+  `flutter build ipa` when it generates the `ExportOptions.plist`.
+
+Flutter then detects manual signing and generates the matching export options
+(`signingStyle = manual` + the `provisioningProfiles` mapping) for the App Store
+export. No Apple ID account is needed.
 
 > Automatic signing can't be used here: `flutter build ipa` runs `xcodebuild`
 > with `-allowProvisioningUpdates`, which requires an Apple ID account on the

@@ -101,17 +101,23 @@ jobs:
             -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
           security default-keychain -s "$KEYCHAIN_PATH"
 
-          # Install the profile under its UUID so xcodebuild finds it.
-          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
-          mkdir -p "$PROFILE_DIR"
+          # Install the profile (in both locations Xcode/Flutter look in).
           security cms -D -i profile.mobileprovision > "$RUNNER_TEMP/profile.plist"
           PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/profile.plist")
-          cp profile.mobileprovision "$PROFILE_DIR/$PROFILE_UUID.mobileprovision"
+
+          # xcodebuild (the archive step) reads this one:
+          XCODE_PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          # `flutter build ipa` scans this one when it generates the export
+          # options (getProvisioningProfileDirectory in flutter_tools):
+          FLUTTER_PROFILE_DIR="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          mkdir -p "$XCODE_PROFILE_DIR" "$FLUTTER_PROFILE_DIR"
+          cp profile.mobileprovision "$XCODE_PROFILE_DIR/$PROFILE_UUID.mobileprovision"
+          cp profile.mobileprovision "$FLUTTER_PROFILE_DIR/$PROFILE_UUID.mobileprovision"
 
           echo "Code signing identities:"
           security find-identity -v -p codesigning
           echo "Installed profiles:"
-          ls -1 "$PROFILE_DIR"
+          ls -1 "$XCODE_PROFILE_DIR" "$FLUTTER_PROFILE_DIR"
 
       # Only needed for the fastforge `altool` upload, not for the build.
       - name: Install App Store Connect API key
