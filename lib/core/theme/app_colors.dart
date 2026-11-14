@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Original palette. The map styling is our own — nothing here is sampled from
 /// Google Maps (AGENTS.md §Assets).

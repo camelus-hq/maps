@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/app/app.dart';
 import 'package:openmaps/core/theme/app_spacing.dart';
 import 'package:openmaps/data/fakes/fake_external_actions.dart';

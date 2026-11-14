@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:qr/qr.dart';
 
 /// Draws a QR code for [data] with the `qr` encoder and our own painter.

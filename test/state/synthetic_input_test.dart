@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/state/commands/synthetic_input.dart';
 
 /// Guards the `ui.*` synthetic-input primitives against the widget stack they

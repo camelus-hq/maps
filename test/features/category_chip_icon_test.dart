@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/domain/entities/place_category.dart';
 import 'package:openmaps/features/common/place_result_icon.dart';
 import 'package:openmaps/features/map_home/widgets/category_chips.dart';

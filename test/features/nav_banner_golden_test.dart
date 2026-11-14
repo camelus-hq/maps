@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/core/theme/app_theme.dart';
 import 'package:openmaps/domain/entities/route.dart';
 import 'package:openmaps/domain/entities/travel_mode.dart';

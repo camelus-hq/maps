@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A read-only 0–5 star row that fills partially for a fractional rating
 /// (e.g. 4.8 shows nearly five stars). Part of the review UI, not a gesture

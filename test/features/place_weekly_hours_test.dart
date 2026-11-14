@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/core/theme/app_theme.dart';
 import 'package:openmaps/features/place_details/widgets/place_weekly_hours.dart';
 

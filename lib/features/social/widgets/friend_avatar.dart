@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A round friend avatar: the Nostr profile picture when there is one, else a
 /// monogram on the theme's container colour.

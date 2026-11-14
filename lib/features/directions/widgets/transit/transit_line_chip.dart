@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A coloured line chip ("S41", "U8", "Bus 100"): the operator's own colour
 /// with the line's label, used for the lines serving a stop and for departure
