@@ -17,6 +17,9 @@ build/
 *.env
 .dart-define.json
 
+# fastforge output (iOS/desktop packages built by `fastforge release`)
+dist/
+
 # Emulator / screenshots artefacts
 *.apk
 *.aab

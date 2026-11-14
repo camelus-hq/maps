@@ -60,3 +60,13 @@ than throwing), so the app runs without them:
 - **`--control` entrypoint arg** — `MainActivity` bridges it from an `Intent`
   extra on Android; on iOS pass it via the Xcode scheme's "Arguments Passed On
   Launch" (debug/profile builds only).
+
+## Continuous integration
+
+`.github/workflows/build_ios.yaml` builds a signed App Store `.ipa` on a
+`macos-26` runner with [fastforge](https://fastforge.dev) (`distribute_options.yaml`,
+release `appstore`) and uploads it to App Store Connect (**TestFlight**) on every
+published GitHub Release or on manual dispatch. It also attaches the `.ipa` to the
+Release and uploads the obfuscation symbols (`build/ios/symbols`) as a workflow
+artifact.
+

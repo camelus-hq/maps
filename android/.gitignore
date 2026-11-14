@@ -12,6 +12,7 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+google-services.json
 
 # Bundler (fastlane): its vendored gems and local config.
 /vendor

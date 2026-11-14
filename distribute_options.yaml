@@ -1,0 +1,30 @@
+# fastforge distribution config — run with `fastforge release --name appstore`.
+#
+# The `appstore` release builds a signed App Store .ipa (automatic signing) and
+# uploads it to App Store Connect (TestFlight). Credentials come from the
+# environment, never from this file:
+#   APPSTORE_APIKEY / APPSTORE_APIISSUER  (App Store Connect API key id + issuer)
+#   ~/private_keys/AuthKey_<APPSTORE_APIKEY>.p8
+#
+# Locally: `dart pub get && flutter pub get`, a valid ~/.netrc for Mapbox, and
+# an App Store Connect API key in ~/private_keys, then `fastforge release --name appstore`.
+output: dist/
+
+releases:
+  - name: appstore
+    jobs:
+      - name: ios-appstore
+        package:
+          platform: ios
+          target: ipa
+          build_args:
+            # `flutter build ipa` needs an export method or an export-options
+            # plist. With automatic signing, letting Flutter generate the plist
+            # from the export method is enough.
+            export-method: app-store
+            # Same config file (gitignored) the local/Android builds use.
+            dart-define-from-file: .dart-define.json
+            obfuscate: ''
+            split-debug-info: build/ios/symbols
+        publish:
+          target: appstore

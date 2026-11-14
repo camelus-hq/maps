@@ -1,0 +1,126 @@
+name: Build iOS IPA
+
+# Builds a signed App Store .ipa with fastforge and uploads it to App Store
+# Connect (TestFlight). Signing is fully automatic, driven by an App Store
+# Connect API key whose .p8 is placed in ~/private_keys/ (the location Apple's
+# command-line tools search). See docs/ios.md §"Continuous integration".
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   MAPBOX_DOWNLOADS_TOKEN            Mapbox secret token, scope Downloads:Read
+#   DART_DEFINES_JSON_BASE64          base64 of .dart-define.json
+#   APP_STORE_CONNECT_KEY_ID          App Store Connect API key ID
+#   APP_STORE_CONNECT_ISSUER_ID       App Store Connect API issuer ID
+#   APP_STORE_CONNECT_API_KEY_BASE64  base64 of AuthKey_<key id>.p8
+#
+# One-time Xcode setup (committed): the Runner target must use
+# "Automatically manage signing" with the Apple team selected (DEVELOPMENT_TEAM).
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    # macOS 26 (arm64) — the current GA image. See docs/ios.md for notes.
+    runs-on: macos-26
+    permissions:
+      contents: write
+
+    env:
+      # fastforge's appstore publisher reads these and shells out to
+      # `xcrun altool --upload-app`. The matching key file is written below.
+      APPSTORE_APIKEY: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APPSTORE_APIISSUER: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Enable Swift Package Manager
+        run: flutter config --enable-swift-package-manager
+
+      # The Mapbox iOS SDK is pulled over Swift Package Manager and is gated
+      # behind a token with the Downloads:Read scope, fetched via ~/.netrc.
+      # Must run before the build so SPM can resolve the package.
+      - name: Configure Mapbox downloads credentials
+        env:
+          MAPBOX_DOWNLOADS_TOKEN: ${{ secrets.MAPBOX_DOWNLOADS_TOKEN }}
+        run: |
+          if [ -z "$MAPBOX_DOWNLOADS_TOKEN" ]; then
+            echo "::error::MAPBOX_DOWNLOADS_TOKEN secret is not set"
+            exit 1
+          fi
+          printf 'machine api.mapbox.com\n  login mapbox\n  password %s\n' \
+            "$MAPBOX_DOWNLOADS_TOKEN" > ~/.netrc
+          chmod 600 ~/.netrc
+
+      # Automatic signing: xcodebuild (invoked by `flutter build ipa`) passes
+      # -allowProvisioningUpdates and picks the App Store Connect API key up
+      # from ~/private_keys. The same file is used by the fastforge upload step.
+      - name: Install App Store Connect API key
+        env:
+          API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+        run: |
+          if [ -z "$API_KEY_BASE64" ] || [ -z "$KEY_ID" ]; then
+            echo "::error::APP_STORE_CONNECT_API_KEY_BASE64 / APP_STORE_CONNECT_KEY_ID are not set"
+            exit 1
+          fi
+          mkdir -p ~/private_keys
+          echo "$API_KEY_BASE64" | base64 --decode > ~/private_keys/AuthKey_${KEY_ID}.p8
+          chmod 600 ~/private_keys/AuthKey_${KEY_ID}.p8
+
+      - name: Write dart-define config
+        env:
+          DART_DEFINES_JSON_BASE64: ${{ secrets.DART_DEFINES_JSON_BASE64 }}
+        run: |
+          if [ -z "$DART_DEFINES_JSON_BASE64" ]; then
+            echo "::error::DART_DEFINES_JSON_BASE64 secret is not set"
+            exit 1
+          fi
+          echo "$DART_DEFINES_JSON_BASE64" | base64 --decode > .dart-define.json
+
+      - name: Install fastforge
+        run: |
+          dart pub global activate fastforge
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+      - name: Build and upload to App Store Connect
+        run: fastforge release --name appstore
+
+      - name: Upload IPA to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: dist/**/*.ipa
+
+      - name: Upload debug symbols
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-symbols
+          path: build/ios/symbols/**
+          if-no-files-found: ignore
+
+      - name: Clean up secrets
+        if: always()
+        run: |
+          rm -f ~/.netrc
+          rm -rf ~/private_keys
+          rm -f .dart-define.json
