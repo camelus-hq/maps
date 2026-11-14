@@ -1,19 +1,24 @@
 name: Build iOS IPA
 
 # Builds a signed App Store .ipa with fastforge and uploads it to App Store
-# Connect (TestFlight). Signing is fully automatic, driven by an App Store
-# Connect API key whose .p8 is placed in ~/private_keys/ (the location Apple's
-# command-line tools search). See docs/ios.md §"Continuous integration".
+# Connect (TestFlight). See docs/ios.md §"Continuous integration".
+#
+# Signing: the Runner target uses "Automatically manage signing" with the team
+# set (DEVELOPMENT_TEAM in project.pbxproj). `flutter build ipa` never passes an
+# App Store Connect API key to xcodebuild, so the build needs the real signing
+# assets installed locally: an Apple Distribution certificate (.p12) and an
+# App Store provisioning profile (.mobileprovision). The API key is used only by
+# the fastforge `altool` upload.
 #
 # Required repository secrets (Settings → Secrets and variables → Actions):
 #   MAPBOX_DOWNLOADS_TOKEN            Mapbox secret token, scope Downloads:Read
 #   DART_DEFINES_JSON_BASE64          base64 of .dart-define.json
+#   IOS_CERTIFICATE_BASE64            base64 of the Apple Distribution .p12
+#   IOS_CERTIFICATE_PASSWORD          password of that .p12 (optional)
+#   IOS_PROVISION_PROFILE_BASE64      base64 of the App Store .mobileprovision
 #   APP_STORE_CONNECT_KEY_ID          App Store Connect API key ID
 #   APP_STORE_CONNECT_ISSUER_ID       App Store Connect API issuer ID
 #   APP_STORE_CONNECT_API_KEY_BASE64  base64 of AuthKey_<key id>.p8
-#
-# One-time Xcode setup (committed): the Runner target must use
-# "Automatically manage signing" with the Apple team selected (DEVELOPMENT_TEAM).
 
 on:
   release:
@@ -64,9 +69,51 @@ jobs:
             "$MAPBOX_DOWNLOADS_TOKEN" > ~/.netrc
           chmod 600 ~/.netrc
 
-      # Automatic signing: xcodebuild (invoked by `flutter build ipa`) passes
-      # -allowProvisioningUpdates and picks the App Store Connect API key up
-      # from ~/private_keys. The same file is used by the fastforge upload step.
+      # Xcode signs the archive with these local assets (no Apple ID account on
+      # the runner, and `flutter build ipa` can't hand xcodebuild an API key).
+      - name: Import distribution certificate and provisioning profile
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+        run: |
+          if [ -z "$CERTIFICATE_BASE64" ] || [ -z "$PROFILE_BASE64" ]; then
+            echo "::error::IOS_CERTIFICATE_BASE64 / IOS_PROVISION_PROFILE_BASE64 are not set"
+            exit 1
+          fi
+
+          echo "$CERTIFICATE_BASE64" | base64 --decode > certificate.p12
+          echo "$PROFILE_BASE64" | base64 --decode > profile.mobileprovision
+
+          # Ephemeral keychain that only exists for this run.
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          security create-keychain -p "" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "" "$KEYCHAIN_PATH"
+          # The .p12 may be passwordless; only pass -P when a password is set.
+          IMPORT_ARGS=(-A -t cert -f pkcs12 -k "$KEYCHAIN_PATH")
+          if [ -n "$CERTIFICATE_PASSWORD" ]; then
+            IMPORT_ARGS=(-P "$CERTIFICATE_PASSWORD" "${IMPORT_ARGS[@]}")
+          fi
+          security import certificate.p12 "${IMPORT_ARGS[@]}"
+          security set-key-partition-list -S apple-tool:,apple: -k "" "$KEYCHAIN_PATH"
+          security list-keychains -d user \
+            -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          security default-keychain -s "$KEYCHAIN_PATH"
+
+          # Install the profile under its UUID so xcodebuild finds it.
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILE_DIR"
+          security cms -D -i profile.mobileprovision > "$RUNNER_TEMP/profile.plist"
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/profile.plist")
+          cp profile.mobileprovision "$PROFILE_DIR/$PROFILE_UUID.mobileprovision"
+
+          echo "Code signing identities:"
+          security find-identity -v -p codesigning
+          echo "Installed profiles:"
+          ls -1 "$PROFILE_DIR"
+
+      # Only needed for the fastforge `altool` upload, not for the build.
       - name: Install App Store Connect API key
         env:
           API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
@@ -121,6 +168,6 @@ jobs:
       - name: Clean up secrets
         if: always()
         run: |
-          rm -f ~/.netrc
+          rm -f ~/.netrc certificate.p12 profile.mobileprovision .dart-define.json
           rm -rf ~/private_keys
-          rm -f .dart-define.json
+          security delete-keychain "$RUNNER_TEMP/app-signing.keychain-db" 2>/dev/null || true

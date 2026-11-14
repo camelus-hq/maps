@@ -70,3 +70,51 @@ published GitHub Release or on manual dispatch. It also attaches the `.ipa` to t
 Release and uploads the obfuscation symbols (`build/ios/symbols`) as a workflow
 artifact.
 
+### Required repository secrets
+
+Set these under **Settings → Secrets and variables → Actions**. Nothing here is
+committed.
+
+| Secret | What it is |
+|---|---|
+| `MAPBOX_DOWNLOADS_TOKEN` | Mapbox **secret** token with the `Downloads:Read` scope (the same one Android uses for the Maven repo). Written to `~/.netrc` so SPM can fetch `mapbox-maps-ios`. |
+| `DART_DEFINES_JSON_BASE64` | base64 of the repo's `.dart-define.json`. |
+| `IOS_CERTIFICATE_BASE64` | base64 of an **Apple Distribution** certificate exported as `.p12` (with its private key). |
+| `IOS_CERTIFICATE_PASSWORD` | Password of that `.p12`. **Optional** — leave unset for a passwordless certificate. |
+| `IOS_PROVISION_PROFILE_BASE64` | base64 of the **App Store** provisioning profile (`.mobileprovision`) for `app.camelus.maps`. |
+| `APP_STORE_CONNECT_KEY_ID` | App Store Connect API key **Key ID**. |
+| `APP_STORE_CONNECT_ISSUER_ID` | App Store Connect API **Issuer ID**. |
+| `APP_STORE_CONNECT_API_KEY_BASE64` | base64 of the `AuthKey_<KEY_ID>.p8` file (upload only). |
+
+```sh
+base64 < .dart-define.json         | tr -d '\n'   # → DART_DEFINES_JSON_BASE64
+base64 < distribution.p12          | tr -d '\n'   # → IOS_CERTIFICATE_BASE64
+base64 < AppStore.mobileprovision  | tr -d '\n'   # → IOS_PROVISION_PROFILE_BASE64
+base64 < AuthKey_XXXXXXXXXX.p8     | tr -d '\n'   # → APP_STORE_CONNECT_API_KEY_BASE64
+```
+
+### Signing
+
+The build needs the real signing assets installed on the runner: an **Apple
+Distribution** certificate (`.p12`, in the keychain) and an **App Store
+provisioning profile** (`.mobileprovision`, in
+`~/Library/MobileDevice/Provisioning Profiles`). The Runner target keeps
+`CODE_SIGN_STYLE = Automatic` + `DEVELOPMENT_TEAM`; with the assets present,
+Xcode's automatic signing uses them.
+
+> An App Store Connect API key alone is **not** enough for the build. Flutter's
+> `flutter build ipa` runs `xcodebuild` with `-allowProvisioningUpdates` but never
+> passes `-authenticationKeyPath/-ID/-IssuerID`, so a `.p8` in `~/private_keys` is
+> only used by the `xcrun altool` upload, not by the archive/codesign step.
+
+How to obtain the two files (Apple Developer portal → Certificates, Identifiers
+& Profiles, team `5H4429Z686`):
+
+1. **App ID** `app.camelus.maps` must exist (register it if not).
+2. **Certificates → + → Apple Distribution** → create, download, open in Keychain
+   Access, then export the certificate **and its private key** as a `.p12`. Set a
+   password or leave it empty; if you set one, store it as
+   `IOS_CERTIFICATE_PASSWORD` (otherwise omit that secret).
+3. **Profiles → + → App Store** → select the App ID and the distribution
+   certificate → download the `.mobileprovision`.
+
