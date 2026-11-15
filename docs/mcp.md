@@ -9,7 +9,7 @@ driving workflow is *drive → screenshot → compare → fix* (AGENTS.md §Driv
 1. Launch the app with the control channel (debug/profile only):
 
    ```sh
-   flutter run --control 7981            # or, for an installed build:
+   flutter run --flavor direct --control 7981   # or, for an installed build:
    adb shell am start -n app.camelus.maps/.MainActivity --es openmaps.control.port 7981
    adb forward tcp:7981 tcp:7981
    ```

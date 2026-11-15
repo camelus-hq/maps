@@ -5,12 +5,18 @@
     "version": "0.2.0",
     "configurations": [
 
+        // Android dev builds must select a distribution flavor (`direct` here)
+        // and pass APP_FLAVOR so the self-updater is wired; drop both `--flavor`
+        // and APP_FLAVOR for an iOS run (the iOS scheme is not flavored).
         {
             "name": "openmaps",
             "request": "launch",
             "type": "dart",
             "args": [
-                "--dart-define-from-file=.dart-define.json"
+                "--dart-define-from-file=.dart-define.json",
+                "--dart-define=APP_FLAVOR=direct",
+                "--flavor",
+                "direct"
             ]
         },
         {
@@ -19,7 +25,10 @@
             "type": "dart",
             "flutterMode": "profile",
             "args": [
-                "--dart-define-from-file=.dart-define.json"
+                "--dart-define-from-file=.dart-define.json",
+                "--dart-define=APP_FLAVOR=direct",
+                "--flavor",
+                "direct"
             ]
         },
         {
@@ -28,7 +37,10 @@
             "type": "dart",
             "flutterMode": "release",
             "args": [
-                "--dart-define-from-file=.dart-define.json"
+                "--dart-define-from-file=.dart-define.json",
+                "--dart-define=APP_FLAVOR=direct",
+                "--flavor",
+                "direct"
             ]
         }
     ]

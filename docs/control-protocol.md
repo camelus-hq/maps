@@ -7,7 +7,8 @@ hand-maintained until M9.4 generates it from the registry.
 ## Transport
 
 - TCP on `127.0.0.1` (localhost only), started with `--control <port>`
-  (e.g. `flutter run --control 7981`). **Never enabled in release builds.**
+  (e.g. `flutter run --flavor direct --control 7981`; Android needs a `--flavor`).
+  **Never enabled in release builds.**
 - On Android, `adb` cannot set the embedding's serializable entrypoint-args
   extra, so `MainActivity` bridges a plain string extra instead:
 

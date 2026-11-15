@@ -21,7 +21,7 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 [bundle exec] fastlane android release
 ```
 
-Build the arm64-v8a release APK, write version.json and upload both over SSH
+Build the arm64-v8a direct release APK, write version.json and upload both over SSH
 
 ### android manifest
 
@@ -30,6 +30,30 @@ Build the arm64-v8a release APK, write version.json and upload both over SSH
 ```
 
 Write version.json from pubspec.yaml (no build, no upload) — for previewing
+
+### android beta
+
+```sh
+[bundle exec] fastlane android beta
+```
+
+Build the play-flavor AAB and upload it to Google Play (open testing/beta track)
+
+### android production
+
+```sh
+[bundle exec] fastlane android production
+```
+
+Build the play-flavor AAB and upload it to Google Play (production track)
+
+### android ship
+
+```sh
+[bundle exec] fastlane android ship
+```
+
+Release everywhere: self-hosted direct APK + manifest, then Google Play production
 
 ----
 

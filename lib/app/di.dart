@@ -142,10 +142,15 @@ List<Override> buildAppOverrides(
     // installs an APK, which iOS/the web cannot do (the stores handle updates
     // there). On other platforms the keyless defaults advertise no release, so
     // no update prompt ever appears.
+    //
+    // It is also **flavor-gated**: only the `direct` flavor (signed with the
+    // app's own key, see `AppConfig.hasSelfUpdate`) checks the self-hosted
+    // manifest; the `play` flavor updates through Google Play and stays out of
+    // it. Without the wiring the keyless default advertises no release.
     appVersionSourceProvider.overrideWith(
       (Ref ref) => const PackageInfoAppVersionSource(),
     ),
-    if (_supportsSelfUpdate) ...<Override>[
+    if (_supportsSelfUpdate && config.hasSelfUpdate) ...<Override>[
       releaseSourceProvider.overrideWith((Ref ref) {
         final http.Client client = http.Client();
         ref.onDispose(client.close);
@@ -253,9 +258,11 @@ List<Override> buildAppOverrides(
   return overrides;
 }
 
-/// Whether the in-app self-updater can run: it downloads and installs an APK,
-/// which only Android supports. iOS and the web get the keyless default (no
-/// advertised release), so no Android update prompt ever shows there.
+/// Whether the platform can run the in-app self-updater at all: it downloads
+/// and installs an APK, which only Android supports. Callers combine this with
+/// `AppConfig.hasSelfUpdate` (only the `direct` flavor). iOS and the web get the
+/// keyless default (no advertised release), so no Android update prompt shows
+/// there.
 bool get _supportsSelfUpdate =>
     !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 

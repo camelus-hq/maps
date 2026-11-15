@@ -71,6 +71,23 @@ void main() {
       expect(custom.updateManifestUrl, 'https://updates.test/version.json');
     });
 
+    test('only the direct distribution flavor self-updates', () {
+      // No flavor (tests, iOS, the web, a build that forgot the define) means
+      // no in-app updater — a `play` build must never install a direct APK.
+      expect(AppConfig.empty.hasSelfUpdate, isFalse);
+      expect(AppConfig.directFlavor, 'direct');
+      expect(AppConfig.playFlavor, 'play');
+      expect(
+        const AppConfig(appFlavor: AppConfig.directFlavor).hasSelfUpdate,
+        isTrue,
+      );
+      expect(
+        const AppConfig(appFlavor: AppConfig.playFlavor).hasSelfUpdate,
+        isFalse,
+      );
+      expect(const AppConfig(appFlavor: 'unknown').hasSelfUpdate, isFalse);
+    });
+
     test('the Camelus service set has a key flag and camelus.app defaults', () {
       expect(AppConfig.empty.hasCamelusToken, isFalse);
       expect(

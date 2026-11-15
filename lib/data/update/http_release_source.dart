@@ -17,7 +17,7 @@ import '../../domain/ports/release_source.dart';
 /// {
 ///   "versionCode": 2001,
 ///   "versionName": "1.4.0",
-///   "apkUrl": "https://example.com/app/app-arm64-v8a-release.apk",
+///   "apkUrl": "https://example.com/app/app-arm64-v8a-direct-release.apk",
 ///   "sha256": "9f2b…",
 ///   "mandatory": false,
 ///   "releaseNotes": "Bug fixes and performance improvements"

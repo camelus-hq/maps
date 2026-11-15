@@ -22,7 +22,7 @@ void main() {
       final HttpReleaseSource service = source(
         (http.Request request) async => http.Response(
           '{"versionCode":2001,"versionName":"1.4.0",'
-          '"apkUrl":"https://example.com/app/app-arm64-v8a-release.apk",'
+          '"apkUrl":"https://example.com/app/app-arm64-v8a-direct-release.apk",'
           '"sha256":"9f2b","mandatory":true,"releaseNotes":"Fixes"}',
           200,
         ),
@@ -35,7 +35,7 @@ void main() {
       expect(release.versionName, '1.4.0');
       expect(
         release.apkUrl.toString(),
-        'https://example.com/app/app-arm64-v8a-release.apk',
+        'https://example.com/app/app-arm64-v8a-direct-release.apk',
       );
       // "9f2b" is not a 64-char hex digest, so it is dropped (no checksum).
       expect(release.sha256, isNull);

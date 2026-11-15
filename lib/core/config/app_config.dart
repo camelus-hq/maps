@@ -17,6 +17,7 @@ class AppConfig {
     this.transitBaseUrl = defaultTransitBaseUrl,
     this.transitUserAgent = defaultTransitUserAgent,
     this.updateManifestUrl = defaultUpdateManifestUrl,
+    this.appFlavor = '',
     this.feedbackPubkey = '',
     this.nostrNsec = '',
     this.camelusApiToken = '',
@@ -126,6 +127,18 @@ class AppConfig {
   static const String defaultUpdateManifestUrl =
       'https://<example>/version.json';
 
+  /// The Android **distribution flavors** (the `distribution` dimension in
+  /// `android/app/build.gradle.kts`), supplied with
+  /// `--dart-define=APP_FLAVOR=…`.
+  ///
+  /// `direct` builds are signed with the app's own key and accept the
+  /// self-hosted in-app update; `play` builds ship through Google Play, which
+  /// owns their updates, and never self-update. An absent (or unrecognised)
+  /// flavor also keeps the updater off, so only a build that explicitly opts in
+  /// can ever download and install an APK.
+  static const String directFlavor = 'direct';
+  static const String playFlavor = 'play';
+
   final String mapboxAccessToken;
 
   final String valhallaBaseUrl;
@@ -159,6 +172,9 @@ class AppConfig {
 
   /// URL of the self-update manifest (see [defaultUpdateManifestUrl]).
   final String updateManifestUrl;
+
+  /// The distribution flavor this build was made from (see [directFlavor]).
+  final String appFlavor;
 
   /// The Nostr public key (`npub…` or 64-char hex) that in-app feedback is sent
   /// to, supplied with `--dart-define=FEEDBACK_PUBKEY=…`.
@@ -214,6 +230,10 @@ class AppConfig {
     required bool productBuild,
     required String raw,
   }) => productBuild ? '' : raw;
+
+  /// Whether this build accepts the self-hosted in-app update: only the
+  /// [directFlavor] does (see [appFlavor]).
+  bool get hasSelfUpdate => appFlavor == directFlavor;
 
   bool get hasMapboxToken => mapboxAccessToken.isNotEmpty;
 
@@ -279,6 +299,7 @@ class AppConfig {
       const String.fromEnvironment('UPDATE_MANIFEST_URL'),
       defaultUpdateManifestUrl,
     ),
+    appFlavor: const String.fromEnvironment('APP_FLAVOR').trim(),
     feedbackPubkey: const String.fromEnvironment('FEEDBACK_PUBKEY').trim(),
     // Development-only convenience: the automatic sign-in key is compiled out
     // of a production build (a release APK never carries or uses it), so the

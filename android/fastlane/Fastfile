@@ -4,8 +4,9 @@ require "yaml"
 
 # fastlane/Fastfile — OpenMaps Android release pipeline.
 #
-# Builds the arm64-v8a release APK, generates the self-update manifest the app
-# checks at startup, and uploads both to a server over SSH:
+# Builds the arm64-v8a `direct` release APK (the self-updating distribution
+# flavor, signed with the app's own key), generates the self-update manifest the
+# app checks at startup, and uploads both to a server over SSH:
 #
 #   cd android && bundle exec fastlane release
 #
@@ -25,6 +26,12 @@ require "yaml"
 #                             else the most recent commits)
 #   OPENMAPS_CHANGELOG_COUNT  max commits to list (default 50, capped at 200)
 #
+# Google Play lanes (`beta`, `production`, and `ship` which runs a self-hosted
+# `release` first) build the `play`-flavor AAB and upload it with supply. They
+# need the Play service-account key, again from the environment:
+#   G_PLAY_FASTLANE_SERVICE_ACCOUNT  the service-account JSON key's contents
+#                                    (the JSON string, not a path)
+#
 # Release notes are generated from the git commit subjects since the previous
 # release, so the app's update prompt shows what changed. An explicit
 # `release_notes:` / OPENMAPS_RELEASE_NOTES wins; `fastlane/release_notes.txt`
@@ -39,8 +46,19 @@ require "yaml"
 #
 # The manifest is exactly what the app's HttpReleaseSource parses:
 #   {"versionCode":2001,"versionName":"1.4.0",
-#    "apkUrl":"https://example.com/app/app-arm64-v8a-release.apk",
+#    "apkUrl":"https://example.com/app/app-arm64-v8a-direct-release.apk",
 #    "sha256":"…","mandatory":false,"releaseNotes":"…"}
+#
+# The APK is built with the `direct` flavor and `--dart-define=APP_FLAVOR=direct`
+# so the app it ships knows it may self-update; the `play` AAB is built for
+# Google Play without that define and never checks this manifest.
+#
+# Lanes:
+#   release     direct APK + version.json, uploaded over SSH (the self-updater)
+#   manifest    write version.json only, no build/upload (for previewing)
+#   beta        play-flavor AAB → Google Play open-testing track
+#   production  play-flavor AAB → Google Play production track
+#   ship        release + production (self-hosted everywhere, in one command)
 
 # fastlane runs with the working directory set to this file's directory.
 FASTLANE_DIR = Dir.pwd
@@ -48,7 +66,22 @@ ANDROID_DIR = File.expand_path("..", FASTLANE_DIR)
 PROJECT_ROOT = File.expand_path("..", ANDROID_DIR)
 
 APK_DIR = File.join(PROJECT_ROOT, "build", "app", "outputs", "flutter-apk")
-APK_NAME = "app-arm64-v8a-release.apk"
+
+# The distribution flavor self-hosted APKs are built with (`direct` is signed
+# with the app's own key, so the installed app can update itself; `play` is
+# signed with the upload key for Google Play). Flutter inserts the flavor into
+# the APK filename, so it is the single source of truth for both the build and
+# the name the manifest points at: `app-<abi>-<flavor>-release.apk`.
+FLAVOR = "direct"
+APK_NAME = "app-arm64-v8a-#{FLAVOR}-release.apk"
+
+# The flavor shipped through Google Play (signed with the upload key). Its AAB
+# is built **without** `APP_FLAVOR`, so it never self-updates, and Flutter
+# writes it under `bundle/<flavor><BuildType>/app-<flavor>-<buildType>.aab`.
+PLAY_FLAVOR = "play"
+AAB_DIR = File.join(PROJECT_ROOT, "build", "app", "outputs", "bundle")
+AAB_NAME = "app-#{PLAY_FLAVOR}-release.aab"
+AAB_PATH = File.join(AAB_DIR, "#{PLAY_FLAVOR}Release", AAB_NAME)
 
 # Flutter overrides the version code of each split APK with
 # `ABI_VERSION * 1000 + versionCode` (FlutterPluginConstants.ABI_VERSION, where
@@ -66,7 +99,7 @@ MAX_CHANGELOG_COUNT = 200
 default_platform(:android)
 
 platform :android do
-  desc "Build the arm64-v8a release APK, write version.json and upload both over SSH"
+  desc "Build the arm64-v8a direct release APK, write version.json and upload both over SSH"
   lane :release do |options|
     version_name, version_code = read_pubspec_version
     effective_code = version_code + ABI_VERSION_CODE * 1000
@@ -97,6 +130,34 @@ platform :android do
     UI.success("Wrote #{manifest_path}")
     puts File.read(manifest_path)
   end
+
+  desc "Build the play-flavor AAB and upload it to Google Play (open testing/beta track)"
+  lane :beta do
+    aab = build_aab
+    upload_to_play_store(
+      track: "beta",
+      package_name: app_package_name,
+      aab: aab,
+      json_key_data: play_json_key,
+    )
+  end
+
+  desc "Build the play-flavor AAB and upload it to Google Play (production track)"
+  lane :production do
+    aab = build_aab
+    upload_to_play_store(
+      track: "production",
+      package_name: app_package_name,
+      aab: aab,
+      json_key_data: play_json_key,
+    )
+  end
+
+  desc "Release everywhere: self-hosted direct APK + manifest, then Google Play production"
+  lane :ship do |options|
+    release(options)
+    production
+  end
 end
 
 def read_pubspec_version
@@ -118,9 +179,57 @@ def build_apk
       "--dart-define-from-file=.dart-define.json",
       "--split-per-abi",
       "--obfuscate",
-      "--split-debug-info=./myBuilds/obfuscate"
+      "--split-debug-info=./myBuilds/obfuscate",
+      "--flavor", FLAVOR,
+      # The app only self-updates when told which flavor it is (see
+      # AppConfig.hasSelfUpdate); the `play` flavor is built without this.
+      "--dart-define=APP_FLAVOR=#{FLAVOR}",
     )
   end
+end
+
+# Builds the `play`-flavor release App Bundle and returns its path. No
+# `APP_FLAVOR` define on purpose: a Play build must not wire the self-updater.
+def build_aab
+  Dir.chdir(PROJECT_ROOT) do
+    sh(
+      "flutter", "build", "appbundle",
+      "--release",
+      "--dart-define-from-file=.dart-define.json",
+      "--obfuscate",
+      "--split-debug-info=./myBuilds/obfuscate",
+      "--flavor", PLAY_FLAVOR,
+    )
+  end
+
+  unless File.exist?(AAB_PATH)
+    UI.user_error!("Expected AAB not found after the build: #{AAB_PATH}")
+  end
+  AAB_PATH
+end
+
+# The Android application id, read from the Gradle config so it stays in one
+# place. `upload_to_play_store` needs it (there is no Appfile with one).
+def app_package_name
+  gradle = File.read(File.join(ANDROID_DIR, "app", "build.gradle.kts"))
+  match = gradle.match(/applicationId\s*=\s*"([^"]+)"/)
+  if match.nil?
+    UI.user_error!("Could not read applicationId from android/app/build.gradle.kts")
+  end
+  match[1]
+end
+
+# The Play service-account JSON key the publish lanes upload with, from the
+# environment (never committed). Its contents, not a path to the file.
+def play_json_key
+  key = ENV["G_PLAY_FASTLANE_SERVICE_ACCOUNT"].to_s
+  if key.strip.empty?
+    UI.user_error!(
+      "G_PLAY_FASTLANE_SERVICE_ACCOUNT is not set — it must hold the Google " \
+      "Play service-account JSON key's contents"
+    )
+  end
+  key
 end
 
 def write_manifest(options, version_name, version_code, sha256)

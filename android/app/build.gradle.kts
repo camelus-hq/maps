@@ -1,9 +1,18 @@
 import org.gradle.authentication.http.BasicAuthentication
+import java.util.Properties
+import java.io.FileInputStream
 
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
 // The Mapbox Android SDK is hosted on Mapbox's Maven repository and needs a
@@ -46,11 +55,44 @@ android {
         versionName = flutter.versionName
     }
 
+    // app signing
+
+
+    flavorDimensions += "distribution"
+
+
+    signingConfigs {
+        create("upload") {
+            keyAlias = keystoreProperties["uploadKeyAlias"] as String
+            keyPassword = keystoreProperties["uploadKeyPassword"] as String
+            storeFile = file(keystoreProperties["uploadStoreFile"] as String)
+            storePassword = keystoreProperties["uploadStorePassword"] as String
+        }
+        create("appKey") {
+            keyAlias = keystoreProperties["appKeyAlias"] as String
+            keyPassword = keystoreProperties["appKeyPassword"] as String
+            storeFile = file(keystoreProperties["appStoreFile"] as String)
+            storePassword = keystoreProperties["appStorePassword"] as String
+        }
+    }
+
+
+    productFlavors {
+        create("play") {
+            dimension = "distribution"
+            signingConfig = signingConfigs.getByName("upload")
+        }
+        create("direct") {
+            dimension = "distribution"
+            signingConfig = signingConfigs.getByName("appKey")
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            //  signingConfig = signingConfigs.getByName("debug")
         }
     }
 }
