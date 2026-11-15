@@ -220,7 +220,12 @@ class RouteController extends Notifier<RouteState> {
   }
 
   /// Plans from the current location to [destination].
-  Future<void> plan(Place destination) async {
+  ///
+  /// Pass [suggestMode] when directions are opened fresh (the place sheet's
+  /// Directions pill) so the travel mode defaults to the one that suits the
+  /// trip's air distance; otherwise the mode already in state is kept, so a
+  /// traveller who picked walking stays on walking for the next destination.
+  Future<void> plan(Place destination, {bool suggestMode = false}) async {
     unawaited(
       ref.read(recentSearchesProvider.notifier).recordPlace(destination),
     );
@@ -232,8 +237,14 @@ class RouteController extends Notifier<RouteState> {
       );
       return;
     }
+    final TravelMode mode = suggestMode
+        ? TravelMode.suggestedForDistance(
+            origin.position.distanceTo(destination.position),
+          )
+        : state.mode;
     state = state.copyWith(
       status: RouteStatus.loading,
+      mode: mode,
       origin: origin,
       destination: destination,
       stops: const <Place>[],

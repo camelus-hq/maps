@@ -197,7 +197,7 @@ sync test fails if it drifts from the registry.
 | `route.mode` | Change the travel mode (params: {mode: drive\|walk\|cycle}). |
 | `route.origin` | Set the route start (params: {id}). |
 | `route.pickOnMap` | Arm long-press picking (params: {field: origin\|destination\|stop, index?}). A "stop" with no index fills a new stop on the next long-press. |
-| `route.plan` | Plan a route to a place id (params: {id}). |
+| `route.plan` | Plan a route to a place id (params: {id}). The travel mode defaults to the one that suits the trip distance (walk under 2 km, cycle 2–9 km, transit 9–20 km, drive over 20 km). |
 | `route.removeStop` | Remove a route stop by index (params: {index}). |
 | `route.request` | Request a street route (params: {origin:{lat,lon}, destination:{lat,lon}, mode?: drive\|walk\|cycle}). For public transport use `transit.plan`. |
 | `route.select` | Select a route alternative by index (params: {index}). |

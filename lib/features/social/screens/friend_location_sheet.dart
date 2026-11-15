@@ -261,6 +261,7 @@ class FriendLocationSheet extends ConsumerWidget {
             position: position,
             category: 'Live location',
           ),
+          suggestMode: true,
         );
   }
 

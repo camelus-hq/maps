@@ -21,6 +21,7 @@ import '../../../state/settings.dart';
 import '../../../state/transit_stop_board.dart';
 import '../../../state/usecases.dart';
 import '../../common/map_sheet.dart';
+import '../../common/shimmer.dart';
 import '../../reviews/widgets/place_reviews_section.dart';
 import '../../reviews/widgets/star_rating.dart';
 import 'place_departures_tab.dart';
@@ -217,6 +218,9 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
       osmPlaceDetailsProvider(widget.place.id),
     );
     final Place place = widget.place.withOsmDetails(osm.value);
+    // The Overview facts (address apart) come from the OSM element lookup, so
+    // the pane shimmers until it lands instead of flashing "No more details".
+    final bool osmLoading = osm.isLoading;
     final String placeKey = ReviewPlace.keyFor(place.id);
     final bool reviewsLoading = ref
         .watch(placeReviewsProvider(placeKey))
@@ -286,7 +290,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
               ),
               const SizedBox(height: AppSpacing.md),
               _tabBar(context),
-              _tabBody(context, place, summary),
+              _tabBody(context, place, summary, overviewLoading: osmLoading),
             ],
           ),
         );
@@ -417,7 +421,9 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
             label: 'Directions',
             primary: true,
             onTap: () => unawaited(
-              ref.read(routeControllerProvider.notifier).plan(place),
+              ref
+                  .read(routeControllerProvider.notifier)
+                  .plan(place, suggestMode: true),
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
@@ -464,12 +470,17 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     _PlaceTab.photos => 'Photos',
   };
 
-  Widget _tabBody(BuildContext context, Place place, ReviewSummary summary) {
+  Widget _tabBody(
+    BuildContext context,
+    Place place,
+    ReviewSummary summary, {
+    required bool overviewLoading,
+  }) {
     final _PlaceTab tab =
         _visibleTabs[_tabs.index.clamp(0, _visibleTabs.length - 1)];
     final Widget body = switch (tab) {
       _PlaceTab.departures => const PlaceDeparturesTab(),
-      _PlaceTab.overview => _overview(context, place),
+      _PlaceTab.overview => _overview(context, place, loading: overviewLoading),
       _PlaceTab.reviews => PlaceReviewsSection(
         place: place,
         showTitle: false,
@@ -490,7 +501,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
   }
 
   /// The Overview facts, each row only when we actually know the value.
-  Widget _overview(BuildContext context, Place place) {
+  Widget _overview(BuildContext context, Place place, {required bool loading}) {
     final ThemeData theme = Theme.of(context);
     final List<Widget> rows = <Widget>[];
     final String? address = place.address;
@@ -505,6 +516,19 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
             onPressed: () => unawaited(_copyAddress()),
           ),
         ),
+      );
+    }
+    // The address is ours already; the rest of the facts come from the OSM
+    // lookup, so keep what we know and shimmer the rows still on their way
+    // instead of flashing "No more details yet".
+    if (loading) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          ...rows,
+          if (rows.isNotEmpty) const SizedBox(height: AppSpacing.xs),
+          const _OverviewSkeleton(),
+        ],
       );
     }
     // The general weekly hours (all days), after the address.
@@ -839,6 +863,40 @@ class _InfoRow extends StatelessWidget {
       ),
     );
     return onTap == null ? content : InkWell(onTap: onTap, child: content);
+  }
+}
+
+/// The shimmering stand-in for the Overview facts while the OpenStreetMap
+/// lookup is still in flight — icon-and-line rows matching [_InfoRow].
+class _OverviewSkeleton extends StatelessWidget {
+  const _OverviewSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          for (final double width in const <double>[1.0, 0.75, 0.55, 0.85])
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              child: Row(
+                children: <Widget>[
+                  const ShimmerBox(height: 20, circle: true),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: width,
+                      child: const ShimmerBox(height: 16),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 

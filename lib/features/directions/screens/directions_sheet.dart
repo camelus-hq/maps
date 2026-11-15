@@ -13,6 +13,7 @@ import '../../../state/route.dart';
 import '../../../state/settings.dart';
 import '../../common/error_text.dart';
 import '../../common/map_sheet.dart';
+import '../../common/shimmer.dart';
 import '../widgets/cycle_options.dart';
 import '../widgets/maneuver_glyph.dart';
 import '../widgets/transit_itineraries.dart';
@@ -218,10 +219,7 @@ class DirectionsSheet extends ConsumerWidget {
     final bool imperial = ref.watch(imperialUnitsProvider);
     switch (state.status) {
       case RouteStatus.loading:
-        return const Padding(
-          padding: EdgeInsets.all(AppSpacing.lg),
-          child: Center(child: CircularProgressIndicator()),
-        );
+        return const _RouteLoadingSkeleton();
       case RouteStatus.error:
         final ({IconData icon, String text}) presentation = errorPresentation(
           state.error,
@@ -351,6 +349,47 @@ class _ErrorState extends StatelessWidget {
             icon: const Icon(Icons.refresh),
             label: const Text('Retry'),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The shimmering stand-in shown while a route is being planned: the
+/// duration / distance headline and a handful of turn-by-turn rows.
+class _RouteLoadingSkeleton extends StatelessWidget {
+  const _RouteLoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const ShimmerBox(width: 170, height: 20),
+          const SizedBox(height: AppSpacing.sm),
+          const ShimmerBox(width: 120, height: 12),
+          const SizedBox(height: AppSpacing.sm),
+          const ShimmerBox(width: 90, height: 32),
+          const Divider(height: AppSpacing.lg),
+          for (int i = 0; i < 5; i++) ...<Widget>[
+            Row(
+              children: <Widget>[
+                const ShimmerBox(height: 22, circle: true),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: i.isEven ? 1.0 : 0.7,
+                    child: const ShimmerBox(height: 14),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                const ShimmerBox(width: 36, height: 12),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
         ],
       ),
     );

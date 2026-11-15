@@ -7,6 +7,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../domain/entities/transit.dart';
 import '../../../../state/route.dart';
 import '../../../common/error_text.dart';
+import '../../../common/shimmer.dart';
 import 'transit_common.dart';
 import 'transit_itinerary_card.dart';
 
@@ -243,10 +244,7 @@ class _TransitBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     switch (state.status) {
       case RouteStatus.loading:
-        return const Padding(
-          padding: EdgeInsets.all(AppSpacing.lg),
-          child: Center(child: CircularProgressIndicator()),
-        );
+        return const _TransitLoadingSkeleton();
       case RouteStatus.error:
         final ({IconData icon, String text}) presentation = errorPresentation(
           state.error,
@@ -314,6 +312,27 @@ class _TransitError extends StatelessWidget {
             icon: const Icon(Icons.refresh),
             label: const Text('Retry'),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The shimmering stand-in shown while public-transport journeys are being
+/// planned: a few journey-card blocks in place of the list.
+class _TransitLoadingSkeleton extends StatelessWidget {
+  const _TransitLoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          for (int i = 0; i < 3; i++) ...<Widget>[
+            const ShimmerBox(height: 88, radius: 12),
+            const SizedBox(height: AppSpacing.sm),
+          ],
         ],
       ),
     );

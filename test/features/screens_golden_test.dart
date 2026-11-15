@@ -158,6 +158,8 @@ void main() {
     ) as List<Object?>;
     final String id = (results.first as Map<String, Object?>)['id']! as String;
     await registry.dispatch('route.plan', <String, Object?>{'id': id});
+    // Pin Cycle so the golden keeps guarding the bike-options panel.
+    await registry.dispatch('route.mode', <String, Object?>{'mode': 'cycle'});
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -189,6 +191,8 @@ void main() {
     ) as List<Object?>;
     final String id = (results.first as Map<String, Object?>)['id']! as String;
     await registry.dispatch('route.plan', <String, Object?>{'id': id});
+    // Pin Cycle to match the directions-sheet golden above.
+    await registry.dispatch('route.mode', <String, Object?>{'mode': 'cycle'});
 
     await tester.pumpWidget(
       UncontrolledProviderScope(

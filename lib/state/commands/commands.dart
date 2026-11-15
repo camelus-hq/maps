@@ -853,7 +853,10 @@ List<Command> buildCommands(Ref ref) {
     ),
     Command(
       id: 'route.plan',
-      description: 'Plan a route to a place id (params: {id}).',
+      description:
+          'Plan a route to a place id (params: {id}). The travel mode defaults '
+          'to the one that suits the trip distance (walk under 2 km, cycle '
+          '2–9 km, transit 9–20 km, drive over 20 km).',
       handler: (CommandRequest request) async {
         final Object? id = request.params['id'];
         if (id is! String || id.isEmpty) {
@@ -871,7 +874,9 @@ List<Command> buildCommands(Ref ref) {
         if (place == null) {
           throw NotFoundException('Place not found: $id');
         }
-        await ref.read(routeControllerProvider.notifier).plan(place);
+        await ref
+            .read(routeControllerProvider.notifier)
+            .plan(place, suggestMode: true);
         final Route? selected = ref.read(routeControllerProvider).selectedRoute;
         return selected == null ? null : _routeJson(selected);
       },

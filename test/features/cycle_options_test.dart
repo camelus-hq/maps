@@ -16,8 +16,10 @@ void main() {
       <String, Object?>{'text': 'coffee'},
     ) as List<Object?>;
     final String id = (results.first as Map<String, Object?>)['id']! as String;
-    // The default travel mode is Cycle; plan a route in it.
+    // Directions open on the mode that suits the distance; switch to Cycle and
+    // re-plan so the bike options are on screen.
     await registry.dispatch('route.plan', <String, Object?>{'id': id});
+    await registry.dispatch('route.mode', <String, Object?>{'mode': 'cycle'});
     return container;
   }
 

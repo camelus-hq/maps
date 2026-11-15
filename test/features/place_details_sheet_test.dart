@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,6 +11,8 @@ import 'package:openmaps/data/fakes/fake_review_service.dart';
 import 'package:openmaps/data/fakes/fake_social_service.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/place.dart';
+import 'package:openmaps/domain/ports/osm_place_source.dart';
+import 'package:openmaps/features/common/shimmer.dart';
 import 'package:openmaps/features/place_details/widgets/place_details_sheet.dart';
 import 'package:openmaps/features/reviews/widgets/star_rating.dart';
 import 'package:openmaps/state/place.dart';
@@ -36,12 +40,12 @@ void main() {
   late FakeExternalActions external;
   late FakeOsmPlaceSource osm;
 
-  ProviderContainer container() {
+  ProviderContainer container({OsmPlaceSource? osmSource}) {
     return ProviderContainer(
       overrides: <Override>[
         reviewServiceProvider.overrideWithValue(FakeReviewService()),
         socialServiceProvider.overrideWithValue(FakeSocialService()),
-        osmPlaceSourceProvider.overrideWithValue(osm),
+        osmPlaceSourceProvider.overrideWithValue(osmSource ?? osm),
         externalActionsProvider.overrideWithValue(external),
       ],
     );
@@ -462,4 +466,77 @@ void main() {
     expect(find.text('check_date'), findsOneWidget);
     expect(find.text('2025-09-27'), findsOneWidget);
   });
+
+  testWidgets('the Overview shimmers until the OSM lookup lands', (
+    WidgetTester tester,
+  ) async {
+    // A place whose address Mapbox already gave us: it must stay visible while
+    // the OSM lookup fills in the rest.
+    const Place known = Place(
+      id: 'node/111',
+      name: 'Willow Park',
+      position: LatLon(52.5150, 13.4030),
+      address: '1 Lantern Way',
+    );
+    final _SlowOsmPlaceSource slow = _SlowOsmPlaceSource(
+      const Place(
+        id: 'node/111',
+        name: 'Willow Park',
+        position: LatLon(52.5150, 13.4030),
+        phone: '030 53166994',
+      ),
+    );
+    final ProviderContainer c = container(osmSource: slow);
+    addTearDown(c.dispose);
+    tester.view.physicalSize = const Size(420, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await c.read(friendsProvider.future);
+    c.read(selectedPlaceProvider.notifier).select(known);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(body: PlaceDetailsSheet(place: known)),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    // Expand the sheet so the Overview pane lays out; the shimmer runs, so
+    // pumpAndSettle would never settle while the lookup is pending.
+    await tester.drag(find.byType(ListView), const Offset(0, -900));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.byType(Shimmer), findsOneWidget);
+    // The facts we already had are not hidden behind the skeleton.
+    expect(find.text('1 Lantern Way'), findsOneWidget);
+    expect(find.text('No more details yet'), findsNothing);
+
+    // The lookup lands and the real facts replace the skeleton.
+    slow.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Shimmer), findsNothing);
+    expect(find.text('1 Lantern Way'), findsOneWidget);
+    expect(find.text('030 53166994'), findsOneWidget);
+  });
+}
+
+/// An [OsmPlaceSource] whose single lookup stays pending until [complete] is
+/// called, so a test can observe the loading skeleton.
+class _SlowOsmPlaceSource implements OsmPlaceSource {
+  _SlowOsmPlaceSource(this._place);
+
+  final Place _place;
+  final Completer<Place?> _completer = Completer<Place?>();
+
+  void complete() => _completer.complete(_place);
+
+  @override
+  Future<Place?> lookup(String osmRef) => _completer.future;
 }
