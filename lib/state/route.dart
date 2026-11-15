@@ -17,6 +17,7 @@ import '../domain/entities/transit_stop_marker.dart';
 import '../domain/entities/travel_mode.dart';
 import '../domain/ports/map_service.dart';
 import 'follow.dart';
+import 'location.dart';
 import 'ports.dart';
 import 'saved_places.dart';
 import 'usecases.dart';
@@ -229,7 +230,28 @@ class RouteController extends Notifier<RouteState> {
     unawaited(
       ref.read(recentSearchesProvider.notifier).recordPlace(destination),
     );
-    final Place? origin = await _currentLocationPlace();
+    // Resolve the start from the already-tracked fix (kept live for the
+    // location puck) when there is one, so the sheet opens on this very frame.
+    // Without a fix we must ask the location service, which can take seconds
+    // (a permission prompt, or the first GNSS fix) — so the loading state (and
+    // with it the sheet and its shimmer) is committed *before* that await
+    // instead of the sheet appearing only once the start is known.
+    final Place? known = _trackedLocationPlace();
+    state = state.copyWith(
+      status: RouteStatus.loading,
+      mode: suggestMode && known != null
+          ? TravelMode.suggestedForDistance(
+              known.position.distanceTo(destination.position),
+            )
+          : state.mode,
+      origin: known,
+      destination: destination,
+      stops: const <Place>[],
+      clearError: true,
+      clearPickTarget: true,
+      clearEditingEndpoint: true,
+    );
+    final Place? origin = known ?? await _currentLocationPlace();
     if (origin == null) {
       state = state.copyWith(
         status: RouteStatus.error,
@@ -237,20 +259,15 @@ class RouteController extends Notifier<RouteState> {
       );
       return;
     }
-    final TravelMode mode = suggestMode
-        ? TravelMode.suggestedForDistance(
-            origin.position.distanceTo(destination.position),
-          )
-        : state.mode;
+    // The fix may only have landed now, so (re)pick the suggested mode with the
+    // real start distance before requesting.
     state = state.copyWith(
-      status: RouteStatus.loading,
-      mode: mode,
       origin: origin,
-      destination: destination,
-      stops: const <Place>[],
-      clearError: true,
-      clearPickTarget: true,
-      clearEditingEndpoint: true,
+      mode: suggestMode
+          ? TravelMode.suggestedForDistance(
+              origin.position.distanceTo(destination.position),
+            )
+          : state.mode,
     );
     if (state.mode.isTransit) {
       await _requestTransit();
@@ -894,19 +911,27 @@ class RouteController extends Notifier<RouteState> {
     ).add(Duration(minutes: rounded));
   }
 
+  /// The device's position as a directions start point, preferring the
+  /// tracker's live fix (instant) and only falling back to the location service
+  /// when none has arrived yet.
   Future<Place?> _currentLocationPlace() async {
-    final LocationSample? sample = await ref
-        .read(locationServiceProvider)
-        .lastKnown();
-    if (sample == null) {
-      return null;
-    }
-    return Place(
-      id: 'current-location',
-      name: 'Your location',
-      position: sample.position,
-    );
+    final LocationSample? tracked = ref.read(locationTrackerProvider).fix;
+    final LocationSample? sample =
+        tracked ?? await ref.read(locationServiceProvider).lastKnown();
+    return _placeFor(sample);
   }
+
+  /// The tracker's live fix as a start point, or `null` before one has arrived.
+  Place? _trackedLocationPlace() =>
+      _placeFor(ref.read(locationTrackerProvider).fix);
+
+  static Place? _placeFor(LocationSample? sample) => sample == null
+      ? null
+      : Place(
+          id: 'current-location',
+          name: 'Your location',
+          position: sample.position,
+        );
 
   void _draw(List<Route> routes, int selectedIndex, {bool fit = true}) {
     // A route overview / preview takes camera ownership away from follow mode.
