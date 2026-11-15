@@ -11,7 +11,11 @@ import 'package:openmaps/data/fakes/fake_review_service.dart';
 import 'package:openmaps/data/fakes/fake_social_service.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/place.dart';
+import 'package:openmaps/domain/entities/review.dart';
+import 'package:openmaps/domain/entities/review_bounds.dart';
+import 'package:openmaps/domain/entities/review_draft.dart';
 import 'package:openmaps/domain/ports/osm_place_source.dart';
+import 'package:openmaps/domain/ports/review_service.dart';
 import 'package:openmaps/features/common/shimmer.dart';
 import 'package:openmaps/features/place_details/widgets/place_details_sheet.dart';
 import 'package:openmaps/features/reviews/widgets/star_rating.dart';
@@ -525,6 +529,55 @@ void main() {
     expect(find.text('1 Lantern Way'), findsOneWidget);
     expect(find.text('030 53166994'), findsOneWidget);
   });
+
+  testWidgets('the Reviews tab shimmers while reviews load', (
+    WidgetTester tester,
+  ) async {
+    final _PendingReviewService reviews = _PendingReviewService();
+    final ProviderContainer c = ProviderContainer(
+      overrides: <Override>[
+        reviewServiceProvider.overrideWithValue(reviews),
+        socialServiceProvider.overrideWithValue(FakeSocialService()),
+        osmPlaceSourceProvider.overrideWithValue(osm),
+        externalActionsProvider.overrideWithValue(external),
+      ],
+    );
+    addTearDown(c.dispose);
+    tester.view.physicalSize = const Size(420, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await c.read(friendsProvider.future);
+    c.read(selectedPlaceProvider.notifier).select(unreviewed);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: c,
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: Scaffold(body: PlaceDetailsSheet(place: unreviewed)),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    // Expand and open the Reviews pane; the reviews are still loading, so the
+    // pane must shimmer rather than spin.
+    await tester.drag(find.byType(ListView), const Offset(0, -900));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.text('Reviews'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.byType(Shimmer), findsOneWidget);
+
+    reviews.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Shimmer), findsNothing);
+    expect(find.text('No reviews yet'), findsOneWidget);
+  });
 }
 
 /// An [OsmPlaceSource] whose single lookup stays pending until [complete] is
@@ -539,4 +592,32 @@ class _SlowOsmPlaceSource implements OsmPlaceSource {
 
   @override
   Future<Place?> lookup(String osmRef) => _completer.future;
+}
+
+/// A [ReviewService] whose place-review lookup stays pending until [complete],
+/// so a test can observe the Reviews loading skeleton.
+class _PendingReviewService implements ReviewService {
+  final Completer<List<Review>> _completer = Completer<List<Review>>();
+
+  void complete() => _completer.complete(const <Review>[]);
+
+  @override
+  bool get isLoggedIn => false;
+
+  @override
+  String? get currentUserPubkey => null;
+
+  @override
+  Future<void> publishReview(ReviewDraft draft) async {}
+
+  @override
+  Future<List<Review>> reviewsForPlace(String placeKey) => _completer.future;
+
+  @override
+  Future<List<Review>> reviewsInBounds(ReviewBounds bounds) async =>
+      const <Review>[];
+
+  @override
+  Future<List<String>> uploadPhotos(List<ReviewPhoto> photos) async =>
+      const <String>[];
 }

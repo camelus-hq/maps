@@ -13,6 +13,7 @@ import '../../../state/commands/commands_provider.dart';
 import '../../../state/ports.dart';
 import '../../../state/reviews.dart';
 import '../../common/error_text.dart';
+import '../../common/shimmer.dart';
 import 'review_tile.dart';
 
 /// The reviews block inside the place sheet: the friend recommendation banner,
@@ -55,10 +56,7 @@ class _PlaceReviewsSectionState extends ConsumerState<PlaceReviewsSection> {
     );
     final ThemeData theme = Theme.of(context);
     return async.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
-        child: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () => const _ReviewsLoadingSkeleton(),
       error: (Object error, StackTrace _) {
         final ({IconData icon, String text}) presentation = errorPresentation(
           error is AppException ? error : null,
@@ -182,6 +180,52 @@ class _PlaceReviewsSectionState extends ConsumerState<PlaceReviewsSection> {
 
   bool _isOwn(Review review) =>
       ref.read(reviewServiceProvider).currentUserPubkey == review.authorPubkey;
+}
+
+/// The shimmering stand-in for the review list while reviews load.
+class _ReviewsLoadingSkeleton extends StatelessWidget {
+  const _ReviewsLoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const SizedBox(height: AppSpacing.sm),
+          for (int i = 0; i < 3; i++)
+            const Padding(
+              padding: EdgeInsets.only(bottom: AppSpacing.md),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  ShimmerBox(height: 40, circle: true),
+                  SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        ShimmerBox(width: 120, height: 14),
+                        SizedBox(height: AppSpacing.sm),
+                        ShimmerBox(width: 80, height: 12),
+                        SizedBox(height: AppSpacing.sm),
+                        ShimmerBox(height: 12),
+                        SizedBox(height: AppSpacing.xs),
+                        FractionallySizedBox(
+                          alignment: Alignment.centerLeft,
+                          widthFactor: 0.6,
+                          child: ShimmerBox(height: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 /// The "Recommended by your friends" banner with the average and friend count.

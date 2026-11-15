@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/app_spacing.dart';
+import '../../common/shimmer.dart';
 
 /// The Photos tab: the place's OpenStreetMap `image` (and `image:<n>`) pictures,
 /// loaded at runtime. Our own media corpus stays empty (AGENTS.md §Assets), so
@@ -60,15 +61,7 @@ class PlacePhotos extends StatelessWidget {
                       ImageChunkEvent? progress,
                     ) => progress == null
                     ? child
-                    : Container(
-                        color: theme.colorScheme.surfaceContainerHighest,
-                        alignment: Alignment.center,
-                        child: const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ),
+                    : const Shimmer(child: ShimmerBox()),
               ),
             ),
           ),

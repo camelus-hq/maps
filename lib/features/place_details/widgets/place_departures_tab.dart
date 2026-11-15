@@ -7,6 +7,7 @@ import '../../../domain/entities/transit.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/transit_stop_board.dart';
 import '../../common/error_text.dart';
+import '../../common/shimmer.dart';
 import '../../directions/widgets/transit/transit_common.dart';
 import '../../directions/widgets/transit/transit_departure_row.dart';
 import '../../directions/widgets/transit/transit_line_chip.dart';
@@ -80,10 +81,7 @@ class PlaceDeparturesTab extends ConsumerWidget {
     }
 
     if (state.isLoading && state.departures.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(AppSpacing.lg),
-        child: Center(child: CircularProgressIndicator()),
-      );
+      return const _DeparturesLoadingSkeleton();
     }
     if (state.status == StopBoardStatus.error && state.departures.isEmpty) {
       return _ErrorState(error: state.error);
@@ -199,10 +197,7 @@ class _TripDetail extends ConsumerWidget {
           ),
         ),
         if (line == null && state.tripLoading)
-          const Padding(
-            padding: EdgeInsets.all(AppSpacing.lg),
-            child: Center(child: CircularProgressIndicator()),
-          )
+          const _TripLoadingSkeleton()
         else if (line == null)
           _TripError(state: state, departure: departure)
         else ...<Widget>[
@@ -469,6 +464,83 @@ class _ErrorState extends ConsumerWidget {
             icon: const Icon(Icons.refresh),
             label: const Text('Retry'),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The shimmering stand-in for the departure list while the stop board loads:
+/// a line badge, a destination and a time per row.
+class _DeparturesLoadingSkeleton extends StatelessWidget {
+  const _DeparturesLoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          for (int i = 0; i < 6; i++)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                AppSpacing.sm,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  ShimmerBox(width: 52, height: 24, radius: 6),
+                  SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        ShimmerBox(width: 150, height: 14),
+                        SizedBox(height: AppSpacing.xs + 2),
+                        ShimmerBox(width: 100, height: 12),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The shimmering stand-in for a train's stop list while the trip detail loads.
+class _TripLoadingSkeleton extends StatelessWidget {
+  const _TripLoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const ShimmerBox(width: 180, height: 20),
+          const SizedBox(height: AppSpacing.md),
+          for (int i = 0; i < 6; i++)
+            const Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: 6,
+              ),
+              child: Row(
+                children: <Widget>[
+                  ShimmerBox(width: 46, height: 12),
+                  SizedBox(width: AppSpacing.sm),
+                  ShimmerBox(height: 10, circle: true),
+                  SizedBox(width: AppSpacing.sm),
+                  Expanded(child: ShimmerBox(height: 12)),
+                ],
+              ),
+            ),
         ],
       ),
     );
