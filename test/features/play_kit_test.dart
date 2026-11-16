@@ -278,4 +278,51 @@ void main() {
     await tester.pump();
     expect(selected, 'parks');
   });
+
+  testWidgets(
+    'a single-line field keeps its height when the clear button shows',
+    (WidgetTester tester) async {
+      await _pump(tester, const PlayTextField(hint: 'Search here'));
+      final double before = tester.getSize(find.byType(PlayTextField)).height;
+
+      await tester.enterText(find.byType(PlayTextField), 'coffee');
+      await tester.pump();
+      final double after = tester.getSize(find.byType(PlayTextField)).height;
+
+      expect(after, before);
+    },
+  );
+
+  testWidgets('a popup menu near the edge is clamped on screen', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(
+        Overlay(
+          initialEntries: <OverlayEntry>[
+            OverlayEntry(
+              builder: (BuildContext context) => Align(
+                alignment: Alignment.bottomRight,
+                child: PlayMenuButton<String>(
+                  onSelected: (String _) {},
+                  items: const <PlayMenuItem<String>>[
+                    PlayMenuItem<String>(value: 'x', label: 'Remove Home'),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.tap(find.byIcon(PlayIcons.more));
+    await tester.pumpAndSettle();
+
+    final Rect menu = tester.getRect(find.text('Remove Home'));
+    final Size screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+    expect(menu.left, greaterThanOrEqualTo(0));
+    expect(menu.top, greaterThanOrEqualTo(0));
+    expect(menu.right, lessThanOrEqualTo(screen.width));
+    expect(menu.bottom, lessThanOrEqualTo(screen.height));
+  });
 }

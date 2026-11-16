@@ -227,7 +227,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final SavedPlaces saved = ref.watch(savedPlacesProvider);
     final List<RecentSearch> recents = ref.watch(recentSearchesProvider);
     return ListView(
-      padding: const EdgeInsets.only(bottom: PlaySpace.xxl),
+      padding: const EdgeInsets.fromLTRB(
+        PlaySpace.md,
+        0,
+        PlaySpace.md,
+        PlaySpace.xxl,
+      ),
       children: <Widget>[
         _SavedPlacesRow(
           saved: saved,
@@ -420,9 +425,9 @@ class _SavedPlaceCard extends StatelessWidget {
       onTap: value == null ? () => onAdd(slot) : () => onOpen(value),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
-          PlaySpace.lg,
+          PlaySpace.xs,
           PlaySpace.md,
-          PlaySpace.sm,
+          PlaySpace.xs,
           PlaySpace.md,
         ),
         child: Row(
@@ -487,9 +492,9 @@ class _RecentHeader extends StatelessWidget {
     final VoidCallback? clear = onClear;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        PlaySpace.lg,
+        PlaySpace.xs,
         PlaySpace.sm,
-        PlaySpace.lg,
+        PlaySpace.xs,
         PlaySpace.sm,
       ),
       child: Row(

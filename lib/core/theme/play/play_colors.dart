@@ -40,15 +40,23 @@ enum PlayShadow {
   pop;
 
   /// Resolves the box shadows for this treatment against [colors].
+  ///
+  /// A diffuse drop shadow reads as depth on the light canvas, but on the dark
+  /// canvas a black shadow only smears a dark halo around a surface, so `soft`
+  /// is dropped in dark mode (surfaces stay legible via their hairline border
+  /// and their tone).
   List<BoxShadow> resolve(PlayColors colors) => switch (this) {
     PlayShadow.none => const <BoxShadow>[],
-    PlayShadow.soft => <BoxShadow>[
-      BoxShadow(
-        color: colors.shadowSoft,
-        blurRadius: 20,
-        offset: const Offset(0, 8),
-      ),
-    ],
+    PlayShadow.soft =>
+      colors.brightness == Brightness.dark
+          ? const <BoxShadow>[]
+          : <BoxShadow>[
+              BoxShadow(
+                color: colors.shadowSoft,
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
     PlayShadow.pop => <BoxShadow>[
       BoxShadow(color: colors.ink, offset: const Offset(0, 3)),
     ],

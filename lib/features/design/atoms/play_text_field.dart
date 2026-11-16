@@ -12,8 +12,9 @@ import 'play_surface.dart';
 ///
 /// Built on [EditableText] (the widgets-layer editor), so it needs no Material:
 /// the surface, the leading slot, the hint overlay, the clear button and the
-/// caret/selection colours are all ours. Single-line fields are pill-shaped;
-/// multi-line ones use a rounded rectangle with the content aligned to the top.
+/// caret/selection colours are all ours. Single-line fields are pill-shaped and
+/// a fixed height (so the clear button doesn't change it); multi-line ones use a
+/// rounded rectangle with the content aligned to the top.
 class PlayTextField extends StatefulWidget {
   const PlayTextField({
     super.key,
@@ -51,6 +52,9 @@ class PlayTextField extends StatefulWidget {
   /// Shows a clear (✕) button once there is text.
   final bool clearable;
   final EdgeInsetsGeometry? padding;
+
+  /// The fixed content height of a single-line field.
+  static const double _lineHeight = 26;
 
   @override
   State<PlayTextField> createState() => _PlayTextFieldState();
@@ -102,6 +106,74 @@ class _PlayTextFieldState extends State<PlayTextField> {
     final Widget? trailing = widget.trailing;
     final int? maxLength = widget.maxLength;
 
+    final Widget content = Row(
+      crossAxisAlignment: multiline
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.center,
+      children: <Widget>[
+        if (leading != null) ...<Widget>[
+          multiline
+              ? Padding(
+                  padding: const EdgeInsets.only(top: PlaySpace.xs),
+                  child: leading,
+                )
+              : leading,
+          const SizedBox(width: PlaySpace.sm),
+        ],
+        Expanded(
+          child: Stack(
+            children: <Widget>[
+              if (hint != null && !hasText)
+                Text(
+                  hint,
+                  maxLines: multiline ? widget.maxLines : 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: PlayType.body.copyWith(color: colors.inkFaint),
+                ),
+              EditableText(
+                controller: _controller,
+                focusNode: _focus,
+                style: PlayType.body.copyWith(color: colors.ink),
+                cursorColor: colors.primary,
+                backgroundCursorColor: colors.inkFaint,
+                selectionColor: colors.primary.withValues(alpha: 0.25),
+                maxLines: widget.maxLines,
+                minLines: widget.minLines,
+                autofocus: widget.autofocus,
+                keyboardType: multiline
+                    ? TextInputType.multiline
+                    : TextInputType.text,
+                textInputAction: widget.textInputAction,
+                textCapitalization: widget.textCapitalization,
+                inputFormatters: maxLength == null
+                    ? null
+                    : <TextInputFormatter>[
+                        LengthLimitingTextInputFormatter(maxLength),
+                      ],
+                onChanged: widget.onChanged,
+                onSubmitted: widget.onSubmitted,
+              ),
+            ],
+          ),
+        ),
+        if (widget.clearable && hasText && !multiline) ...<Widget>[
+          const SizedBox(width: PlaySpace.xs),
+          PlayIconButton(
+            icon: PlayIcons.close,
+            variant: PlayIconButtonVariant.plain,
+            size: PlayTextField._lineHeight,
+            iconSize: 16,
+            semanticLabel: 'Clear',
+            onPressed: _clear,
+          ),
+        ],
+        if (trailing != null) ...<Widget>[
+          const SizedBox(width: PlaySpace.xs),
+          trailing,
+        ],
+      ],
+    );
+
     final Widget field = PlaySurface(
       radius: multiline ? PlayRadii.md : PlayRadii.pill,
       borderWidth: 1,
@@ -110,75 +182,13 @@ class _PlayTextFieldState extends State<PlayTextField> {
           widget.padding ??
           EdgeInsets.symmetric(
             horizontal: PlaySpace.lg,
-            vertical: multiline ? PlaySpace.md : PlaySpace.md,
+            vertical: multiline ? PlaySpace.md : PlaySpace.sm,
           ),
-      child: Row(
-        crossAxisAlignment: multiline
-            ? CrossAxisAlignment.start
-            : CrossAxisAlignment.center,
-        children: <Widget>[
-          if (leading != null) ...<Widget>[
-            multiline
-                ? Padding(
-                    padding: const EdgeInsets.only(top: PlaySpace.xs),
-                    child: leading,
-                  )
-                : leading,
-            const SizedBox(width: PlaySpace.sm),
-          ],
-          Expanded(
-            child: Stack(
-              children: <Widget>[
-                if (hint != null && !hasText)
-                  Text(
-                    hint,
-                    maxLines: multiline ? widget.maxLines : 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: PlayType.body.copyWith(color: colors.inkFaint),
-                  ),
-                EditableText(
-                  controller: _controller,
-                  focusNode: _focus,
-                  style: PlayType.body.copyWith(color: colors.ink),
-                  cursorColor: colors.primary,
-                  backgroundCursorColor: colors.inkFaint,
-                  selectionColor: colors.primary.withValues(alpha: 0.25),
-                  maxLines: widget.maxLines,
-                  minLines: widget.minLines,
-                  autofocus: widget.autofocus,
-                  keyboardType: multiline
-                      ? TextInputType.multiline
-                      : TextInputType.text,
-                  textInputAction: widget.textInputAction,
-                  textCapitalization: widget.textCapitalization,
-                  inputFormatters: maxLength == null
-                      ? null
-                      : <TextInputFormatter>[
-                          LengthLimitingTextInputFormatter(maxLength),
-                        ],
-                  onChanged: widget.onChanged,
-                  onSubmitted: widget.onSubmitted,
-                ),
-              ],
-            ),
-          ),
-          if (widget.clearable && hasText && !multiline) ...<Widget>[
-            const SizedBox(width: PlaySpace.xs),
-            PlayIconButton(
-              icon: PlayIcons.close,
-              variant: PlayIconButtonVariant.plain,
-              size: 32,
-              iconSize: 18,
-              semanticLabel: 'Clear',
-              onPressed: _clear,
-            ),
-          ],
-          if (trailing != null) ...<Widget>[
-            const SizedBox(width: PlaySpace.xs),
-            trailing,
-          ],
-        ],
-      ),
+      // A fixed content height keeps a single-line field the same height whether
+      // or not the clear button is showing (the button is taller than the text).
+      child: multiline
+          ? content
+          : SizedBox(height: PlayTextField._lineHeight, child: content),
     );
 
     if (maxLength == null) {

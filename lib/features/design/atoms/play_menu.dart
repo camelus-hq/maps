@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 
 import '../../../core/theme/play/play_colors.dart';
@@ -27,8 +29,10 @@ class PlayMenuItem<T> {
 /// A small popup menu anchored to an icon button — the play replacement for
 /// Material's `PopupMenuButton`.
 ///
-/// The overlay is positioned with [CompositedTransformTarget]/[Follower] (widgets
-/// layer), so no Material menu is involved; a tap outside dismisses it.
+/// The overlay is laid out with a [CustomSingleChildLayout] that keeps it on
+/// screen: it opens below the button, flips above it when there is no room, and
+/// is clamped to the viewport with a margin on both axes. A tap outside
+/// dismisses it.
 class PlayMenuButton<T> extends StatefulWidget {
   const PlayMenuButton({
     super.key,
@@ -52,7 +56,6 @@ class PlayMenuButton<T> extends StatefulWidget {
 }
 
 class _PlayMenuButtonState<T> extends State<PlayMenuButton<T>> {
-  final LayerLink _link = LayerLink();
   OverlayEntry? _entry;
 
   @override
@@ -72,24 +75,26 @@ class _PlayMenuButtonState<T> extends State<PlayMenuButton<T>> {
       return;
     }
     final OverlayState? overlay = Overlay.maybeOf(context, rootOverlay: true);
-    if (overlay == null) {
+    final RenderBox? button = context.findRenderObject() as RenderBox?;
+    final RenderBox? overlayBox =
+        overlay?.context.findRenderObject() as RenderBox?;
+    if (overlay == null ||
+        button == null ||
+        overlayBox == null ||
+        !button.hasSize ||
+        !overlayBox.hasSize) {
       return;
     }
+    final Rect anchor =
+        button.localToGlobal(Offset.zero, ancestor: overlayBox) & button.size;
+
     _entry = OverlayEntry(
       builder: (BuildContext context) => Stack(
+        fit: StackFit.expand,
         children: <Widget>[
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: _remove,
-            ),
-          ),
-          CompositedTransformFollower(
-            link: _link,
-            showWhenUnlinked: false,
-            targetAnchor: Alignment.bottomRight,
-            followerAnchor: Alignment.topRight,
-            offset: const Offset(0, PlaySpace.xs),
+          GestureDetector(behavior: HitTestBehavior.opaque, onTap: _remove),
+          CustomSingleChildLayout(
+            delegate: _MenuLayout(anchor: anchor, margin: PlaySpace.sm),
             child: _Menu<T>(
               items: widget.items,
               onSelected: (T value) {
@@ -106,18 +111,58 @@ class _PlayMenuButtonState<T> extends State<PlayMenuButton<T>> {
 
   @override
   Widget build(BuildContext context) {
-    return CompositedTransformTarget(
-      link: _link,
-      child: PlayIconButton(
-        icon: widget.icon,
-        variant: widget.variant,
-        size: widget.size,
-        iconSize: widget.size * 0.5,
-        semanticLabel: widget.semanticLabel,
-        onPressed: _toggle,
-      ),
+    return PlayIconButton(
+      icon: widget.icon,
+      variant: widget.variant,
+      size: widget.size,
+      iconSize: widget.size * 0.5,
+      semanticLabel: widget.semanticLabel,
+      onPressed: _toggle,
     );
   }
+}
+
+/// Places the menu below the anchor, flipping above when needed and clamping it
+/// inside the viewport so it can never run off screen.
+class _MenuLayout extends SingleChildLayoutDelegate {
+  const _MenuLayout({required this.anchor, required this.margin});
+
+  final Rect anchor;
+  final double margin;
+
+  static const double _preferredWidth = 280;
+  static const double _gap = 4;
+
+  @override
+  BoxConstraints getConstraintsForChild(BoxConstraints constraints) {
+    final double maxWidth = math.max(
+      120,
+      math.min(_preferredWidth, constraints.maxWidth - margin * 2),
+    );
+    return BoxConstraints(
+      maxWidth: maxWidth,
+      maxHeight: math.max(0, constraints.maxHeight - margin * 2),
+    );
+  }
+
+  @override
+  Offset getPositionForChild(Size size, Size childSize) {
+    final double dx = anchor.right - childSize.width;
+    final double below = anchor.bottom + _gap;
+    final double dy = below + childSize.height > size.height - margin
+        ? anchor.top - _gap - childSize.height
+        : below;
+    final double maxX = math.max(margin, size.width - childSize.width - margin);
+    final double maxY = math.max(
+      margin,
+      size.height - childSize.height - margin,
+    );
+    return Offset(dx.clamp(margin, maxX), dy.clamp(margin, maxY));
+  }
+
+  @override
+  bool shouldRelayout(_MenuLayout oldDelegate) =>
+      oldDelegate.anchor != anchor || oldDelegate.margin != margin;
 }
 
 class _Menu<T> extends StatelessWidget {
@@ -129,50 +174,47 @@ class _Menu<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final PlayColors colors = PlayColors.of(context);
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 180, maxWidth: 280),
-      child: DefaultTextStyle(
-        style: PlayType.bodyStrong.copyWith(color: colors.ink),
-        child: PlaySurface(
-          radius: PlayRadii.md,
-          borderWidth: 1,
-          shadow: PlayShadow.soft,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              for (final PlayMenuItem<T> item in items)
-                PlayPressable(
-                  onTap: () => onSelected(item.value),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: PlaySpace.lg,
-                      vertical: PlaySpace.md,
-                    ),
-                    child: Row(
-                      children: <Widget>[
-                        if (item.icon != null) ...<Widget>[
-                          Icon(
-                            item.icon,
-                            size: 18,
-                            color: colors.tone(item.tone).foreground,
-                          ),
-                          const SizedBox(width: PlaySpace.md),
-                        ],
-                        Expanded(
-                          child: Text(
-                            item.label,
-                            style: PlayType.bodyStrong.copyWith(
-                              color: colors.ink,
-                            ),
+    return DefaultTextStyle(
+      style: PlayType.bodyStrong.copyWith(color: colors.ink),
+      child: PlaySurface(
+        radius: PlayRadii.md,
+        borderWidth: 1,
+        shadow: PlayShadow.soft,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            for (final PlayMenuItem<T> item in items)
+              PlayPressable(
+                onTap: () => onSelected(item.value),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: PlaySpace.lg,
+                    vertical: PlaySpace.md,
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      if (item.icon != null) ...<Widget>[
+                        Icon(
+                          item.icon,
+                          size: 18,
+                          color: colors.tone(item.tone).foreground,
+                        ),
+                        const SizedBox(width: PlaySpace.md),
+                      ],
+                      Expanded(
+                        child: Text(
+                          item.label,
+                          style: PlayType.bodyStrong.copyWith(
+                            color: colors.ink,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );
