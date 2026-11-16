@@ -1,7 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
-import 'package:material_ui/material_ui.dart';
 
 import 'mapbox_map_service.dart';
 
@@ -28,7 +28,8 @@ class _MapboxMapViewState extends State<MapboxMapView> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final bool darkMode = Theme.of(context).brightness == Brightness.dark;
+    final bool darkMode =
+        MediaQuery.platformBrightnessOf(context) == Brightness.dark;
     if (_lastDarkMode == darkMode) {
       return;
     }
