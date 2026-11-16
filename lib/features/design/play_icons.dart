@@ -84,6 +84,8 @@ abstract final class PlayIcons {
   static const IconData home = PhosphorIconsRegular.house;
   static const IconData work = PhosphorIconsRegular.briefcase;
   static const IconData goTo = PhosphorIconsRegular.arrowUpRight;
+  static const IconData send = PhosphorIconsRegular.paperPlaneRight;
+  static const IconData private = PhosphorIconsRegular.eyeSlash;
   static const IconData liveDot = PhosphorIconsFill.circle;
   static const IconData dot = PhosphorIconsRegular.circle;
 

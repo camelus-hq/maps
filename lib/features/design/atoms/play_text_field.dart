@@ -11,8 +11,9 @@ import 'play_surface.dart';
 /// A rounded text field — the play replacement for Material's `TextField`.
 ///
 /// Built on [EditableText] (the widgets-layer editor), so it needs no Material:
-/// the pill surface, the leading slot, the hint overlay, the clear button and
-/// the caret/selection colours are all ours.
+/// the surface, the leading slot, the hint overlay, the clear button and the
+/// caret/selection colours are all ours. Single-line fields are pill-shaped;
+/// multi-line ones use a rounded rectangle with the content aligned to the top.
 class PlayTextField extends StatefulWidget {
   const PlayTextField({
     super.key,
@@ -25,11 +26,12 @@ class PlayTextField extends StatefulWidget {
     this.onSubmitted,
     this.autofocus = false,
     this.textInputAction,
+    this.textCapitalization = TextCapitalization.none,
+    this.maxLines = 1,
+    this.minLines,
+    this.maxLength,
     this.clearable = true,
-    this.padding = const EdgeInsets.symmetric(
-      horizontal: PlaySpace.lg,
-      vertical: PlaySpace.md,
-    ),
+    this.padding,
   });
 
   final TextEditingController? controller;
@@ -41,10 +43,14 @@ class PlayTextField extends StatefulWidget {
   final ValueChanged<String>? onSubmitted;
   final bool autofocus;
   final TextInputAction? textInputAction;
+  final TextCapitalization textCapitalization;
+  final int maxLines;
+  final int? minLines;
+  final int? maxLength;
 
   /// Shows a clear (✕) button once there is text.
   final bool clearable;
-  final EdgeInsetsGeometry padding;
+  final EdgeInsetsGeometry? padding;
 
   @override
   State<PlayTextField> createState() => _PlayTextFieldState();
@@ -89,21 +95,35 @@ class _PlayTextFieldState extends State<PlayTextField> {
   @override
   Widget build(BuildContext context) {
     final PlayColors colors = PlayColors.of(context);
+    final bool multiline = widget.maxLines > 1;
     final bool hasText = _controller.text.isNotEmpty;
     final String? hint = widget.hint;
     final Widget? leading = widget.leading;
     final Widget? trailing = widget.trailing;
-    final TextInputAction? action = widget.textInputAction;
+    final int? maxLength = widget.maxLength;
 
-    return PlaySurface(
-      radius: PlayRadii.pill,
+    final Widget field = PlaySurface(
+      radius: multiline ? PlayRadii.md : PlayRadii.pill,
       borderWidth: 1,
       shadow: PlayShadow.none,
-      padding: widget.padding,
+      padding:
+          widget.padding ??
+          EdgeInsets.symmetric(
+            horizontal: PlaySpace.lg,
+            vertical: multiline ? PlaySpace.md : PlaySpace.md,
+          ),
       child: Row(
+        crossAxisAlignment: multiline
+            ? CrossAxisAlignment.start
+            : CrossAxisAlignment.center,
         children: <Widget>[
           if (leading != null) ...<Widget>[
-            leading,
+            multiline
+                ? Padding(
+                    padding: const EdgeInsets.only(top: PlaySpace.xs),
+                    child: leading,
+                  )
+                : leading,
             const SizedBox(width: PlaySpace.sm),
           ],
           Expanded(
@@ -112,7 +132,7 @@ class _PlayTextFieldState extends State<PlayTextField> {
                 if (hint != null && !hasText)
                   Text(
                     hint,
-                    maxLines: 1,
+                    maxLines: multiline ? widget.maxLines : 1,
                     overflow: TextOverflow.ellipsis,
                     style: PlayType.body.copyWith(color: colors.inkFaint),
                   ),
@@ -123,17 +143,26 @@ class _PlayTextFieldState extends State<PlayTextField> {
                   cursorColor: colors.primary,
                   backgroundCursorColor: colors.inkFaint,
                   selectionColor: colors.primary.withValues(alpha: 0.25),
-                  maxLines: 1,
+                  maxLines: widget.maxLines,
+                  minLines: widget.minLines,
                   autofocus: widget.autofocus,
-                  keyboardType: TextInputType.text,
-                  textInputAction: action,
+                  keyboardType: multiline
+                      ? TextInputType.multiline
+                      : TextInputType.text,
+                  textInputAction: widget.textInputAction,
+                  textCapitalization: widget.textCapitalization,
+                  inputFormatters: maxLength == null
+                      ? null
+                      : <TextInputFormatter>[
+                          LengthLimitingTextInputFormatter(maxLength),
+                        ],
                   onChanged: widget.onChanged,
                   onSubmitted: widget.onSubmitted,
                 ),
               ],
             ),
           ),
-          if (widget.clearable && hasText) ...<Widget>[
+          if (widget.clearable && hasText && !multiline) ...<Widget>[
             const SizedBox(width: PlaySpace.xs),
             PlayIconButton(
               icon: PlayIcons.close,
@@ -151,10 +180,29 @@ class _PlayTextFieldState extends State<PlayTextField> {
         ],
       ),
     );
+
+    if (maxLength == null) {
+      return field;
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        field,
+        const SizedBox(height: PlaySpace.xs),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            '${_controller.text.length}/$maxLength',
+            style: PlayType.caption.copyWith(color: colors.inkFaint),
+          ),
+        ),
+      ],
+    );
   }
 }
 
-@PlayPreview(name: 'PlayTextField', size: Size(460, 220))
+@PlayPreview(name: 'PlayTextField', size: Size(460, 360))
 Widget playTextFieldPreview() {
   return PlayPreviewFrame(
     child: Column(
@@ -163,10 +211,13 @@ Widget playTextFieldPreview() {
         const PlayTextField(hint: 'Search here'),
         const SizedBox(height: PlaySpace.lg),
         PlayTextField(
-          hint: 'Filter places',
+          hint: 'What happened?',
+          maxLines: 4,
+          minLines: 3,
+          maxLength: 200,
           leading: Builder(
             builder: (BuildContext context) => Icon(
-              PlayIcons.search,
+              PlayIcons.review,
               size: 20,
               color: PlayColors.of(context).inkMuted,
             ),

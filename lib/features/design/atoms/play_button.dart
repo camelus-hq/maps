@@ -34,6 +34,7 @@ class PlayButton extends StatelessWidget {
     required this.label,
     this.onPressed,
     this.icon,
+    this.iconWidget,
     this.trailingIcon,
     this.variant = PlayButtonVariant.primary,
     this.size = PlayButtonSize.md,
@@ -44,6 +45,10 @@ class PlayButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
+
+  /// A custom leading widget (takes precedence over [icon]) — for a spinner while
+  /// an action is in flight.
+  final Widget? iconWidget;
   final IconData? trailingIcon;
   final PlayButtonVariant variant;
   final PlayButtonSize size;
@@ -60,12 +65,16 @@ class PlayButton extends StatelessWidget {
     final PlayToneColors palette = _palette(colors);
     final _ButtonMetrics metrics = _ButtonMetrics.of(size);
     final bool enabled = onPressed != null;
+    final Widget? leadingWidget = iconWidget;
 
     Widget row = Row(
       mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: <Widget>[
-        if (icon != null) ...<Widget>[
+        if (leadingWidget != null) ...<Widget>[
+          leadingWidget,
+          const SizedBox(width: PlaySpace.sm),
+        ] else if (icon != null) ...<Widget>[
           Icon(icon, size: metrics.iconSize, color: palette.foreground),
           const SizedBox(width: PlaySpace.sm),
         ],

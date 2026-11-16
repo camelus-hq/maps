@@ -1,18 +1,18 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:material_ui/material_ui.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../../core/theme/app_spacing.dart';
 import '../../../domain/usecases/send_feedback.dart';
 import '../../../state/config.dart';
 import '../../../state/feedback.dart';
 import '../../../state/screenshot.dart';
 import '../../../state/social.dart';
 import '../../common/navigation.dart';
+import '../../design/play.dart';
 
 /// The feedback screen (`/feedback`): shows the screenshot the banner captured
 /// and a text field, then sends both as one private, end-to-end encrypted Nostr
@@ -91,7 +91,7 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     final AppConfig config = ref.watch(appConfigProvider);
     final bool configured = config.hasFeedbackPubkey;
     final bool signedIn = ref.watch(nostrPubkeyProvider).value != null;
@@ -102,11 +102,8 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
       FeedbackState next,
     ) {
       if (next.isSent) {
-        final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+        showPlayToast(context, 'Thanks! Your feedback was sent.');
         popOrHome(context);
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Thanks! Your feedback was sent.')),
-        );
       }
     });
 
@@ -115,102 +112,97 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
         _screenshot != null &&
         !state.isSending &&
         _controller.text.trim().isNotEmpty;
+    final String? error = state.error;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Send feedback')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          children: <Widget>[
-            Text.rich(
-              TextSpan(
-                style: theme.textTheme.bodyMedium,
-                children: <TextSpan>[
-                  const TextSpan(
-                    text:
-                        'Your report goes straight to the OpenMaps team end-to-end encrypted. '
-                        'Please describe your issue and add a user story.\n\n',
-                  ),
-                  const TextSpan(text: 'Example user story: '),
-                  const TextSpan(text: '“As a '),
-                  const TextSpan(
-                    text: 'user',
-                    style: TextStyle(fontStyle: FontStyle.italic),
-                  ),
-                  const TextSpan(text: ', I want to be able to '),
-                  const TextSpan(
-                    text: 'see my location on the map',
-                    style: TextStyle(fontStyle: FontStyle.italic),
-                  ),
-                  const TextSpan(text: ' so that I can '),
-                  const TextSpan(
-                    text: 'navigate easily',
-                    style: TextStyle(fontStyle: FontStyle.italic),
-                  ),
-                  const TextSpan(text: '.”'),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _ScreenshotPreview(screenshot: _screenshot, capturing: _capturing),
-            const SizedBox(height: AppSpacing.md),
-            TextField(
-              controller: _controller,
-              minLines: 4,
-              maxLines: 8,
-              maxLength: SendFeedback.maxMessageLength,
-              textCapitalization: TextCapitalization.sentences,
-              onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                hintText: 'What happened?\nWhat did you expect?\nUser Story',
-                border: OutlineInputBorder(),
-                alignLabelWithHint: true,
-              ),
-            ),
-            if (!configured) ...<Widget>[
-              const SizedBox(height: AppSpacing.sm),
-              _Notice(
-                icon: Icons.info_outline,
-                text:
-                    'Feedback isn\'t set up in this build — no recipient key '
-                    'was configured.',
-              ),
-            ] else if (!signedIn) ...<Widget>[
-              const SizedBox(height: AppSpacing.sm),
-              _Notice(
-                icon: Icons.visibility_off_outlined,
-                text:
-                    'You are not signed in, so this report is sent from an '
-                    'anonymous identity.',
-                action: TextButton(
-                  onPressed: () => context.push('/profile'),
-                  child: const Text('Sign in'),
+    return PlayScaffold(
+      appBar: const PlayAppBar(title: 'Send feedback'),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          PlaySpace.lg,
+          PlaySpace.sm,
+          PlaySpace.lg,
+          PlaySpace.xxl,
+        ),
+        children: <Widget>[
+          Text.rich(
+            TextSpan(
+              style: PlayType.body.copyWith(color: colors.ink),
+              children: const <TextSpan>[
+                TextSpan(
+                  text:
+                      'Your report goes straight to the OpenMaps team end-to-end encrypted. '
+                      'Please describe your issue and add a user story.\n\n',
                 ),
-              ),
-            ],
-            if (state.error != null) ...<Widget>[
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                state.error!,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.error,
+                TextSpan(text: 'Example user story: '),
+                TextSpan(text: '“As a '),
+                TextSpan(
+                  text: 'user',
+                  style: TextStyle(fontStyle: FontStyle.italic),
                 ),
+                TextSpan(text: ', I want to be able to '),
+                TextSpan(
+                  text: 'see my location on the map',
+                  style: TextStyle(fontStyle: FontStyle.italic),
+                ),
+                TextSpan(text: ' so that I can '),
+                TextSpan(
+                  text: 'navigate easily',
+                  style: TextStyle(fontStyle: FontStyle.italic),
+                ),
+                TextSpan(text: '.”'),
+              ],
+            ),
+          ),
+          const SizedBox(height: PlaySpace.lg),
+          _ScreenshotPreview(screenshot: _screenshot, capturing: _capturing),
+          const SizedBox(height: PlaySpace.lg),
+          PlayTextField(
+            controller: _controller,
+            minLines: 4,
+            maxLines: 8,
+            maxLength: SendFeedback.maxMessageLength,
+            textCapitalization: TextCapitalization.sentences,
+            hint: 'What happened?\nWhat did you expect?\nUser Story',
+            onChanged: (_) => setState(() {}),
+          ),
+          if (!configured) ...<Widget>[
+            const SizedBox(height: PlaySpace.sm),
+            const _Notice(
+              icon: PlayIcons.info,
+              text:
+                  'Feedback isn\'t set up in this build — no recipient key '
+                  'was configured.',
+            ),
+          ] else if (!signedIn) ...<Widget>[
+            const SizedBox(height: PlaySpace.sm),
+            _Notice(
+              icon: PlayIcons.private,
+              text:
+                  'You are not signed in, so this report is sent from an '
+                  'anonymous identity.',
+              action: PlayButton(
+                label: 'Sign in',
+                variant: PlayButtonVariant.ghost,
+                size: PlayButtonSize.sm,
+                onPressed: () => context.push('/profile'),
               ),
-            ],
-            const SizedBox(height: AppSpacing.md),
-            FilledButton.icon(
-              onPressed: canSend ? _send : null,
-              icon: state.isSending
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.send),
-              label: Text(state.isSending ? 'Sending…' : 'Send'),
             ),
           ],
-        ),
+          if (error != null) ...<Widget>[
+            const SizedBox(height: PlaySpace.sm),
+            Text(error, style: PlayType.body.copyWith(color: colors.coral)),
+          ],
+          const SizedBox(height: PlaySpace.lg),
+          PlayButton(
+            label: state.isSending ? 'Sending…' : 'Send',
+            icon: PlayIcons.send,
+            iconWidget: state.isSending
+                ? const PlaySpinner(size: 18, strokeWidth: 2)
+                : null,
+            expand: true,
+            onPressed: canSend ? _send : null,
+          ),
+        ],
       ),
     );
   }
@@ -225,33 +217,38 @@ class _ScreenshotPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     final Uint8List? bytes = screenshot;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('Screenshot', style: theme.textTheme.labelLarge),
-        const SizedBox(height: AppSpacing.xs),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            height: 300,
-            width: double.infinity,
-            color: theme.colorScheme.surfaceContainerHighest,
-            alignment: Alignment.center,
-            child: bytes != null
-                ? Image.memory(
-                    bytes,
-                    fit: BoxFit.contain,
-                    alignment: Alignment.topCenter,
-                    width: double.infinity,
-                  )
-                : capturing
-                ? const CircularProgressIndicator()
-                : Icon(
-                    Icons.image_not_supported_outlined,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+        Text(
+          'Screenshot',
+          style: PlayType.bodyStrong.copyWith(color: colors.ink),
+        ),
+        const SizedBox(height: PlaySpace.xs),
+        PlaySurface(
+          tone: PlayTone.sunken,
+          radius: PlayRadii.md,
+          shadow: PlayShadow.none,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(PlayRadii.md),
+            child: SizedBox(
+              height: 300,
+              width: double.infinity,
+              child: bytes != null
+                  ? Image.memory(
+                      bytes,
+                      fit: BoxFit.contain,
+                      alignment: Alignment.topCenter,
+                      width: double.infinity,
+                    )
+                  : Center(
+                      child: capturing
+                          ? const PlaySpinner()
+                          : Icon(PlayIcons.brokenImage, color: colors.inkMuted),
+                    ),
+            ),
           ),
         ),
       ],
@@ -269,22 +266,24 @@ class _Notice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Container(
+    final PlayColors colors = PlayColors.of(context);
+    final Widget? trailing = action;
+    return PlaySurface(
+      tone: PlayTone.sunken,
+      radius: PlayRadii.md,
+      shadow: PlayShadow.none,
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
+        horizontal: PlaySpace.md,
+        vertical: PlaySpace.sm,
       ),
       child: Row(
         children: <Widget>[
-          Icon(icon, size: 20, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(child: Text(text, style: theme.textTheme.bodyMedium)),
-          if (action case final Widget trailing) trailing,
+          Icon(icon, size: 20, color: colors.inkMuted),
+          const SizedBox(width: PlaySpace.sm),
+          Expanded(
+            child: Text(text, style: PlayType.body.copyWith(color: colors.ink)),
+          ),
+          ?trailing,
         ],
       ),
     );

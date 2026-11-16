@@ -1,11 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../../state/ports.dart';
 import '../../../state/settings.dart';
+import '../../design/play.dart';
 
 /// First-run onboarding: a short location rationale shown once, then the map.
 class OnboardingScreen extends ConsumerWidget {
@@ -13,48 +13,50 @@ class OnboardingScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Icon(Icons.explore, size: 72, color: scheme.primary),
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                'Welcome to OpenMaps',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                'See your area on the map, search for places and get '
-                'turn-by-turn directions.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Your location stays on your device.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              FilledButton(
-                onPressed: () => unawaited(_finish(ref, requestLocation: true)),
-                child: const Text('Allow location & continue'),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TextButton(
-                onPressed: () =>
-                    unawaited(_finish(ref, requestLocation: false)),
-                child: const Text('Not now'),
-              ),
-            ],
-          ),
+    final PlayColors colors = PlayColors.of(context);
+    return PlayScaffold(
+      child: Padding(
+        padding: const EdgeInsets.all(PlaySpace.xl),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Icon(PlayIcons.brand, size: 72, color: colors.primary),
+            const SizedBox(height: PlaySpace.xl),
+            Text(
+              'Welcome to OpenMaps',
+              textAlign: TextAlign.center,
+              style: PlayType.headline.copyWith(color: colors.ink),
+            ),
+            const SizedBox(height: PlaySpace.md),
+            Text(
+              'See your area on the map, search for places and get '
+              'turn-by-turn directions.',
+              textAlign: TextAlign.center,
+              style: PlayType.body.copyWith(color: colors.ink),
+            ),
+            const SizedBox(height: PlaySpace.sm),
+            Text(
+              'Your location stays on your device.',
+              textAlign: TextAlign.center,
+              style: PlayType.caption.copyWith(color: colors.inkMuted),
+            ),
+            const SizedBox(height: PlaySpace.xxl),
+            PlayButton(
+              label: 'Allow location & continue',
+              icon: PlayIcons.locate,
+              size: PlayButtonSize.lg,
+              expand: true,
+              onPressed: () => unawaited(_finish(ref, requestLocation: true)),
+            ),
+            const SizedBox(height: PlaySpace.sm),
+            PlayButton(
+              label: 'Not now',
+              variant: PlayButtonVariant.ghost,
+              expand: true,
+              onPressed: () => unawaited(_finish(ref, requestLocation: false)),
+            ),
+          ],
         ),
       ),
     );
