@@ -9,7 +9,7 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 abstract final class PlayIcons {
   // Chrome ----------------------------------------------------------------
   static const IconData search = PhosphorIconsRegular.magnifyingGlass;
-  static const IconData brand = PhosphorIconsRegular.compass;
+  static const IconData brand = PhosphorIconsRegular.mapPin;
   static const IconData microphone = PhosphorIconsRegular.microphone;
   static const IconData user = PhosphorIconsRegular.user;
   static const IconData tune = PhosphorIconsRegular.faders;

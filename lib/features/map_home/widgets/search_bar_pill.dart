@@ -29,7 +29,7 @@ class SearchBarPill extends ConsumerWidget {
         children: <Widget>[
           // Our own brand mark (a compass tile), never Google's logo.
           PlaySurface(
-            radius: PlayRadii.xs,
+            radius: PlayRadii.pill,
             tone: PlayTone.primary,
             shadow: PlayShadow.none,
             padding: const EdgeInsets.all(7),
