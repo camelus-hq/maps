@@ -56,13 +56,17 @@ class PlayChip extends StatelessWidget {
               Icon(icon, size: 18, color: palette.foreground),
               const SizedBox(width: PlaySpace.sm),
             ],
-            Text(
-              label,
-              style: PlayType.bodyStrong.copyWith(color: palette.foreground),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: PlayType.bodyStrong.copyWith(color: palette.foreground),
+              ),
             ),
             if (trailingWidget != null) ...<Widget>[
               const SizedBox(width: PlaySpace.sm),
-              trailingWidget,
+              Flexible(child: trailingWidget),
             ],
           ],
         ),

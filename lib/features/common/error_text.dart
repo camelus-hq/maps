@@ -1,6 +1,7 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../core/errors/app_exception.dart';
+import '../design/play_icons.dart';
 
 /// The user-facing line and icon for a failed request.
 ///
@@ -9,6 +10,8 @@ import '../../core/errors/app_exception.dart';
 /// feature (e.g. a search provider with no category index for an amenity) gets
 /// its own line rather than a silent substitute; everything else falls back to
 /// the typed exception's own human-readable message.
+///
+/// Icons come from the play kit (Phosphor), never Material.
 ({String text, IconData icon}) errorPresentation(
   AppException? error, {
   required String fallback,
@@ -16,7 +19,7 @@ import '../../core/errors/app_exception.dart';
   if (error?.isOffline ?? false) {
     return (
       text: "You're offline. Check your connection and try again.",
-      icon: Icons.wifi_off,
+      icon: PlayIcons.offline,
     );
   }
   if (error is UnsupportedException) {
@@ -24,11 +27,11 @@ import '../../core/errors/app_exception.dart';
       text:
           "This search provider can't browse that category. Pick another "
           'provider in Settings.',
-      icon: Icons.search_off,
+      icon: PlayIcons.unsupported,
     );
   }
   if (error is RequestTimeoutException) {
-    return (text: error.message, icon: Icons.timer_off_outlined);
+    return (text: error.message, icon: PlayIcons.timeout);
   }
-  return (text: error?.message ?? fallback, icon: Icons.cloud_off_outlined);
+  return (text: error?.message ?? fallback, icon: PlayIcons.cloudOff);
 }

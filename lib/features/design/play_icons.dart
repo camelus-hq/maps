@@ -44,9 +44,16 @@ abstract final class PlayIcons {
   static const IconData recent = PhosphorIconsRegular.clockCounterClockwise;
   static const IconData saved = PhosphorIconsRegular.star;
   static const IconData savedFilled = PhosphorIconsFill.star;
+  static const IconData filter = PhosphorIconsRegular.funnel;
   static const IconData loading = PhosphorIconsRegular.hourglass;
   static const IconData error = PhosphorIconsRegular.warningCircle;
   static const IconData contributePlace = PhosphorIconsRegular.mapPinPlus;
+
+  // Errors ----------------------------------------------------------------
+  static const IconData offline = PhosphorIconsRegular.wifiSlash;
+  static const IconData unsupported = PhosphorIconsRegular.magnifyingGlassMinus;
+  static const IconData timeout = PhosphorIconsRegular.timer;
+  static const IconData cloudOff = PhosphorIconsRegular.cloudSlash;
 
   // Actions ---------------------------------------------------------------
   static const IconData arrowRight = PhosphorIconsRegular.arrowRight;

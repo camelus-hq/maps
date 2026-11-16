@@ -1,7 +1,8 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/core/errors/app_exception.dart';
 import 'package:openmaps/features/common/error_text.dart';
+import 'package:openmaps/features/design/play.dart';
 
 void main() {
   test('offline failures get an explicit offline message and icon', () {
@@ -9,7 +10,7 @@ void main() {
       const OfflineException('Geocoding request failed'),
       fallback: 'Search failed',
     );
-    expect(offline.icon, Icons.wifi_off);
+    expect(offline.icon, PlayIcons.offline);
     expect(offline.text, contains('offline'));
   });
 
@@ -18,7 +19,7 @@ void main() {
       const RequestTimeoutException('Geocoding request timed out'),
       fallback: 'Search failed',
     );
-    expect(timeout.icon, Icons.timer_off_outlined);
+    expect(timeout.icon, PlayIcons.timeout);
     expect(timeout.text, 'Geocoding request timed out');
   });
 
@@ -41,7 +42,7 @@ void main() {
       const UnsupportedException('No Mapbox category for "toilets"'),
       fallback: 'Search failed',
     );
-    expect(unsupported.icon, Icons.search_off);
+    expect(unsupported.icon, PlayIcons.unsupported);
     expect(unsupported.text, contains("can't browse that category"));
     expect(unsupported.text, isNot(contains('No Mapbox category')));
   });

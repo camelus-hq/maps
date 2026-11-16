@@ -1,4 +1,4 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../../core/theme/app_colors.dart';
 
@@ -10,7 +10,7 @@ class MapSurfacePlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Brightness brightness = Theme.of(context).brightness;
+    final Brightness brightness = MediaQuery.platformBrightnessOf(context);
     final Color background = brightness == Brightness.dark
         ? AppColors.mapPlaceholderDark
         : AppColors.mapPlaceholder;
