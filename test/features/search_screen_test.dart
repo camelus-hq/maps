@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/app/app.dart';
 import 'package:openmaps/data/fakes/fake_map_service.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/state/home.dart';
 import 'package:openmaps/state/ports.dart';
 import 'package:openmaps/state/saved_places.dart';
@@ -18,7 +19,7 @@ void main() {
     await tester.tap(find.text('Search here'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField), 'coffee');
+    await tester.enterText(find.byType(PlayTextField), 'coffee');
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
 
@@ -45,13 +46,13 @@ void main() {
 
       await tester.tap(find.text('Search here'));
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField), 'coffee');
+      await tester.enterText(find.byType(PlayTextField), 'coffee');
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
 
       // Back on the map (not the search list), with the category sheet open and
       // the cafes pinned.
-      expect(find.byType(TextField), findsNothing);
+      expect(find.byType(PlayTextField), findsNothing);
       expect(find.text('Search here'), findsOneWidget);
       expect(container.read(selectedCategoryProvider), 'Cafes');
       expect(
@@ -76,15 +77,15 @@ void main() {
 
     await tester.tap(find.text('Search here'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'coffee');
+    await tester.enterText(find.byType(PlayTextField), 'coffee');
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
 
     // The chip name leads the results, with a coloured magnifying glass.
-    final Finder suggestion = find.widgetWithText(ListTile, 'Cafes');
+    final Finder suggestion = find.widgetWithText(PlayRow, 'Cafes');
     expect(suggestion, findsOneWidget);
     final Icon icon = tester.widget<Icon>(
-      find.descendant(of: suggestion, matching: find.byIcon(Icons.search)),
+      find.descendant(of: suggestion, matching: find.byIcon(PlayIcons.search)),
     );
     expect(icon.color, isNotNull);
 
@@ -108,7 +109,7 @@ void main() {
     await tester.tap(find.text('Search here'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField), 'coffee');
+    await tester.enterText(find.byType(PlayTextField), 'coffee');
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
 
@@ -152,7 +153,7 @@ void main() {
 
     await tester.tap(find.text('Search here'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'coffee');
+    await tester.enterText(find.byType(PlayTextField), 'coffee');
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Harbour Coffee'));
@@ -166,7 +167,7 @@ void main() {
     expect(find.text('Harbour Coffee'), findsOneWidget);
     expect(find.text('pizza'), findsOneWidget);
     expect(find.byIcon(PhosphorIconsRegular.coffee), findsWidgets);
-    expect(find.byIcon(Icons.history), findsOneWidget);
+    expect(find.byIcon(PlayIcons.recent), findsOneWidget);
   });
 
   testWidgets('tapping a recent place opens it on the map', (
@@ -177,7 +178,7 @@ void main() {
 
     await tester.tap(find.text('Search here'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'coffee');
+    await tester.enterText(find.byType(PlayTextField), 'coffee');
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Harbour Coffee'));
@@ -213,7 +214,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Set home'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField), 'coffee');
+    await tester.enterText(find.byType(PlayTextField), 'coffee');
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Harbour Coffee'));
@@ -235,7 +236,7 @@ void main() {
 
     await tester.tap(find.text('Search here'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'coffee');
+    await tester.enterText(find.byType(PlayTextField), 'coffee');
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
     await tester.testTextInput.receiveAction(TextInputAction.search);

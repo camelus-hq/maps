@@ -142,6 +142,13 @@ void main() {
                 selectedIndex: 0,
                 onSelected: (int _) {},
               ),
+              const PlayTextField(hint: 'Search here'),
+              PlayMenuButton<String>(
+                onSelected: (String _) {},
+                items: const <PlayMenuItem<String>>[
+                  PlayMenuItem<String>(value: 'x', label: 'Remove'),
+                ],
+              ),
               PlayRow(icon: PlayIcons.nearby, label: 'Nearby', onTap: () {}),
               const PlayRow(
                 icon: PlayIcons.contributePlace,

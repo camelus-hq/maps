@@ -109,7 +109,7 @@ void main() {
 
     // Still on the map (no search screen), with the category sheet open, the
     // chip selected and the cafe pins drawn on the map.
-    expect(find.byType(TextField), findsNothing);
+    expect(find.byType(PlayTextField), findsNothing);
     expect(find.text('Search here'), findsOneWidget);
     expect(container.read(selectedCategoryProvider), 'Cafes');
     expect(tester.widget<PlayChip>(chip).selected, isTrue);

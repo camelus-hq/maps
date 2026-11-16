@@ -81,6 +81,9 @@ abstract final class PlayIcons {
   static const IconData note = PhosphorIconsRegular.notePencil;
   static const IconData review = PhosphorIconsRegular.pencilSimple;
   static const IconData brokenImage = PhosphorIconsRegular.imageBroken;
+  static const IconData home = PhosphorIconsRegular.house;
+  static const IconData work = PhosphorIconsRegular.briefcase;
+  static const IconData goTo = PhosphorIconsRegular.arrowUpRight;
   static const IconData liveDot = PhosphorIconsFill.circle;
   static const IconData dot = PhosphorIconsRegular.circle;
 

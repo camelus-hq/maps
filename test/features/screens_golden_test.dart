@@ -6,6 +6,7 @@ import 'package:openmaps/core/theme/app_theme.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/place.dart';
 import 'package:openmaps/domain/ports/places_repository.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/directions/screens/directions_sheet.dart';
 import 'package:openmaps/features/directions/screens/endpoint_picker_screen.dart';
 import 'package:openmaps/features/directions/widgets/directions_endpoint_card.dart';
@@ -98,7 +99,7 @@ void main() {
 
     await tester.tap(find.text('Search here'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'coffee');
+    await tester.enterText(find.byType(PlayTextField), 'coffee');
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
 
