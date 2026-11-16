@@ -1,5 +1,4 @@
 import 'package:flutter/widgets.dart';
-import 'package:material_ui/material_ui.dart' show Icons;
 
 import '../../../core/theme/play/play_colors.dart';
 import '../../../core/theme/play/play_tokens.dart';
@@ -7,6 +6,7 @@ import '../atoms/play_avatar.dart';
 import '../atoms/play_icon_button.dart';
 import '../atoms/play_pressable.dart';
 import '../atoms/play_surface.dart';
+import '../play_icons.dart';
 import '../play_previews.dart';
 
 /// The floating search bar at the top of the map, in play dress.
@@ -53,7 +53,7 @@ class PlaySearchBar extends StatelessWidget {
             tone: PlayTone.teal,
             shadow: PlayShadow.none,
             padding: const EdgeInsets.all(7),
-            child: Icon(Icons.explore, size: 20, color: colors.onTeal),
+            child: Icon(PlayIcons.brand, size: 20, color: colors.onTeal),
           ),
           const SizedBox(width: PlaySpace.md),
           Expanded(
@@ -65,7 +65,7 @@ class PlaySearchBar extends StatelessWidget {
             ),
           ),
           PlayIconButton(
-            icon: Icons.mic_none,
+            icon: PlayIcons.microphone,
             variant: PlayIconButtonVariant.plain,
             size: 40,
             iconSize: 22,

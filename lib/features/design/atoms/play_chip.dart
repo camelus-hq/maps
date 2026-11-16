@@ -1,8 +1,8 @@
 import 'package:flutter/widgets.dart';
-import 'package:material_ui/material_ui.dart' show Icons;
 
 import '../../../core/theme/play/play_colors.dart';
 import '../../../core/theme/play/play_tokens.dart';
+import '../play_icons.dart';
 import '../play_previews.dart';
 import 'play_surface.dart';
 
@@ -18,6 +18,7 @@ class PlayChip extends StatelessWidget {
     this.icon,
     this.selected = false,
     this.onTap,
+    this.onLongPress,
     this.trailing,
   });
 
@@ -25,6 +26,7 @@ class PlayChip extends StatelessWidget {
   final IconData? icon;
   final bool selected;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   /// Optional widget after the label (a count, a close glyph…).
   final Widget? trailing;
@@ -44,6 +46,7 @@ class PlayChip extends StatelessWidget {
       borderWidth: selected ? 0 : 1,
       backgroundColor: palette.background,
       onTap: onTap,
+      onLongPress: onLongPress,
       child: SizedBox(
         height: 40,
         child: Row(
@@ -82,15 +85,15 @@ Widget playChipPreview() {
               spacing: PlaySpace.sm,
               runSpacing: PlaySpace.sm,
               children: <Widget>[
-                const PlayChip(label: 'Cafés', icon: Icons.local_cafe),
+                const PlayChip(label: 'Cafés', icon: PlayIcons.cafe),
                 const PlayChip(
                   label: 'Parks',
-                  icon: Icons.park,
+                  icon: PlayIcons.park,
                   selected: true,
                 ),
                 PlayChip(
                   label: 'Water',
-                  icon: Icons.water_drop,
+                  icon: PlayIcons.water,
                   trailing: Text(
                     '12',
                     style: PlayType.caption.copyWith(color: colors.inkMuted),
@@ -98,7 +101,7 @@ Widget playChipPreview() {
                 ),
                 PlayChip(
                   label: 'Groceries',
-                  icon: Icons.shopping_basket,
+                  icon: PlayIcons.groceries,
                   onTap: () {},
                 ),
               ],

@@ -1,8 +1,8 @@
 import 'package:flutter/widgets.dart';
-import 'package:material_ui/material_ui.dart' show Icons;
 
 import '../../../core/theme/play/play_tokens.dart';
 import '../atoms/play_icon_button.dart';
+import '../play_icons.dart';
 import '../play_previews.dart';
 
 /// One control in a [PlayMapControlRail].
@@ -71,23 +71,23 @@ Widget playMapControlRailPreview() {
     child: PlayMapControlRail(
       controls: <PlayMapControl>[
         PlayMapControl(
-          icon: Icons.layers_outlined,
+          icon: PlayIcons.layers,
           semanticLabel: 'Layers',
           onTap: () {},
         ),
         PlayMapControl(
-          icon: Icons.navigation_outlined,
+          icon: PlayIcons.navigation,
           semanticLabel: 'Reset bearing',
           rotation: 0.4,
           onTap: () {},
         ),
         const PlayMapControl(
-          icon: Icons.my_location,
+          icon: PlayIcons.locate,
           semanticLabel: 'Following your location',
           active: true,
         ),
         const PlayMapControl(
-          icon: Icons.gps_off,
+          icon: PlayIcons.locationLost,
           semanticLabel: 'Location unavailable',
           alert: true,
         ),

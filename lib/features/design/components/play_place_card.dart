@@ -1,11 +1,11 @@
 import 'package:flutter/widgets.dart';
-import 'package:material_ui/material_ui.dart' show Icons;
 
 import '../../../core/theme/play/play_colors.dart';
 import '../../../core/theme/play/play_tokens.dart';
 import '../atoms/play_icon_button.dart';
 import '../atoms/play_surface.dart';
 import '../atoms/play_tag.dart';
+import '../play_icons.dart';
 import '../play_previews.dart';
 
 /// A place / search-result row in play dress.
@@ -112,14 +112,14 @@ Widget playPlaceCardPreview() {
         PlayPlaceCard(
           title: 'The Barn Coffee',
           subtitle: 'Coffee shop · Torstraße 12',
-          icon: Icons.local_cafe,
+          icon: PlayIcons.cafe,
           tone: PlayTone.pink,
           tags: const <Widget>[
             PlayTag(label: '4.8', tone: PlayTone.lemon),
             PlayTag(label: 'Open', tone: PlayTone.mint),
           ],
           trailing: const PlayIconButton(
-            icon: Icons.directions,
+            icon: PlayIcons.directions,
             variant: PlayIconButtonVariant.primary,
             size: 44,
             semanticLabel: 'Directions',
@@ -130,11 +130,11 @@ Widget playPlaceCardPreview() {
         PlayPlaceCard(
           title: 'Mauerpark',
           subtitle: '1.2 km · 16 min walk',
-          icon: Icons.park,
+          icon: PlayIcons.park,
           tone: PlayTone.mint,
           selected: true,
           trailing: const PlayIconButton(
-            icon: Icons.bookmark_outline,
+            icon: PlayIcons.save,
             size: 44,
             semanticLabel: 'Save',
           ),

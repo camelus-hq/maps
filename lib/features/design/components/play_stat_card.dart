@@ -1,9 +1,9 @@
 import 'package:flutter/widgets.dart';
-import 'package:material_ui/material_ui.dart' show Icons;
 
 import '../../../core/theme/play/play_colors.dart';
 import '../../../core/theme/play/play_tokens.dart';
 import '../atoms/play_surface.dart';
+import '../play_icons.dart';
 import '../play_previews.dart';
 
 /// A big-number card — "12 min", "3.4 km", "14:32".
@@ -95,7 +95,7 @@ Widget playStatCardPreview() {
                   label: 'min',
                   caption: 'Arrives 14:32',
                   tone: PlayTone.soft,
-                  icon: Icons.schedule,
+                  icon: PlayIcons.clock,
                 ),
               ),
               SizedBox(width: PlaySpace.md),
@@ -105,7 +105,7 @@ Widget playStatCardPreview() {
                   label: 'km',
                   caption: 'via Prenzlauer Allee',
                   tone: PlayTone.mint,
-                  icon: Icons.route,
+                  icon: PlayIcons.route,
                 ),
               ),
             ],

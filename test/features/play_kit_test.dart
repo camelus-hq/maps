@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:material_ui/material_ui.dart' show Icons;
 import 'package:openmaps/features/design/play.dart';
 
 /// Wraps [child] in the minimum the play kit needs — a palette, a text
@@ -112,12 +111,12 @@ void main() {
               const SizedBox(height: PlaySpace.sm),
               PlayButton(
                 label: 'Go',
-                icon: Icons.arrow_forward,
+                icon: PlayIcons.arrowRight,
                 onPressed: () {},
               ),
               const PlayButton(label: 'Disabled'),
-              PlayIconButton(icon: Icons.layers_outlined, onPressed: () {}),
-              const PlayIconButton(icon: Icons.gps_off, alert: true),
+              PlayIconButton(icon: PlayIcons.layers, onPressed: () {}),
+              const PlayIconButton(icon: PlayIcons.locationLost, alert: true),
               PlayChip(label: 'Parks', selected: true, onTap: () {}),
               const PlayTag(label: 'Live'),
               PlayAvatar(label: 'Ada', size: 48, dot: true),
@@ -148,13 +147,13 @@ void main() {
                   PlayCategoryData(
                     id: 'parks',
                     label: 'Parks',
-                    icon: Icons.park,
+                    icon: PlayIcons.park,
                     selected: true,
                   ),
                   PlayCategoryData(
                     id: 'cafes',
                     label: 'Cafés',
-                    icon: Icons.local_cafe,
+                    icon: PlayIcons.cafe,
                   ),
                 ],
                 onSelect: (_) {},
@@ -162,19 +161,19 @@ void main() {
               PlayPlaceCard(
                 title: 'Mauerpark',
                 subtitle: '1.2 km',
-                icon: Icons.park,
+                icon: PlayIcons.park,
                 onTap: () {},
               ),
               const PlayStatCard(value: '12', label: 'min', expand: true),
               PlayMapControlRail(
                 controls: <PlayMapControl>[
                   PlayMapControl(
-                    icon: Icons.layers_outlined,
+                    icon: PlayIcons.layers,
                     semanticLabel: 'Layers',
                     onTap: () {},
                   ),
                   const PlayMapControl(
-                    icon: Icons.my_location,
+                    icon: PlayIcons.locate,
                     semanticLabel: 'Location',
                     active: true,
                   ),
@@ -224,7 +223,7 @@ void main() {
       tester,
       PlayCategoryRow(
         categories: const <PlayCategoryData>[
-          PlayCategoryData(id: 'parks', label: 'Parks', icon: Icons.park),
+          PlayCategoryData(id: 'parks', label: 'Parks', icon: PlayIcons.park),
         ],
         onSelect: (String id) => selected = id,
       ),

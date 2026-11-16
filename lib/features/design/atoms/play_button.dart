@@ -1,10 +1,8 @@
 import 'package:flutter/widgets.dart';
-// Only the preview glyphs come from Material; the atoms themselves are
-// Material-agnostic (they take an [IconData]).
-import 'package:material_ui/material_ui.dart' show Icons;
 
 import '../../../core/theme/play/play_colors.dart';
 import '../../../core/theme/play/play_tokens.dart';
+import '../play_icons.dart';
 import '../play_previews.dart';
 import 'play_surface.dart';
 
@@ -182,7 +180,7 @@ Widget playButtonPreview() {
                     in PlayButtonVariant.values)
                   PlayButton(
                     label: variant.name,
-                    icon: Icons.arrow_forward,
+                    icon: PlayIcons.arrowRight,
                     variant: variant,
                     onPressed: () {},
                   ),
@@ -205,7 +203,7 @@ Widget playButtonPreview() {
                     tone: PlayTone.mint,
                     onPressed: () {},
                   ),
-                const PlayButton(label: 'disabled', icon: Icons.lock_outline),
+                const PlayButton(label: 'disabled', icon: PlayIcons.lock),
               ],
             ),
           ],

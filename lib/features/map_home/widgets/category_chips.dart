@@ -1,35 +1,22 @@
 import 'dart:async';
 
-import 'package:flutter/widget_previews.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../../domain/entities/place_category.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/home.dart';
 import '../../../state/settings.dart';
 import '../../common/navigation.dart';
 import '../../common/place_result_icon.dart';
+import '../../design/play.dart';
 import 'category_picker_sheet.dart';
 
-@Preview()
-Widget categoryChipsPreview() {
-  return ProviderScope(
-    child: MaterialApp(
-      home: Scaffold(
-        body: Column(
-          children: const <Widget>[SizedBox(height: 50), CategoryChips()],
-        ),
-      ),
-    ),
-  );
-}
-
-/// Horizontally scrolling category chips beneath the search bar.
+/// Horizontally scrolling category chips beneath the search bar, in the play
+/// style.
 ///
 /// The chips are the user's pinned categories (default Parks · Cafes · Water
-/// fountain · Groceries · Toilets) followed by a settings chip that opens the
+/// fountain · Groceries · Toilets) followed a settings chip that opens the
 /// category picker. Tapping a chip selects it — the map stays visible with the
 /// places pinned and a results sheet — and tapping it again deselects and
 /// clears them (`search.category` — the same path agents use).
@@ -41,22 +28,20 @@ class CategoryChips extends ConsumerWidget {
     final List<PlaceCategory> pinned = ref.watch(pinnedCategoriesProvider);
     final String? selected = ref.watch(selectedCategoryProvider);
     return SizedBox(
-      height: 40,
-      child: ListView.separated(
+      height: 44,
+      child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        itemCount: pinned.length + 1,
-        separatorBuilder: (BuildContext context, int index) =>
-            const SizedBox(width: AppSpacing.sm),
-        itemBuilder: (BuildContext context, int index) {
-          if (index == pinned.length) {
-            return const _CategorySettingsChip();
-          }
-          return _CategoryChip(
-            category: pinned[index],
-            selected: selected == pinned[index].label,
-          );
-        },
+        padding: const EdgeInsets.symmetric(horizontal: PlaySpace.lg),
+        children: <Widget>[
+          for (int i = 0; i < pinned.length; i++) ...<Widget>[
+            _CategoryChip(
+              category: pinned[i],
+              selected: selected == pinned[i].label,
+            ),
+            const SizedBox(width: PlaySpace.sm),
+          ],
+          const _CategorySettingsChip(),
+        ],
       ),
     );
   }
@@ -70,27 +55,11 @@ class _CategoryChip extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    return FilterChip(
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      elevation: 2,
-      visualDensity: VisualDensity.comfortable,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(25),
-        side: BorderSide(
-          color: selected ? scheme.primary : scheme.outlineVariant,
-        ),
-      ),
-      avatar: Icon(
-        placeResultIcon(category.id),
-        size: 18,
-        color: selected ? scheme.primary : scheme.onSurfaceVariant,
-      ),
-      label: Text(category.label),
+    return PlayChip(
+      label: category.label,
+      icon: placeResultIcon(category.id),
       selected: selected,
-      showCheckmark: false,
-      onSelected: (bool value) => unawaited(_select(context, ref, value)),
+      onTap: () => unawaited(_select(context, ref, !selected)),
     );
   }
 
@@ -119,28 +88,31 @@ class _CategorySettingsChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    return Tooltip(
-      message: 'Choose categories',
-      child: Material(
-        color: scheme.surface,
-        elevation: 2,
-        shape: StadiumBorder(side: BorderSide(color: scheme.outlineVariant)),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => unawaited(showCategoryPicker(context)),
-          child: SizedBox(
-            width: 40,
-            child: Center(
-              child: Icon(
-                Icons.settings,
-                size: 18,
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
+    final PlayColors colors = PlayColors.of(context);
+    return PlaySurface(
+      radius: PlayRadii.pill,
+      borderWidth: 1,
+      shadow: PlayShadow.soft,
+      padding: const EdgeInsets.all(PlaySpace.sm),
+      onTap: () => unawaited(showCategoryPicker(context)),
+      child: SizedBox(
+        width: 24,
+        height: 24,
+        child: Center(
+          child: Semantics(
+            label: 'Choose categories',
+            child: Icon(PlayIcons.tune, size: 18, color: colors.inkMuted),
           ),
         ),
       ),
     );
   }
+}
+
+@PlayPreview(name: 'CategoryChips', size: Size(560, 120))
+Widget categoryChipsPreview() {
+  return PlayPreviewFrame(
+    alignment: Alignment.topLeft,
+    child: const ProviderScope(child: CategoryChips()),
+  );
 }

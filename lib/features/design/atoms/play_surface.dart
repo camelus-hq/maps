@@ -21,6 +21,7 @@ class PlaySurface extends StatelessWidget {
     this.borderColor,
     this.backgroundColor,
     this.onTap,
+    this.onLongPress,
     this.child,
   });
 
@@ -39,6 +40,7 @@ class PlaySurface extends StatelessWidget {
   final Color? backgroundColor;
 
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final Widget? child;
 
   @override
@@ -62,11 +64,12 @@ class PlaySurface extends StatelessWidget {
       child: Padding(padding: padding ?? EdgeInsets.zero, child: child),
     );
 
-    if (onTap == null) {
+    if (onTap == null && onLongPress == null) {
       return painted;
     }
     return PlayPressable(
       onTap: onTap,
+      onLongPress: onLongPress,
       scale: 0.98,
       child: ClipRRect(borderRadius: borderRadius, child: painted),
     );

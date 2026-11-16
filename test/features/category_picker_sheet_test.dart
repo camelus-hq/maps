@@ -26,7 +26,7 @@ void main() {
 
     expect(find.text('Choose categories'), findsOneWidget);
     expect(find.textContaining('long press to pin'), findsOneWidget);
-    expect(find.text('Sustenance'), findsOneWidget);
+    expect(find.text('SUSTENANCE'), findsOneWidget);
     expect(find.text('Restaurants'), findsOneWidget);
     expect(find.text('Cafes'), findsOneWidget);
   });

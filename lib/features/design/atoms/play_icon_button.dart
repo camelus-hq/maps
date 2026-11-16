@@ -2,10 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 // Only the preview glyphs come from Material; the atom takes an [IconData].
-import 'package:material_ui/material_ui.dart' show Icons;
 
 import '../../../core/theme/play/play_colors.dart';
 import '../../../core/theme/play/play_tokens.dart';
+import '../play_icons.dart';
 import '../play_previews.dart';
 import 'play_surface.dart';
 
@@ -136,26 +136,26 @@ Widget playIconButtonPreview() {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: <Widget>[
                 const PlayIconButton(
-                  icon: Icons.layers_outlined,
+                  icon: PlayIcons.layers,
                   semanticLabel: 'Layers',
                 ),
                 const PlayIconButton(
-                  icon: Icons.my_location,
+                  icon: PlayIcons.locate,
                   variant: PlayIconButtonVariant.primary,
                 ),
                 const PlayIconButton(
-                  icon: Icons.navigation_outlined,
+                  icon: PlayIcons.navigation,
                   variant: PlayIconButtonVariant.plain,
                 ),
                 PlayIconButton(
-                  icon: Icons.navigation_outlined,
+                  icon: PlayIcons.navigation,
                   variant: PlayIconButtonVariant.plain,
                   rotation: math.pi * 0.25,
                 ),
-                const PlayIconButton(icon: Icons.my_location, active: true),
-                const PlayIconButton(icon: Icons.gps_off, alert: true),
-                PlayIconButton(icon: Icons.place, tone: PlayTone.mint),
-                const PlayIconButton(icon: Icons.add, size: 64),
+                const PlayIconButton(icon: PlayIcons.locate, active: true),
+                const PlayIconButton(icon: PlayIcons.locationLost, alert: true),
+                PlayIconButton(icon: PlayIcons.place, tone: PlayTone.mint),
+                const PlayIconButton(icon: PlayIcons.add, size: 64),
               ],
             ),
             const SizedBox(height: PlaySpace.xl),

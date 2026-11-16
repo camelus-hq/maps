@@ -1,8 +1,8 @@
 import 'package:flutter/widgets.dart';
-import 'package:material_ui/material_ui.dart' show Icons;
 
 import '../../../core/theme/play/play_colors.dart';
 import '../../../core/theme/play/play_tokens.dart';
+import '../play_icons.dart';
 import '../play_previews.dart';
 
 /// A round avatar: a network picture when there is one, else a monogram (or an
@@ -144,7 +144,7 @@ Widget playAvatarPreview() {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: <Widget>[
                 const PlayAvatar(label: 'Ada Lovelace', size: 56),
-                const PlayAvatar(label: 'Grace', icon: Icons.person),
+                const PlayAvatar(label: 'Grace', icon: PlayIcons.user),
                 const PlayAvatar(
                   label: 'Alan',
                   tone: PlayTone.mint,

@@ -1,9 +1,9 @@
 import 'package:flutter/widgets.dart';
-import 'package:material_ui/material_ui.dart' show Icons;
 
 import '../../../core/theme/play/play_colors.dart';
 import '../../../core/theme/play/play_tokens.dart';
 import '../atoms/play_chip.dart';
+import '../play_icons.dart';
 import '../play_previews.dart';
 
 /// One entry in a [PlayCategoryRow].
@@ -99,31 +99,35 @@ Widget playCategoryRowPreview() {
                 PlayCategoryData(
                   id: 'parks',
                   label: 'Parks',
-                  icon: Icons.park,
+                  icon: PlayIcons.park,
                   selected: true,
                 ),
                 PlayCategoryData(
                   id: 'cafes',
                   label: 'Cafés',
-                  icon: Icons.local_cafe,
+                  icon: PlayIcons.cafe,
                 ),
                 PlayCategoryData(
                   id: 'water',
                   label: 'Water',
-                  icon: Icons.water_drop,
+                  icon: PlayIcons.water,
                 ),
                 PlayCategoryData(
                   id: 'fuel',
                   label: 'Fuel',
-                  icon: Icons.local_gas_station,
+                  icon: PlayIcons.fuel,
                 ),
                 PlayCategoryData(
                   id: 'atms',
                   label: 'ATMs',
-                  icon: Icons.account_balance,
+                  icon: PlayIcons.bank,
                 ),
               ],
-              trailing: PlayChip(label: 'More', icon: Icons.tune, onTap: () {}),
+              trailing: PlayChip(
+                label: 'More',
+                icon: PlayIcons.tune,
+                onTap: () {},
+              ),
             ),
             const SizedBox(height: PlaySpace.sm),
             Padding(

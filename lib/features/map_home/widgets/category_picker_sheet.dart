@@ -3,12 +3,12 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../../domain/entities/place_category.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/settings.dart';
 import '../../common/navigation.dart';
 import '../../common/place_result_icon.dart';
+import '../../design/play.dart';
 
 /// Presents the category picker: every browse category, grouped, with the
 /// pinned ones highlighted.
@@ -32,6 +32,7 @@ class CategoryPickerSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final PlayColors colors = PlayColors.of(context);
     final List<String> pinned = ref.watch(settingsProvider).pinnedCategoryIds;
     final Set<String> pinnedSet = pinned.toSet();
     return FractionallySizedBox(
@@ -43,35 +44,33 @@ class CategoryPickerSheet extends ConsumerWidget {
           children: <Widget>[
             Padding(
               padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
+                PlaySpace.lg,
                 0,
-                AppSpacing.md,
-                AppSpacing.sm,
+                PlaySpace.lg,
+                PlaySpace.sm,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
                     'Choose categories',
-                    style: Theme.of(context).textTheme.titleMedium,
+                    style: PlayType.title.copyWith(color: colors.ink),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: PlaySpace.xs),
                   Text(
                     'Tap to search nearby · long press to pin to the top '
                     '(${pinned.length}/$maxPinnedCategories)',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                    style: PlayType.caption.copyWith(color: colors.inkMuted),
                   ),
                 ],
               ),
             ),
-            const Divider(height: 1),
+            const PlayDivider(),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.sm,
+                  horizontal: PlaySpace.lg,
+                  vertical: PlaySpace.sm,
                 ),
                 children: <Widget>[
                   for (final String group in categoryGroups)
@@ -103,20 +102,25 @@ class CategoryPickerSheet extends ConsumerWidget {
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.only(
-            top: AppSpacing.sm,
-            bottom: AppSpacing.xs,
+            top: PlaySpace.sm,
+            bottom: PlaySpace.sm,
           ),
-          child: Text(group, style: Theme.of(context).textTheme.titleMedium),
+          child: Text(
+            group.toUpperCase(),
+            style: PlayType.overline.copyWith(
+              color: PlayColors.of(context).inkMuted,
+            ),
+          ),
         ),
         Wrap(
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.sm,
+          spacing: PlaySpace.sm,
+          runSpacing: PlaySpace.sm,
           children: <Widget>[
             for (final PlaceCategory category in categories)
               _chip(context, ref, category, pinned.contains(category.id)),
           ],
         ),
-        const SizedBox(height: AppSpacing.md),
+        const SizedBox(height: PlaySpace.md),
       ],
     );
   }
@@ -127,18 +131,12 @@ class CategoryPickerSheet extends ConsumerWidget {
     PlaceCategory category,
     bool pinned,
   ) {
-    return GestureDetector(
+    return PlayChip(
+      label: category.label,
+      icon: placeResultIcon(category.id),
+      selected: pinned,
+      onTap: () => _search(context, ref, category),
       onLongPress: () => unawaited(_togglePin(context, ref, category)),
-      child: FilterChip(
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        visualDensity: VisualDensity.comfortable,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-        avatar: Icon(placeResultIcon(category.id), size: 18),
-        label: Text(category.label),
-        selected: pinned,
-        showCheckmark: false,
-        onSelected: (_) => _search(context, ref, category),
-      ),
     );
   }
 

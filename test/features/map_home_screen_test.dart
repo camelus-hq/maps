@@ -4,8 +4,9 @@ import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/app/app.dart';
 import 'package:openmaps/data/fakes/fake_map_service.dart';
 import 'package:openmaps/features/common/place_result_icon.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/map_home/widgets/map_surface_placeholder.dart';
-import 'package:openmaps/features/social/widgets/friend_avatar.dart';
+import 'package:openmaps/features/map_home/widgets/search_bar_pill.dart';
 import 'package:openmaps/state/home.dart';
 import 'package:openmaps/state/ports.dart';
 
@@ -26,13 +27,21 @@ void main() {
     expect(find.text('Water fountain'), findsOneWidget);
     expect(find.text('Groceries'), findsOneWidget);
     expect(find.text('Toilets'), findsOneWidget);
-    expect(find.byIcon(Icons.settings, skipOffstage: false), findsOneWidget);
+    expect(find.byIcon(PlayIcons.tune, skipOffstage: false), findsOneWidget);
     // The search pill carries logo/mic/avatar slots and the chips carry icons.
     // The default keyless build is signed in, so the account slot is the
     // profile avatar, not the signed-out person glyph.
-    expect(find.byIcon(Icons.mic_none), findsOneWidget);
-    expect(find.byType(FriendAvatar), findsOneWidget);
-    expect(find.byIcon(Icons.person), findsNothing);
+    expect(find.byIcon(PlayIcons.microphone), findsOneWidget);
+    expect(find.byType(PlayAvatar), findsOneWidget);
+    // The signed-out glyph only appears in the search bar (the nav bar's "You"
+    // uses the same Phosphor glyph, so scope the check to the pill).
+    expect(
+      find.descendant(
+        of: find.byType(SearchBarPill),
+        matching: find.byIcon(PlayIcons.user),
+      ),
+      findsNothing,
+    );
     // Chips paint the shared place-result glyph (one source of truth).
     expect(find.byIcon(placeResultIcon('park')), findsOneWidget);
     expect(find.byIcon(placeResultIcon('cafe')), findsOneWidget);
@@ -92,7 +101,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final Finder chip = find.widgetWithText(FilterChip, 'Cafes');
+    final Finder chip = find.widgetWithText(PlayChip, 'Cafes');
     await tester.tap(chip);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 350));
@@ -103,7 +112,7 @@ void main() {
     expect(find.byType(TextField), findsNothing);
     expect(find.text('Search here'), findsOneWidget);
     expect(container.read(selectedCategoryProvider), 'Cafes');
-    expect(tester.widget<FilterChip>(chip).selected, isTrue);
+    expect(tester.widget<PlayChip>(chip).selected, isTrue);
     final FakeMapService map =
         container.read(mapServiceProvider) as FakeMapService;
     expect(map.markers, isNotEmpty);
@@ -112,7 +121,7 @@ void main() {
     await tester.tap(chip);
     await tester.pumpAndSettle();
     expect(container.read(selectedCategoryProvider), isNull);
-    expect(tester.widget<FilterChip>(chip).selected, isFalse);
+    expect(tester.widget<PlayChip>(chip).selected, isFalse);
     expect(map.markers, isEmpty);
   });
 
@@ -129,7 +138,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(FilterChip, 'Cafes'));
+    await tester.tap(find.widgetWithText(PlayChip, 'Cafes'));
     await tester.pumpAndSettle();
     expect(container.read(selectedCategoryProvider), 'Cafes');
     final FakeMapService map =

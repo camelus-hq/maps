@@ -1,15 +1,16 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/home.dart';
 import '../../../state/search.dart';
+import '../../design/play.dart';
 
-/// The "Search this area" affordance: shown when results are on screen but the
-/// map has been panned away from them. Re-runs the last query (or category).
+/// The "Search this area" affordance, in the play style: shown when results are
+/// on screen but the map has been panned away from them. Re-runs the last query
+/// (or category).
 class SearchAreaChip extends ConsumerWidget {
   const SearchAreaChip({super.key});
 
@@ -22,13 +23,13 @@ class SearchAreaChip extends ConsumerWidget {
       searchControllerProvider.select((SearchState state) => state.lastQuery),
     );
     return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.sm),
+      padding: const EdgeInsets.only(top: PlaySpace.sm),
       child: Align(
         alignment: Alignment.center,
-        child: ActionChip(
-          avatar: const Icon(Icons.search, size: 18),
-          label: const Text('Search this area'),
-          onPressed: () => unawaited(_rerun(ref, query)),
+        child: PlayChip(
+          label: 'Search this area',
+          icon: PlayIcons.search,
+          onTap: () => unawaited(_rerun(ref, query)),
         ),
       ),
     );

@@ -1,8 +1,8 @@
 import 'package:flutter/widgets.dart';
-import 'package:material_ui/material_ui.dart' show Icons;
 
 import '../../../core/theme/play/play_colors.dart';
 import '../../../core/theme/play/play_tokens.dart';
+import '../play_icons.dart';
 import '../play_previews.dart';
 
 /// A tiny all-caps status tag ("LIVE", "OPEN", "3 MIN").
@@ -74,7 +74,7 @@ Widget playTagPreview() {
               spacing: PlaySpace.sm,
               runSpacing: PlaySpace.sm,
               children: <Widget>[
-                const PlayTag(label: 'Live', icon: Icons.circle),
+                const PlayTag(label: 'Live', icon: PlayIcons.liveDot),
                 const PlayTag(label: 'Open', tone: PlayTone.mint),
                 const PlayTag(label: '3 min', tone: PlayTone.lemon),
                 const PlayTag(label: 'Closed', tone: PlayTone.coral),
