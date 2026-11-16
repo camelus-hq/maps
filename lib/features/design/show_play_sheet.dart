@@ -64,13 +64,28 @@ class _PlaySheetRoute<T> extends PopupRoute<T> {
     final MediaQueryData media = MediaQuery.of(context);
     final double screenHeight = media.size.height;
     final double bottomInset = media.viewPadding.bottom;
+    final NavigatorState navigator = Navigator.of(context);
 
     Widget sheet = PlaySheet(
       tone: tone,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          const PlaySheetHandle(),
+          // Drag-to-dismiss lives on the handle only: a whole-sheet drag
+          // recognizer would compete with the content's own gestures (scrolling,
+          // chips, long presses) and steal them on a real finger.
+          if (dismissible)
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onVerticalDragEnd: (DragEndDetails details) {
+                if ((details.primaryVelocity ?? 0) > 350) {
+                  navigator.maybePop();
+                }
+              },
+              child: const PlaySheetHandle(),
+            )
+          else
+            const PlaySheetHandle(),
           Flexible(child: builder(context)),
           SizedBox(height: bottomInset),
         ],
@@ -82,25 +97,12 @@ class _PlaySheetRoute<T> extends PopupRoute<T> {
       sheet = SizedBox(height: screenHeight * factor, child: sheet);
     }
 
-    final Widget positioned = Align(
+    return Align(
       alignment: Alignment.bottomCenter,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: screenHeight * 0.92),
         child: sheet,
       ),
-    );
-
-    if (!dismissible) {
-      return positioned;
-    }
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onVerticalDragEnd: (DragEndDetails details) {
-        if ((details.primaryVelocity ?? 0) > 350) {
-          Navigator.of(context).maybePop();
-        }
-      },
-      child: positioned,
     );
   }
 

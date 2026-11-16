@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:ndk_flutter/l10n/app_localizations.dart' as ndk_l10n;
 
 import '../core/theme/app_theme.dart';
+import '../core/theme/play/play_colors.dart';
 import '../domain/entities/app_settings.dart';
 import '../features/feedback/widgets/alpha_banner.dart';
 import '../features/update/widgets/update_prompt.dart';
@@ -51,9 +52,23 @@ class _OpenMapsAppState extends State<OpenMapsApp> {
                 ndk_l10n.AppLocalizations.localizationsDelegates,
             supportedLocales: ndk_l10n.AppLocalizations.supportedLocales,
             routerConfig: _router,
-            builder: (BuildContext context, Widget? child) => AlphaBannerHost(
-              child: UpdatePromptHost(child: child ?? const SizedBox.shrink()),
-            ),
+            builder: (BuildContext context, Widget? child) {
+              // Resolve the Play palette from the theme the app actually
+              // selected (System/Light/Dark), so the Play UI follows the
+              // settings toggle and the platform, not just the platform.
+              final Brightness brightness = Theme.of(context).brightness;
+              final PlayColors colors = brightness == Brightness.dark
+                  ? PlayColors.dark
+                  : PlayColors.light;
+              return PlayTheme(
+                colors: colors,
+                child: AlphaBannerHost(
+                  child: UpdatePromptHost(
+                    child: child ?? const SizedBox.shrink(),
+                  ),
+                ),
+              );
+            },
           );
         },
       ),

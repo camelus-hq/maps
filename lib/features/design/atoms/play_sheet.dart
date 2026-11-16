@@ -33,7 +33,13 @@ class PlaySheet extends StatelessWidget {
         color: colors.tone(tone).background,
         borderRadius: borderRadius,
       ),
-      child: ClipRRect(borderRadius: borderRadius, child: child),
+      // A modal sheet is pushed as a route, so it does not inherit the page's
+      // DefaultTextStyle. Without one, bare `Text` falls back to Flutter's
+      // yellow double-underline debug style — so the sheet provides it.
+      child: DefaultTextStyle(
+        style: PlayType.body.copyWith(color: colors.ink),
+        child: ClipRRect(borderRadius: borderRadius, child: child),
+      ),
     );
   }
 }

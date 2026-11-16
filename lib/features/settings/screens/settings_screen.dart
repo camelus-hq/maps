@@ -28,11 +28,16 @@ class SettingsScreen extends ConsumerWidget {
     final AppConfig config = ref.watch(appConfigProvider);
     final bool hasMapboxToken = config.hasMapboxToken;
     final bool hasCamelusToken = config.hasCamelusToken;
-    const EdgeInsets pad = EdgeInsets.symmetric(horizontal: PlaySpace.lg);
+    const EdgeInsets pad = EdgeInsets.symmetric(horizontal: PlaySpace.xs);
     return PlayScaffold(
       appBar: const PlayAppBar(title: 'Settings'),
       child: ListView(
-        padding: const EdgeInsets.only(bottom: PlaySpace.xxl),
+        padding: const EdgeInsets.fromLTRB(
+          PlaySpace.md,
+          0,
+          PlaySpace.md,
+          PlaySpace.xxl,
+        ),
         children: <Widget>[
           const _Section('Account'),
           const _AccountTile(),
@@ -238,9 +243,9 @@ class _AccountTile extends ConsumerWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(
-            PlaySpace.lg,
+            PlaySpace.xs,
             PlaySpace.sm,
-            PlaySpace.lg,
+            PlaySpace.xs,
             PlaySpace.xs,
           ),
           child: Align(
@@ -410,9 +415,9 @@ class _Section extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        PlaySpace.lg,
+        PlaySpace.xs,
         PlaySpace.xl,
-        PlaySpace.lg,
+        PlaySpace.xs,
         PlaySpace.sm,
       ),
       child: Text(
