@@ -56,6 +56,7 @@ abstract final class PlayIcons {
   static const IconData add = PhosphorIconsRegular.plus;
   static const IconData clock = PhosphorIconsRegular.clock;
   static const IconData route = PhosphorIconsRegular.path;
+  static const IconData refresh = PhosphorIconsRegular.arrowClockwise;
   static const IconData liveDot = PhosphorIconsFill.circle;
   static const IconData dot = PhosphorIconsRegular.circle;
 

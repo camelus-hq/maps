@@ -34,7 +34,10 @@ Future<void> _pump(
 }) {
   return tester.pumpWidget(
     _harness(
-      Align(alignment: Alignment.topLeft, child: widget),
+      Align(
+        alignment: Alignment.topLeft,
+        child: SingleChildScrollView(child: widget),
+      ),
       brightness: brightness,
     ),
   );
@@ -121,6 +124,7 @@ void main() {
               const PlayTag(label: 'Live'),
               PlayAvatar(label: 'Ada', size: 48, dot: true),
               const PlayDivider(dotted: true),
+              const PlaySpinner(),
               PlaySwitch(value: true, onChanged: (bool _) {}),
               const PlaySwitch(value: false),
               PlayRow(icon: PlayIcons.nearby, label: 'Nearby', onTap: () {}),
