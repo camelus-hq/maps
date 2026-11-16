@@ -32,6 +32,22 @@ abstract final class PlayIcons {
   static const IconData locate = PhosphorIconsRegular.crosshair;
   static const IconData locationLost = PhosphorIconsRegular.gpsSlash;
 
+  // Map layers ------------------------------------------------------------
+  static const IconData mapStandard = PhosphorIconsRegular.mapTrifold;
+  static const IconData mapSatellite = PhosphorIconsRegular.globeHemisphereWest;
+  static const IconData mapTerrain = PhosphorIconsRegular.mountains;
+  static const IconData traffic = PhosphorIconsRegular.trafficSignal;
+
+  // Feed / lists ----------------------------------------------------------
+  static const IconData nearby = PhosphorIconsRegular.navigationArrow;
+  static const IconData friends = PhosphorIconsRegular.usersThree;
+  static const IconData recent = PhosphorIconsRegular.clockCounterClockwise;
+  static const IconData saved = PhosphorIconsRegular.star;
+  static const IconData savedFilled = PhosphorIconsFill.star;
+  static const IconData loading = PhosphorIconsRegular.hourglass;
+  static const IconData error = PhosphorIconsRegular.warningCircle;
+  static const IconData contributePlace = PhosphorIconsRegular.mapPinPlus;
+
   // Actions ---------------------------------------------------------------
   static const IconData arrowRight = PhosphorIconsRegular.arrowRight;
   static const IconData lock = PhosphorIconsRegular.lock;

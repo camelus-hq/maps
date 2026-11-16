@@ -1,18 +1,18 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../../domain/entities/map_style.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/map_layers.dart';
+import '../../design/play.dart';
 
-/// Presents the layers switcher (base map style + traffic overlay).
-Future<void> showLayersSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
+/// Presents the layers switcher (base map style + traffic overlay) as a play
+/// modal sheet.
+Future<void> showLayersSheet(BuildContext context) async {
+  await showPlaySheet<void>(
+    context,
     builder: (BuildContext context) => const LayersSheet(),
   );
 }
@@ -25,59 +25,56 @@ class LayersSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final BaseMapStyle style = ref.watch(mapStyleProvider);
     final bool traffic = ref.watch(trafficProvider);
-    return SafeArea(
-      top: false,
+    final PlayColors colors = PlayColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        PlaySpace.lg,
+        0,
+        PlaySpace.lg,
+        PlaySpace.lg,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            child: Text(
-              'Map type',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.sm,
-              AppSpacing.md,
-              AppSpacing.md,
-            ),
-            child: Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: <Widget>[
-                for (final BaseMapStyle option in BaseMapStyle.values)
-                  ChoiceChip(
-                    label: Text(_label(option)),
-                    avatar: Icon(_icon(option), size: 18),
-                    selected: option == style,
-                    onSelected: (_) => unawaited(
-                      ref.read(commandRegistryProvider).dispatch(
-                        'map.style.set',
-                        <String, Object?>{'style': option.name},
-                      ),
+          Text('Map type', style: PlayType.title.copyWith(color: colors.ink)),
+          const SizedBox(height: PlaySpace.md),
+          Wrap(
+            spacing: PlaySpace.sm,
+            runSpacing: PlaySpace.sm,
+            children: <Widget>[
+              for (final BaseMapStyle option in BaseMapStyle.values)
+                PlayChip(
+                  label: _label(option),
+                  icon: _icon(option),
+                  selected: option == style,
+                  onTap: () => unawaited(
+                    ref.read(commandRegistryProvider).dispatch(
+                      'map.style.set',
+                      <String, Object?>{'style': option.name},
                     ),
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
-          const Divider(height: 1),
-          SwitchListTile(
-            secondary: const Icon(Icons.traffic_outlined),
-            title: const Text('Traffic'),
-            subtitle: const Text('Realtime conditions overlay'),
-            value: traffic,
-            onChanged: (bool value) => unawaited(
-              ref.read(commandRegistryProvider).dispatch(
-                'map.traffic',
-                <String, Object?>{'on': value},
+          const SizedBox(height: PlaySpace.lg),
+          const PlayDivider(),
+          PlayRow(
+            icon: PlayIcons.traffic,
+            label: 'Traffic',
+            subtitle: 'Realtime conditions overlay',
+            showChevron: false,
+            trailing: PlaySwitch(
+              value: traffic,
+              semanticLabel: 'Traffic overlay',
+              onChanged: (bool value) => unawaited(
+                ref.read(commandRegistryProvider).dispatch(
+                  'map.traffic',
+                  <String, Object?>{'on': value},
+                ),
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
         ],
       ),
     );
@@ -90,8 +87,8 @@ class LayersSheet extends ConsumerWidget {
   };
 
   static IconData _icon(BaseMapStyle style) => switch (style) {
-    BaseMapStyle.standard => Icons.map_outlined,
-    BaseMapStyle.satellite => Icons.satellite_alt_outlined,
-    BaseMapStyle.terrain => Icons.terrain_outlined,
+    BaseMapStyle.standard => PlayIcons.mapStandard,
+    BaseMapStyle.satellite => PlayIcons.mapSatellite,
+    BaseMapStyle.terrain => PlayIcons.mapTerrain,
   };
 }

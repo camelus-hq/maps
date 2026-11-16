@@ -121,6 +121,26 @@ void main() {
               const PlayTag(label: 'Live'),
               PlayAvatar(label: 'Ada', size: 48, dot: true),
               const PlayDivider(dotted: true),
+              PlaySwitch(value: true, onChanged: (bool _) {}),
+              const PlaySwitch(value: false),
+              PlayRow(icon: PlayIcons.nearby, label: 'Nearby', onTap: () {}),
+              const PlayRow(
+                icon: PlayIcons.contributePlace,
+                label: 'Not available',
+                enabled: false,
+              ),
+              const PlaySheet(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    PlaySheetHandle(),
+                    Padding(
+                      padding: EdgeInsets.all(PlaySpace.lg),
+                      child: Text('sheet'),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
           brightness: brightness,
