@@ -21,6 +21,7 @@ export 'atoms/play_sheet.dart';
 export 'atoms/play_spinner.dart';
 export 'atoms/play_surface.dart';
 export 'atoms/play_switch.dart';
+export 'atoms/play_tabs.dart';
 export 'atoms/play_tag.dart';
 export 'components/play_category_row.dart';
 export 'components/play_map_control_rail.dart';

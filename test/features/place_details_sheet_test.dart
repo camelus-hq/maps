@@ -17,6 +17,7 @@ import 'package:openmaps/domain/entities/review_draft.dart';
 import 'package:openmaps/domain/ports/osm_place_source.dart';
 import 'package:openmaps/domain/ports/review_service.dart';
 import 'package:openmaps/features/common/shimmer.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/place_details/widgets/place_details_sheet.dart';
 import 'package:openmaps/features/reviews/widgets/star_rating.dart';
 import 'package:openmaps/state/place.dart';
@@ -192,7 +193,7 @@ void main() {
     expect(find.text('instagram.com/willow'), findsOneWidget);
     expect(find.text('hi@willow.example'), findsOneWidget);
     expect(find.text('Wheelchair accessible'), findsOneWidget);
-    expect(find.byIcon(Icons.accessible), findsOneWidget);
+    expect(find.byIcon(PlayIcons.wheelchair), findsOneWidget);
     // The general weekly hours (all days) sit in the Overview.
     expect(find.text('Opening hours'), findsOneWidget);
     expect(find.text('Mon'), findsOneWidget);
@@ -222,7 +223,7 @@ void main() {
     await expand(tester);
 
     expect(find.text('Not wheelchair accessible'), findsOneWidget);
-    expect(find.byIcon(Icons.not_accessible), findsOneWidget);
+    expect(find.byIcon(PlayIcons.wheelchairOff), findsOneWidget);
     expect(find.text('Payment'), findsNothing);
     expect(find.byTooltip('Cash'), findsNothing);
   });

@@ -7,6 +7,7 @@ import 'package:openmaps/data/fakes/fake_review_service.dart';
 import 'package:openmaps/data/fakes/fake_social_service.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/place.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/reviews/widgets/star_rating.dart';
 import 'package:openmaps/features/reviews/widgets/write_review_sheet.dart';
 import 'package:openmaps/state/ports.dart';
@@ -73,7 +74,7 @@ void main() {
     await pumpComposer(tester);
     final Finder stars = find.descendant(
       of: find.byType(StarRatingInput),
-      matching: find.byType(InkResponse),
+      matching: find.byType(PlayPressable),
     );
     expect(stars, findsNWidgets(5));
     await tester.tap(stars.at(4));
@@ -91,7 +92,7 @@ void main() {
       find
           .descendant(
             of: find.byType(StarRatingInput),
-            matching: find.byType(InkResponse),
+            matching: find.byType(PlayPressable),
           )
           .at(3),
     );

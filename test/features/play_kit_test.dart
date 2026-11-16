@@ -137,6 +137,11 @@ void main() {
                   PlaySegment<String>(value: 'b', label: 'B'),
                 ],
               ),
+              PlayTabs(
+                tabs: const <String>['Overview', 'Reviews'],
+                selectedIndex: 0,
+                onSelected: (int _) {},
+              ),
               PlayRow(icon: PlayIcons.nearby, label: 'Nearby', onTap: () {}),
               const PlayRow(
                 icon: PlayIcons.contributePlace,

@@ -1,7 +1,7 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../common/shimmer.dart';
+import '../../design/play.dart';
 
 /// The Photos tab: the place's OpenStreetMap `image` (and `image:<n>`) pictures,
 /// loaded at runtime. Our own media corpus stays empty (AGENTS.md §Assets), so
@@ -20,19 +20,24 @@ class PlacePhotos extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     if (urls.isEmpty) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Container(
-            height: 120,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(12),
+          PlaySurface(
+            tone: PlayTone.sunken,
+            radius: PlayRadii.md,
+            shadow: PlayShadow.none,
+            child: SizedBox(
+              height: 120,
+              child: Center(
+                child: Text(
+                  'No photos yet',
+                  style: PlayType.caption.copyWith(color: colors.inkMuted),
+                ),
+              ),
             ),
-            alignment: Alignment.center,
-            child: Text('No photos yet', style: theme.textTheme.bodySmall),
           ),
         ],
       );
@@ -42,7 +47,7 @@ class PlacePhotos extends StatelessWidget {
       children: <Widget>[
         for (final String url in urls) ...<Widget>[
           ClipRRect(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(PlayRadii.md),
             child: AspectRatio(
               aspectRatio: 4 / 3,
               child: Image.network(
@@ -65,14 +70,12 @@ class PlacePhotos extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: PlaySpace.sm),
           Text(
             'Photo from OpenStreetMap',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+            style: PlayType.caption.copyWith(color: colors.inkMuted),
           ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: PlaySpace.md),
         ],
       ],
     );
@@ -87,20 +90,21 @@ class _Broken extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    return Container(
-      color: scheme.surfaceContainerHighest,
-      alignment: Alignment.center,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(Icons.broken_image_outlined, color: scheme.onSurfaceVariant),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Photo unavailable',
-            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
-          ),
-        ],
+    final PlayColors colors = PlayColors.of(context);
+    return ColoredBox(
+      color: colors.surfaceSunken,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(PlayIcons.brokenImage, color: colors.inkMuted),
+            const SizedBox(height: PlaySpace.xs),
+            Text(
+              'Photo unavailable',
+              style: PlayType.caption.copyWith(color: colors.inkMuted),
+            ),
+          ],
+        ),
       ),
     );
   }

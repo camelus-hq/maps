@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+
+import '../../design/play.dart';
 
 /// A read-only 0–5 star row that fills partially for a fractional rating
 /// (e.g. 4.8 shows nearly five stars). Part of the review UI, not a gesture
@@ -19,14 +21,15 @@ class StarRating extends StatelessWidget {
 
   final double size;
 
-  /// Star colour; defaults to the theme's primary (our teal).
+  /// Star colour; defaults to the play accent.
   final Color? color;
 
   final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
-    final Color starColor = color ?? Theme.of(context).colorScheme.primary;
+    final PlayColors colors = PlayColors.of(context);
+    final Color starColor = color ?? colors.primary;
     final double clamped = value.clamp(0.0, 5.0);
     final Widget row = Row(
       mainAxisSize: MainAxisSize.min,
@@ -39,12 +42,13 @@ class StarRating extends StatelessWidget {
               fill: (clamped - i).clamp(0.0, 1.0),
               size: size,
               color: starColor,
+              outline: colors.line,
             ),
           ),
       ],
     );
     final String? label = tooltip;
-    return label == null ? row : Tooltip(message: label, child: row);
+    return label == null ? row : Semantics(label: label, child: row);
   }
 }
 
@@ -70,23 +74,23 @@ class StarRatingInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color color = Theme.of(context).colorScheme.primary;
+    final PlayColors colors = PlayColors.of(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         for (int i = 1; i <= 5; i++)
-          InkResponse(
+          PlayPressable(
             onTap: () => onChanged(value == i ? 0 : i),
-            radius: size * 0.7,
             child: Padding(
-              padding: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.only(right: PlaySpace.xs + 2),
               child: SizedBox(
                 width: size,
                 height: size,
                 child: _Star(
                   fill: i <= value ? 1 : 0,
                   size: size,
-                  color: color,
+                  color: colors.primary,
+                  outline: colors.line,
                 ),
               ),
             ),
@@ -98,11 +102,17 @@ class StarRatingInput extends StatelessWidget {
 
 /// A single star, filled from [fill] (`0..1`) using our own painted path.
 class _Star extends StatelessWidget {
-  const _Star({required this.fill, required this.size, required this.color});
+  const _Star({
+    required this.fill,
+    required this.size,
+    required this.color,
+    required this.outline,
+  });
 
   final double fill;
   final double size;
   final Color color;
+  final Color outline;
 
   @override
   Widget build(BuildContext context) {
@@ -111,7 +121,7 @@ class _Star extends StatelessWidget {
       painter: _StarPainter(
         fill: fill.clamp(0.0, 1.0),
         color: color,
-        outline: Theme.of(context).colorScheme.outlineVariant,
+        outline: outline,
       ),
     );
   }

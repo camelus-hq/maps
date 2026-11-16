@@ -1,7 +1,7 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/opening_hours.dart';
+import '../../design/play.dart';
 
 /// The Overview tab's general opening hours: the whole week, with today's row
 /// highlighted.
@@ -26,20 +26,22 @@ class PlaceWeeklyHours extends StatelessWidget {
     if (days == null) {
       return const SizedBox.shrink();
     }
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme scheme = theme.colorScheme;
+    final PlayColors colors = PlayColors.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         Row(
           children: <Widget>[
-            Icon(Icons.schedule, size: 20, color: scheme.onSurfaceVariant),
-            const SizedBox(width: AppSpacing.md),
-            Text('Opening hours', style: theme.textTheme.bodyLarge),
+            Icon(PlayIcons.clock, size: 20, color: colors.inkMuted),
+            const SizedBox(width: PlaySpace.md),
+            Text(
+              'Opening hours',
+              style: PlayType.bodyStrong.copyWith(color: colors.ink),
+            ),
           ],
         ),
-        const SizedBox(height: AppSpacing.xs),
+        const SizedBox(height: PlaySpace.xs),
         if (days.every((OpeningDay day) => day.isAllDay))
           _row(context, 'Every day', 'Open 24 hours', highlighted: true)
         else
@@ -60,14 +62,15 @@ class PlaceWeeklyHours extends StatelessWidget {
     String hours, {
     required bool highlighted,
   }) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    final Color color = highlighted ? scheme.primary : scheme.onSurface;
-    final FontWeight weight = highlighted ? FontWeight.w600 : FontWeight.w400;
+    final PlayColors colors = PlayColors.of(context);
+    final Color valueColor = highlighted ? colors.primary : colors.ink;
+    final Color dayColor = highlighted ? colors.primary : colors.inkMuted;
+    final FontWeight weight = highlighted ? FontWeight.w700 : FontWeight.w500;
     return Padding(
       padding: const EdgeInsets.only(
         left: 36,
-        top: AppSpacing.xs,
-        bottom: AppSpacing.xs,
+        top: PlaySpace.xs,
+        bottom: PlaySpace.xs,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -76,9 +79,8 @@ class PlaceWeeklyHours extends StatelessWidget {
             width: 46,
             child: Text(
               day,
-              style: TextStyle(
-                fontSize: 13,
-                color: highlighted ? scheme.primary : scheme.onSurfaceVariant,
+              style: PlayType.caption.copyWith(
+                color: dayColor,
                 fontWeight: weight,
               ),
             ),
@@ -86,7 +88,10 @@ class PlaceWeeklyHours extends StatelessWidget {
           Expanded(
             child: Text(
               hours,
-              style: TextStyle(fontSize: 13, color: color, fontWeight: weight),
+              style: PlayType.caption.copyWith(
+                color: valueColor,
+                fontWeight: weight,
+              ),
             ),
           ),
         ],

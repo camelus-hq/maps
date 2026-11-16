@@ -70,6 +70,17 @@ abstract final class PlayIcons {
   static const IconData code = PhosphorIconsRegular.code;
   static const IconData device = PhosphorIconsRegular.deviceMobile;
   static const IconData download = PhosphorIconsRegular.downloadSimple;
+  static const IconData share = PhosphorIconsRegular.shareNetwork;
+  static const IconData copy = PhosphorIconsRegular.copy;
+  static const IconData phone = PhosphorIconsRegular.phone;
+  static const IconData globe = PhosphorIconsRegular.globe;
+  static const IconData mail = PhosphorIconsRegular.envelope;
+  static const IconData wheelchair = PhosphorIconsRegular.wheelchair;
+  static const IconData wheelchairOff = PhosphorIconsRegular.prohibit;
+  static const IconData takeaway = PhosphorIconsRegular.bowlFood;
+  static const IconData note = PhosphorIconsRegular.notePencil;
+  static const IconData review = PhosphorIconsRegular.pencilSimple;
+  static const IconData brokenImage = PhosphorIconsRegular.imageBroken;
   static const IconData liveDot = PhosphorIconsFill.circle;
   static const IconData dot = PhosphorIconsRegular.circle;
 
