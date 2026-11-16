@@ -5,6 +5,7 @@ import 'package:ndk_flutter/l10n/app_localizations.dart' as ndk_l10n;
 
 import '../core/theme/app_theme.dart';
 import '../core/theme/play/play_colors.dart';
+import '../core/theme/play/play_tokens.dart';
 import '../domain/entities/app_settings.dart';
 import '../features/feedback/widgets/alpha_banner.dart';
 import '../features/update/widgets/update_prompt.dart';
@@ -62,9 +63,12 @@ class _OpenMapsAppState extends State<OpenMapsApp> {
                   : PlayColors.light;
               return PlayTheme(
                 colors: colors,
-                child: AlphaBannerHost(
-                  child: UpdatePromptHost(
-                    child: child ?? const SizedBox.shrink(),
+                child: DefaultTextStyle(
+                  style: PlayType.body.copyWith(color: colors.ink),
+                  child: AlphaBannerHost(
+                    child: UpdatePromptHost(
+                      child: child ?? const SizedBox.shrink(),
+                    ),
                   ),
                 ),
               );

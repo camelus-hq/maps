@@ -84,7 +84,6 @@ class _Segment<T> extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? colors.surface : const Color(0x00000000),
           borderRadius: BorderRadius.circular(PlayRadii.pill),
-          boxShadow: selected ? PlayShadow.soft.resolve(colors) : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

@@ -50,7 +50,7 @@ class PlaySearchBar extends StatelessWidget {
         children: <Widget>[
           PlaySurface(
             radius: PlayRadii.sm,
-            tone: PlayTone.teal,
+            tone: PlayTone.primary,
             shadow: PlayShadow.none,
             padding: const EdgeInsets.all(7),
             child: Icon(PlayIcons.brand, size: 20, color: colors.onTeal),

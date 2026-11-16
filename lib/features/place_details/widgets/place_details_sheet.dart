@@ -331,7 +331,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet> {
         child: PlayButton(
           label: 'Write a review',
           icon: PlayIcons.review,
-          variant: PlayButtonVariant.ghost,
+          variant: PlayButtonVariant.soft,
           size: PlayButtonSize.sm,
           onPressed: _openComposer,
         ),
@@ -405,7 +405,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet> {
             icon: PlayIcons.phone,
             label: 'Call',
             size: PlayButtonSize.sm,
-            tone: PlayTone.neutral,
+            variant: PlayButtonVariant.soft,
             onPressed: place.hasPhone ? () => unawaited(_call()) : null,
           ),
           const SizedBox(width: PlaySpace.sm),
@@ -413,7 +413,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet> {
             icon: PlayIcons.globe,
             label: 'Website',
             size: PlayButtonSize.sm,
-            tone: PlayTone.neutral,
+            variant: PlayButtonVariant.soft,
             onPressed: (place.website?.trim().isNotEmpty ?? false)
                 ? () => unawaited(_openWebsite())
                 : null,

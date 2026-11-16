@@ -131,45 +131,48 @@ class _Menu<T> extends StatelessWidget {
     final PlayColors colors = PlayColors.of(context);
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 180, maxWidth: 280),
-      child: PlaySurface(
-        radius: PlayRadii.md,
-        borderWidth: 1,
-        shadow: PlayShadow.soft,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            for (final PlayMenuItem<T> item in items)
-              PlayPressable(
-                onTap: () => onSelected(item.value),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: PlaySpace.lg,
-                    vertical: PlaySpace.md,
-                  ),
-                  child: Row(
-                    children: <Widget>[
-                      if (item.icon != null) ...<Widget>[
-                        Icon(
-                          item.icon,
-                          size: 18,
-                          color: colors.tone(item.tone).foreground,
-                        ),
-                        const SizedBox(width: PlaySpace.md),
-                      ],
-                      Expanded(
-                        child: Text(
-                          item.label,
-                          style: PlayType.bodyStrong.copyWith(
-                            color: colors.ink,
+      child: DefaultTextStyle(
+        style: PlayType.bodyStrong.copyWith(color: colors.ink),
+        child: PlaySurface(
+          radius: PlayRadii.md,
+          borderWidth: 1,
+          shadow: PlayShadow.soft,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              for (final PlayMenuItem<T> item in items)
+                PlayPressable(
+                  onTap: () => onSelected(item.value),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: PlaySpace.lg,
+                      vertical: PlaySpace.md,
+                    ),
+                    child: Row(
+                      children: <Widget>[
+                        if (item.icon != null) ...<Widget>[
+                          Icon(
+                            item.icon,
+                            size: 18,
+                            color: colors.tone(item.tone).foreground,
+                          ),
+                          const SizedBox(width: PlaySpace.md),
+                        ],
+                        Expanded(
+                          child: Text(
+                            item.label,
+                            style: PlayType.bodyStrong.copyWith(
+                              color: colors.ink,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
