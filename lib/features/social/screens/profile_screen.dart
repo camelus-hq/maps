@@ -9,6 +9,7 @@ import '../../../core/errors/app_exception.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/ports.dart';
 import '../../../state/social.dart';
+import '../../common/material_host.dart';
 import '../../design/play.dart';
 import '../widgets/friend_avatar.dart';
 
@@ -120,14 +121,21 @@ class ProfileScreen extends ConsumerWidget {
             style: PlayType.body.copyWith(color: colors.inkMuted),
           ),
           const SizedBox(height: PlaySpace.md),
-          NLogin(
-            ndkFlutter: ndkFlutter,
-            onLoggedIn: () {
-              ref.invalidate(friendsProvider);
-              if (context.mounted) {
-                showPlayToast(context, 'Signed in');
-              }
-            },
+          // ndk_flutter's NLogin is built from the deprecated
+          // `package:flutter/material.dart` library, whose TextField needs a
+          // Material ancestor of that same library; the Play UI (and the app's
+          // `material_ui`) deliberately have none. MaterialHost supplies just
+          // that transparent ancestor around the third-party widget.
+          MaterialHost(
+            child: NLogin(
+              ndkFlutter: ndkFlutter,
+              onLoggedIn: () {
+                ref.invalidate(friendsProvider);
+                if (context.mounted) {
+                  showPlayToast(context, 'Signed in');
+                }
+              },
+            ),
           ),
           const SizedBox(height: PlaySpace.md),
           Text(
