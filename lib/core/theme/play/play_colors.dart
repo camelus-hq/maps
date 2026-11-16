@@ -1,0 +1,281 @@
+import 'package:flutter/widgets.dart';
+
+/// The named colour tones the Play design system paints with.
+///
+/// A tone is a (background, foreground) pair so a surface, a button or a tag
+/// can be dropped on any backdrop and stay readable. Unlike Material's role
+/// colours there is no automatic elevation tinting: a tone is exactly the
+/// colour you picked.
+enum PlayTone {
+  /// Plain card on the page background.
+  neutral,
+
+  /// Recessed area (search wells, input strips).
+  sunken,
+
+  /// High-contrast inverted block (the reference's black card).
+  strong,
+
+  /// The brand blue, full saturation.
+  primary,
+
+  /// A soft blue wash of the brand colour.
+  soft,
+
+  mint,
+  pink,
+  lemon,
+  sky,
+  coral,
+  teal,
+}
+
+/// Swatches for a surface elevation treatment.
+///
+/// `soft` is a diffuse drop shadow for floating cards; `pop` is a hard offset
+/// "sticker" shadow that reads as a deliberate, non-Material signature.
+enum PlayShadow {
+  none,
+  soft,
+  pop;
+
+  /// Resolves the box shadows for this treatment against [colors].
+  List<BoxShadow> resolve(PlayColors colors) => switch (this) {
+    PlayShadow.none => const <BoxShadow>[],
+    PlayShadow.soft => <BoxShadow>[
+      BoxShadow(
+        color: colors.shadowSoft,
+        blurRadius: 20,
+        offset: const Offset(0, 8),
+      ),
+    ],
+    PlayShadow.pop => <BoxShadow>[
+      BoxShadow(color: colors.ink, offset: const Offset(0, 3)),
+    ],
+  };
+}
+
+/// A resolved (background, foreground, optional border) triple for a [PlayTone].
+@immutable
+class PlayToneColors {
+  const PlayToneColors({
+    required this.background,
+    required this.foreground,
+    this.border,
+  });
+
+  final Color background;
+  final Color foreground;
+  final Color? border;
+}
+
+/// The Play palette: one instance per brightness.
+///
+/// This is *our own* colour system, not a Material scheme — there is no
+/// `fromSeed` derivation and no tonal palette. Both [light] and [dark] are
+/// authored by hand so every tone stays legible in both modes.
+@immutable
+class PlayColors {
+  const PlayColors({
+    required this.brightness,
+    required this.canvas,
+    required this.surface,
+    required this.surfaceSunken,
+    required this.line,
+    required this.ink,
+    required this.inkMuted,
+    required this.inkFaint,
+    required this.primary,
+    required this.onPrimary,
+    required this.primarySoft,
+    required this.onPrimarySoft,
+    required this.mint,
+    required this.onMint,
+    required this.pink,
+    required this.onPink,
+    required this.lemon,
+    required this.onLemon,
+    required this.sky,
+    required this.onSky,
+    required this.coral,
+    required this.onCoral,
+    required this.teal,
+    required this.onTeal,
+    required this.strong,
+    required this.onStrong,
+    required this.shadowSoft,
+  });
+
+  final Brightness brightness;
+
+  /// Page background behind everything (the "paper").
+  final Color canvas;
+
+  /// Default card / sheet fill.
+  final Color surface;
+
+  /// Recessed fill a shade darker than [canvas].
+  final Color surfaceSunken;
+
+  /// Hairline divider / outline colour.
+  final Color line;
+
+  /// Primary text.
+  final Color ink;
+
+  /// Secondary text.
+  final Color inkMuted;
+
+  /// Tertiary text, disabled glyphs.
+  final Color inkFaint;
+
+  final Color primary;
+  final Color onPrimary;
+  final Color primarySoft;
+  final Color onPrimarySoft;
+
+  final Color mint;
+  final Color onMint;
+  final Color pink;
+  final Color onPink;
+  final Color lemon;
+  final Color onLemon;
+  final Color sky;
+  final Color onSky;
+  final Color coral;
+  final Color onCoral;
+
+  /// Brand accent carried over from the existing app teal.
+  final Color teal;
+  final Color onTeal;
+
+  /// Inverted high-contrast block: dark in light mode, light in dark mode.
+  final Color strong;
+  final Color onStrong;
+
+  /// Colour of the diffuse [PlayShadow.soft] shadow.
+  final Color shadowSoft;
+
+  /// Resolves [tone] against this palette.
+  PlayToneColors tone(PlayTone tone) => switch (tone) {
+    PlayTone.neutral => PlayToneColors(
+      background: surface,
+      foreground: ink,
+      border: line,
+    ),
+    PlayTone.sunken => PlayToneColors(
+      background: surfaceSunken,
+      foreground: ink,
+      border: line,
+    ),
+    PlayTone.strong => PlayToneColors(background: strong, foreground: onStrong),
+    PlayTone.primary => PlayToneColors(
+      background: primary,
+      foreground: onPrimary,
+    ),
+    PlayTone.soft => PlayToneColors(
+      background: primarySoft,
+      foreground: onPrimarySoft,
+    ),
+    PlayTone.mint => PlayToneColors(background: mint, foreground: onMint),
+    PlayTone.pink => PlayToneColors(background: pink, foreground: onPink),
+    PlayTone.lemon => PlayToneColors(background: lemon, foreground: onLemon),
+    PlayTone.sky => PlayToneColors(background: sky, foreground: onSky),
+    PlayTone.coral => PlayToneColors(background: coral, foreground: onCoral),
+    PlayTone.teal => PlayToneColors(background: teal, foreground: onTeal),
+  };
+
+  /// The resolved palette for the current context.
+  ///
+  /// Reads [PlayTheme] when one is in scope (so a subtree can be pinned to a
+  /// brightness), otherwise follows the platform brightness — which is exactly
+  /// what the widget previewer's light/dark toggle drives.
+  static PlayColors of(BuildContext context) {
+    final PlayColors? themed = PlayTheme.maybeOf(context);
+    if (themed != null) {
+      return themed;
+    }
+    return MediaQuery.maybePlatformBrightnessOf(context) == Brightness.dark
+        ? dark
+        : light;
+  }
+
+  static const PlayColors light = PlayColors(
+    brightness: Brightness.light,
+    canvas: Color(0xFFF3F0E9),
+    surface: Color(0xFFFFFFFF),
+    surfaceSunken: Color(0xFFE9E4D9),
+    line: Color(0xFFE3DDD0),
+    ink: Color(0xFF171614),
+    inkMuted: Color(0xFF625E55),
+    inkFaint: Color(0xFFA19C91),
+    primary: Color(0xFF2440F0),
+    onPrimary: Color(0xFFFFFFFF),
+    primarySoft: Color(0xFFDBE1FF),
+    onPrimarySoft: Color(0xFF101BA6),
+    mint: Color(0xFFBEF5C7),
+    onMint: Color(0xFF0F3A1E),
+    pink: Color(0xFFFBD1E1),
+    onPink: Color(0xFF43142B),
+    lemon: Color(0xFFFBE98A),
+    onLemon: Color(0xFF3A3305),
+    sky: Color(0xFFCFE0FF),
+    onSky: Color(0xFF10266B),
+    coral: Color(0xFFF5325B),
+    onCoral: Color(0xFFFFFFFF),
+    teal: Color(0xFF0E7C66),
+    onTeal: Color(0xFFFFFFFF),
+    strong: Color(0xFF171614),
+    onStrong: Color(0xFFF5F2EA),
+    shadowSoft: Color(0x1A141414),
+  );
+
+  static const PlayColors dark = PlayColors(
+    brightness: Brightness.dark,
+    canvas: Color(0xFF101110),
+    surface: Color(0xFF1B1D1A),
+    surfaceSunken: Color(0xFF0A0B0A),
+    line: Color(0xFF2C2E29),
+    ink: Color(0xFFF2EFE7),
+    inkMuted: Color(0xFFA5A096),
+    inkFaint: Color(0xFF6E6A62),
+    primary: Color(0xFF8593FF),
+    onPrimary: Color(0xFF0A1040),
+    primarySoft: Color(0xFF1E2554),
+    onPrimarySoft: Color(0xFFC9D0FF),
+    mint: Color(0xFF17351F),
+    onMint: Color(0xFFBEF5C7),
+    pink: Color(0xFF3A1A29),
+    onPink: Color(0xFFFBD1E1),
+    lemon: Color(0xFF38310D),
+    onLemon: Color(0xFFFBE98A),
+    sky: Color(0xFF16264F),
+    onSky: Color(0xFFCFE0FF),
+    coral: Color(0xFFFF6E88),
+    onCoral: Color(0xFF34060F),
+    teal: Color(0xFF3FD9B8),
+    onTeal: Color(0xFF05251D),
+    strong: Color(0xFFEFEBE1),
+    onStrong: Color(0xFF171614),
+    shadowSoft: Color(0x66000000),
+  );
+}
+
+/// Pins a [PlayColors] palette to a subtree.
+///
+/// The app always resolves from the platform brightness, but the widget
+/// previewer (and a dark-mode preview embedded in a light page) benefits from
+/// being able to force one explicitly.
+class PlayTheme extends InheritedWidget {
+  const PlayTheme({super.key, required this.colors, required super.child});
+
+  final PlayColors colors;
+
+  /// The palette pinned above [context], if any.
+  static PlayColors? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<PlayTheme>()?.colors;
+
+  @override
+  bool updateShouldNotify(PlayTheme oldWidget) =>
+      !identical(oldWidget.colors, colors);
+}
