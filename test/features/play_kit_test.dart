@@ -127,6 +127,16 @@ void main() {
               const PlaySpinner(),
               PlaySwitch(value: true, onChanged: (bool _) {}),
               const PlaySwitch(value: false),
+              const PlayRadio(selected: true),
+              const PlayProgress(value: 0.4),
+              PlaySegmented<String>(
+                selected: 'a',
+                onChanged: (String _) {},
+                segments: const <PlaySegment<String>>[
+                  PlaySegment<String>(value: 'a', label: 'A'),
+                  PlaySegment<String>(value: 'b', label: 'B'),
+                ],
+              ),
               PlayRow(icon: PlayIcons.nearby, label: 'Nearby', onTap: () {}),
               const PlayRow(
                 icon: PlayIcons.contributePlace,

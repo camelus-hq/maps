@@ -17,6 +17,7 @@ class PlayRow extends StatelessWidget {
     super.key,
     required this.label,
     this.icon,
+    this.leading,
     this.subtitle,
     this.trailing,
     this.onTap,
@@ -26,6 +27,9 @@ class PlayRow extends StatelessWidget {
 
   final String label;
   final IconData? icon;
+
+  /// A custom leading widget (e.g. a [PlayRadio]); takes precedence over [icon].
+  final Widget? leading;
   final String? subtitle;
   final Widget? trailing;
   final VoidCallback? onTap;
@@ -40,6 +44,7 @@ class PlayRow extends StatelessWidget {
     final PlayColors colors = PlayColors.of(context);
     final String? sub = subtitle;
     final Widget? trailingWidget = trailing;
+    final Widget? leadingWidget = leading;
     final bool tappable = enabled && onTap != null;
     final Widget? end =
         trailingWidget ??
@@ -59,7 +64,10 @@ class PlayRow extends StatelessWidget {
           ),
           child: Row(
             children: <Widget>[
-              if (icon != null) ...<Widget>[
+              if (leadingWidget != null) ...<Widget>[
+                leadingWidget,
+                const SizedBox(width: PlaySpace.lg),
+              ] else if (icon != null) ...<Widget>[
                 Icon(
                   icon,
                   size: 22,

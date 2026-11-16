@@ -1,12 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:ndk_flutter/ndk_flutter.dart';
 
 import '../../../core/config/app_config.dart';
-import '../../../core/theme/app_spacing.dart';
 import '../../../domain/entities/app_settings.dart';
 import '../../../domain/entities/app_update.dart';
 import '../../../domain/entities/friend.dart';
@@ -16,9 +15,10 @@ import '../../../state/ports.dart';
 import '../../../state/settings.dart';
 import '../../../state/social.dart';
 import '../../../state/update.dart';
-import '../../social/widgets/friend_avatar.dart';
+import '../../design/play.dart';
 
-/// Functional settings: distance units, theme, search provider, about.
+/// Functional settings: account, distance units, theme, search provider,
+/// developer options, app update and about — all in the play style.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -28,139 +28,128 @@ class SettingsScreen extends ConsumerWidget {
     final AppConfig config = ref.watch(appConfigProvider);
     final bool hasMapboxToken = config.hasMapboxToken;
     final bool hasCamelusToken = config.hasCamelusToken;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
+    const EdgeInsets pad = EdgeInsets.symmetric(horizontal: PlaySpace.lg);
+    return PlayScaffold(
+      appBar: const PlayAppBar(title: 'Settings'),
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: PlaySpace.xxl),
         children: <Widget>[
-          const _SectionHeader('Account'),
+          const _Section('Account'),
           const _AccountTile(),
-          const Divider(height: AppSpacing.xl),
-          const _SectionHeader('Distance units'),
+          const _Section('Distance units'),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            child: SegmentedButton<DistanceUnit>(
-              segments: const <ButtonSegment<DistanceUnit>>[
-                ButtonSegment<DistanceUnit>(
+            padding: pad,
+            child: PlaySegmented<DistanceUnit>(
+              selected: settings.unit,
+              onChanged: (DistanceUnit unit) =>
+                  unawaited(ref.read(settingsProvider.notifier).setUnit(unit)),
+              segments: const <PlaySegment<DistanceUnit>>[
+                PlaySegment<DistanceUnit>(
                   value: DistanceUnit.metric,
-                  label: Text('Metric'),
+                  label: 'Metric',
                 ),
-                ButtonSegment<DistanceUnit>(
+                PlaySegment<DistanceUnit>(
                   value: DistanceUnit.imperial,
-                  label: Text('Imperial'),
+                  label: 'Imperial',
                 ),
               ],
-              selected: <DistanceUnit>{settings.unit},
-              onSelectionChanged: (Set<DistanceUnit> selection) => unawaited(
-                ref.read(settingsProvider.notifier).setUnit(selection.first),
-              ),
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          const _SectionHeader('Theme'),
+          const _Section('Theme'),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            child: SegmentedButton<AppThemeMode>(
-              segments: const <ButtonSegment<AppThemeMode>>[
-                ButtonSegment<AppThemeMode>(
+            padding: pad,
+            child: PlaySegmented<AppThemeMode>(
+              selected: settings.theme,
+              onChanged: (AppThemeMode mode) =>
+                  unawaited(ref.read(settingsProvider.notifier).setTheme(mode)),
+              segments: const <PlaySegment<AppThemeMode>>[
+                PlaySegment<AppThemeMode>(
                   value: AppThemeMode.system,
-                  label: Text('System'),
+                  label: 'System',
                 ),
-                ButtonSegment<AppThemeMode>(
+                PlaySegment<AppThemeMode>(
                   value: AppThemeMode.light,
-                  label: Text('Light'),
+                  label: 'Light',
                 ),
-                ButtonSegment<AppThemeMode>(
+                PlaySegment<AppThemeMode>(
                   value: AppThemeMode.dark,
-                  label: Text('Dark'),
+                  label: 'Dark',
                 ),
               ],
-              selected: <AppThemeMode>{settings.theme},
-              onSelectionChanged: (Set<AppThemeMode> selection) => unawaited(
-                ref.read(settingsProvider.notifier).setTheme(selection.first),
-              ),
             ),
           ),
-          const Divider(height: AppSpacing.xl),
-          const _SectionHeader('Search provider'),
-          RadioGroup<SearchBackend>(
-            groupValue: settings.searchBackend,
-            onChanged: (SearchBackend? value) {
-              if (value != null) {
-                unawaited(
-                  ref.read(settingsProvider.notifier).setSearchBackend(value),
-                );
-              }
-            },
+          const _Section('Search provider'),
+          Padding(
+            padding: pad,
             child: Column(
               children: <Widget>[
-                RadioListTile<SearchBackend>(
+                _BackendRow(
                   value: SearchBackend.mapbox,
-                  title: const Text('Mapbox'),
-                  subtitle: Text(
-                    hasMapboxToken
-                        ? 'Mapbox Geocoding and Search Box'
-                        : 'Needs an access token — OpenStreetMap is used '
-                              'instead',
-                  ),
+                  label: 'Mapbox',
+                  subtitle: hasMapboxToken
+                      ? 'Mapbox Geocoding and Search Box'
+                      : 'Needs an access token — OpenStreetMap is used instead',
                 ),
-                const RadioListTile<SearchBackend>(
+                _BackendRow(
                   value: SearchBackend.openstreetmap,
-                  title: Text('OpenStreetMap'),
-                  subtitle: Text(
-                    'Photon search and Overpass places (no account)',
-                  ),
+                  label: 'OpenStreetMap',
+                  subtitle: 'Photon search and Overpass places (no account)',
                 ),
-                RadioListTile<SearchBackend>(
+                _BackendRow(
                   value: SearchBackend.camelus,
-                  title: const Text('Camelus'),
-                  subtitle: Text(
-                    hasCamelusToken
-                        ? 'Photon, Overpass, Valhalla and transit '
-                              'via camelus.app'
-                        : 'Needs an API key — OpenStreetMap is used instead',
-                  ),
+                  label: 'Camelus',
+                  subtitle: hasCamelusToken
+                      ? 'Photon, Overpass, Valhalla and transit via camelus.app'
+                      : 'Needs an API key — OpenStreetMap is used instead',
                 ),
               ],
             ),
           ),
-          const Divider(height: AppSpacing.xl),
-          const _SectionHeader('Developer'),
-          SwitchListTile(
-            secondary: const Icon(Icons.data_object),
-            title: const Text('Show all OpenStreetMap tags'),
-            subtitle: const Text(
-              'List every raw OSM tag on the place details sheet',
+          const _Section('Developer'),
+          PlayRow(
+            icon: PlayIcons.code,
+            label: 'Show all OpenStreetMap tags',
+            subtitle: 'List every raw OSM tag on the place details sheet',
+            showChevron: false,
+            onTap: () => unawaited(
+              ref
+                  .read(settingsProvider.notifier)
+                  .setShowOsmTags(!settings.showOsmTags),
             ),
-            value: settings.showOsmTags,
-            onChanged: (bool value) => unawaited(
-              ref.read(settingsProvider.notifier).setShowOsmTags(value),
+            trailing: PlaySwitch(
+              value: settings.showOsmTags,
+              semanticLabel: 'Show all OpenStreetMap tags',
+              onChanged: (bool value) => unawaited(
+                ref.read(settingsProvider.notifier).setShowOsmTags(value),
+              ),
             ),
           ),
-          const Divider(height: AppSpacing.xl),
-          const _SectionHeader('App update'),
+          const _Section('App update'),
           const _AppUpdateTile(),
-          const Divider(height: AppSpacing.xl),
-          ListTile(
-            leading: const Icon(Icons.history),
-            title: const Text('Clear recent searches'),
+          const _Section('Data'),
+          PlayRow(
+            icon: PlayIcons.recent,
+            label: 'Clear recent searches',
+            showChevron: false,
             onTap: () async {
               await ref.read(placesRepositoryProvider).clearRecentSearches();
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Recent searches cleared')),
-                );
+                showPlayToast(context, 'Recent searches cleared');
               }
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('About OpenMaps'),
+          PlayRow(
+            icon: PlayIcons.info,
+            label: 'About OpenMaps',
+            showChevron: false,
             onTap: () => _showAbout(context, ref),
           ),
-          const ListTile(
-            leading: Icon(Icons.cloud_off_outlined),
-            title: Text('Offline'),
-            subtitle: Text('Searches and directions need a connection'),
+          const PlayRow(
+            icon: PlayIcons.cloudOff,
+            label: 'Offline',
+            subtitle: 'Searches and directions need a connection',
+            showChevron: false,
+            enabled: false,
           ),
         ],
       ),
@@ -170,28 +159,49 @@ class SettingsScreen extends ConsumerWidget {
   void _showAbout(BuildContext context, WidgetRef ref) {
     final AppVersion version =
         ref.read(installedVersionProvider).value ?? AppVersion.unknown;
-    showAboutDialog(
-      context: context,
-      applicationName: 'OpenMaps',
-      applicationVersion: version.isKnown ? version.versionName : '0.1.0',
-      applicationLegalese:
-          'Map data © Mapbox and OpenStreetMap contributors (ODbL). Search by '
-          'Mapbox or OpenStreetMap (Photon + Overpass). Routing by Valhalla and '
-          'public transport by Transitous (transitous.org/sources) or the '
-          'Camelus map services.',
-      children: const <Widget>[
-        SizedBox(height: AppSpacing.sm),
-        Text(
-          'Camelus Maps, open map data with social features, built for exploring.',
+    unawaited(
+      showPlaySheet<void>(
+        context,
+        builder: (BuildContext context) => _AboutSheet(
+          version: version.isKnown ? version.versionName : '0.1.0',
         ),
-      ],
+      ),
+    );
+  }
+}
+
+/// A single search-provider choice row.
+class _BackendRow extends ConsumerWidget {
+  const _BackendRow({
+    required this.value,
+    required this.label,
+    required this.subtitle,
+  });
+
+  final SearchBackend value;
+  final String label;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final SearchBackend selected = ref.watch(
+      settingsProvider.select((AppSettings s) => s.searchBackend),
+    );
+    return PlayRow(
+      leading: PlayRadio(selected: value == selected),
+      label: label,
+      subtitle: subtitle,
+      showChevron: false,
+      onTap: () => unawaited(
+        ref.read(settingsProvider.notifier).setSearchBackend(value),
+      ),
     );
   }
 }
 
 /// The Nostr account: who is signed in (profile picture + name) and a way out.
 ///
-/// Signing in happens on `/profile`; this tile shows the current identity and
+/// Signing in happens on `/profile`; this row shows the current identity and
 /// dispatches the same `social.logout` command as the profile screen, so the
 /// behaviour is identical and drivable by agents.
 class _AccountTile extends ConsumerWidget {
@@ -201,11 +211,10 @@ class _AccountTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final String? pubkey = ref.watch(nostrPubkeyProvider).value;
     if (pubkey == null) {
-      return ListTile(
-        leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-        title: const Text('Not signed in'),
-        subtitle: const Text('Sign in to share your live location'),
-        trailing: const Icon(Icons.chevron_right),
+      return PlayRow(
+        icon: PlayIcons.user,
+        label: 'Not signed in',
+        subtitle: 'Sign in to share your live location',
         onTap: () => context.push('/profile'),
       );
     }
@@ -216,23 +225,32 @@ class _AccountTile extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        ListTile(
-          leading: FriendAvatar(
+        PlayRow(
+          leading: PlayAvatar(
             label: name,
-            pictureUrl: profile?.pictureUrl,
+            imageUrl: profile?.pictureUrl,
             size: 40,
+            tone: PlayTone.soft,
           ),
-          title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-          subtitle: Text(npub, maxLines: 1, overflow: TextOverflow.ellipsis),
+          label: name,
+          subtitle: npub,
+          showChevron: false,
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          padding: const EdgeInsets.fromLTRB(
+            PlaySpace.lg,
+            PlaySpace.sm,
+            PlaySpace.lg,
+            PlaySpace.xs,
+          ),
           child: Align(
             alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
+            child: PlayButton(
+              label: 'Sign out',
+              icon: PlayIcons.signOut,
+              variant: PlayButtonVariant.ghost,
+              size: PlayButtonSize.sm,
               onPressed: () => unawaited(_signOut(context, ref)),
-              icon: const Icon(Icons.logout),
-              label: const Text('Sign out'),
             ),
           ),
         ),
@@ -245,8 +263,7 @@ class _AccountTile extends ConsumerWidget {
         .read(commandRegistryProvider)
         .dispatch('social.logout', const <String, Object?>{});
     if (context.mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Signed out')));
+      showPlayToast(context, 'Signed out');
     }
   }
 
@@ -275,10 +292,11 @@ class _AppUpdateTile extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        ListTile(
-          leading: const Icon(Icons.smartphone_outlined),
-          title: const Text('Installed version'),
-          subtitle: Text(label),
+        PlayRow(
+          icon: PlayIcons.device,
+          label: 'Installed version',
+          subtitle: label,
+          showChevron: false,
         ),
         ..._status(context, ref, update),
       ],
@@ -293,13 +311,17 @@ class _AppUpdateTile extends ConsumerWidget {
     final AppRelease? release = update.release;
     if (update.installing) {
       return <Widget>[
-        ListTile(
-          leading: const Icon(Icons.downloading_outlined),
-          title: const Text('Installing the update…'),
-          subtitle: LinearProgressIndicator(
-            value: update.progress > 0 && update.progress < 1
-                ? update.progress
-                : null,
+        PlayRow(
+          icon: PlayIcons.download,
+          label: 'Installing the update…',
+          showChevron: false,
+          trailing: SizedBox(
+            width: 96,
+            child: PlayProgress(
+              value: update.progress > 0 && update.progress < 1
+                  ? update.progress
+                  : null,
+            ),
           ),
         ),
       ];
@@ -315,64 +337,62 @@ class _AppUpdateTile extends ConsumerWidget {
               ? changes.first
               : '${changes.first}  (+${changes.length - 1} more)');
       return <Widget>[
-        ListTile(
-          leading: const Icon(Icons.system_update_alt),
-          title: Text('Update available — ${release.versionName}'),
-          subtitle: Text(
-            summary,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: error == null
-                ? null
-                : TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-          trailing: FilledButton(
+        PlayRow(
+          icon: PlayIcons.download,
+          label: 'Update available — ${release.versionName}',
+          subtitle: summary,
+          showChevron: false,
+          trailing: PlayButton(
+            label: 'Update',
+            size: PlayButtonSize.sm,
             onPressed: () => unawaited(
               ref.read(updateControllerProvider.notifier).install(),
             ),
-            child: const Text('Update'),
           ),
         ),
       ];
     }
     if (update.status == UpdateStatus.error) {
       return <Widget>[
-        ListTile(
-          leading: const Icon(Icons.error_outline),
-          title: const Text('Could not check for updates'),
-          subtitle: Text(update.error ?? 'Try again later.'),
-          trailing: TextButton(
+        PlayRow(
+          icon: PlayIcons.error,
+          label: 'Could not check for updates',
+          subtitle: update.error ?? 'Try again later.',
+          showChevron: false,
+          trailing: PlayButton(
+            label: 'Retry',
+            variant: PlayButtonVariant.ghost,
+            size: PlayButtonSize.sm,
             onPressed: () =>
                 unawaited(ref.read(updateControllerProvider.notifier).check()),
-            child: const Text('Retry'),
           ),
         ),
       ];
     }
     if (update.status == UpdateStatus.checking) {
       return const <Widget>[
-        ListTile(
-          leading: SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          title: Text('Checking for updates…'),
+        PlayRow(
+          icon: PlayIcons.loading,
+          label: 'Checking for updates…',
+          showChevron: false,
+          trailing: PlaySpinner(size: 22, strokeWidth: 2),
         ),
       ];
     }
     if (update.status == UpdateStatus.upToDate) {
       return const <Widget>[
-        ListTile(
-          leading: Icon(Icons.check_circle_outline),
-          title: Text('You are up to date'),
+        PlayRow(
+          icon: PlayIcons.check,
+          label: 'You are up to date',
+          showChevron: false,
         ),
       ];
     }
     return <Widget>[
-      ListTile(
-        leading: const Icon(Icons.refresh),
-        title: const Text('Check for updates'),
+      PlayRow(
+        icon: PlayIcons.refresh,
+        label: 'Check for updates',
+        showChevron: false,
         onTap: () =>
             unawaited(ref.read(updateControllerProvider.notifier).check()),
       ),
@@ -380,8 +400,9 @@ class _AppUpdateTile extends ConsumerWidget {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.text);
+/// A section heading.
+class _Section extends StatelessWidget {
+  const _Section(this.text);
 
   final String text;
 
@@ -389,15 +410,65 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.md,
-        AppSpacing.md,
-        AppSpacing.sm,
+        PlaySpace.lg,
+        PlaySpace.xl,
+        PlaySpace.lg,
+        PlaySpace.sm,
       ),
       child: Text(
-        text,
-        style: Theme.of(context).textTheme.titleSmall
-            ?.copyWith(color: Theme.of(context).colorScheme.primary),
+        text.toUpperCase(),
+        style: PlayType.overline.copyWith(
+          color: PlayColors.of(context).inkMuted,
+        ),
+      ),
+    );
+  }
+}
+
+/// The About sheet, shown from settings.
+class _AboutSheet extends StatelessWidget {
+  const _AboutSheet({required this.version});
+
+  final String version;
+
+  @override
+  Widget build(BuildContext context) {
+    final PlayColors colors = PlayColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        PlaySpace.lg,
+        0,
+        PlaySpace.lg,
+        PlaySpace.lg,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(
+            'OpenMaps',
+            style: PlayType.headline.copyWith(color: colors.ink),
+          ),
+          const SizedBox(height: PlaySpace.xs),
+          Text(
+            'Version $version',
+            style: PlayType.caption.copyWith(color: colors.inkMuted),
+          ),
+          const SizedBox(height: PlaySpace.lg),
+          Text(
+            'Map data © Mapbox and OpenStreetMap contributors (ODbL). Search by '
+            'Mapbox or OpenStreetMap (Photon + Overpass). Routing by Valhalla and '
+            'public transport by Transitous (transitous.org/sources) or the '
+            'Camelus map services.',
+            style: PlayType.body.copyWith(color: colors.ink),
+          ),
+          const SizedBox(height: PlaySpace.md),
+          Text(
+            'Camelus Maps, open map data with social features, built for '
+            'exploring.',
+            style: PlayType.body.copyWith(color: colors.inkMuted),
+          ),
+        ],
       ),
     );
   }
