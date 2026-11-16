@@ -97,13 +97,13 @@ void main() {
           .at(3),
     );
     await tester.enterText(
-      find.byType(TextField),
+      find.byType(EditableText),
       'An unforgettable evening. The acoustics are incredible.',
     );
     await tester.pump();
 
-    final FilledButton button = tester.widget<FilledButton>(
-      find.byType(FilledButton),
+    final PlayButton button = tester.widget<PlayButton>(
+      find.widgetWithText(PlayButton, 'Publish review'),
     );
     expect(button.onPressed, isNotNull);
 
@@ -131,8 +131,8 @@ void main() {
       find.text('Friends-only reviews are not available yet.'),
       findsOneWidget,
     );
-    final FilledButton button = tester.widget<FilledButton>(
-      find.byType(FilledButton),
+    final PlayButton button = tester.widget<PlayButton>(
+      find.widgetWithText(PlayButton, 'Publish review'),
     );
     expect(button.onPressed, isNull);
   });
@@ -141,8 +141,8 @@ void main() {
     WidgetTester tester,
   ) async {
     await pumpComposer(tester);
-    final FilledButton button = tester.widget<FilledButton>(
-      find.byType(FilledButton),
+    final PlayButton button = tester.widget<PlayButton>(
+      find.widgetWithText(PlayButton, 'Publish review'),
     );
     expect(button.onPressed, isNull);
   });

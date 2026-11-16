@@ -1,9 +1,10 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_spacing.dart';
 import '../../../domain/entities/place.dart';
@@ -11,6 +12,7 @@ import '../../../domain/entities/review.dart';
 import '../../../domain/entities/review_draft.dart';
 import '../../../state/reviews.dart';
 import '../../common/map_sheet.dart';
+import '../../design/play.dart';
 import '../widgets/star_rating.dart';
 
 /// The "Write a review" sheet (reference: the review composer).
@@ -28,6 +30,7 @@ class WriteReviewSheet extends ConsumerStatefulWidget {
 
 class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _focus = FocusNode();
   final ImagePicker _picker = ImagePicker();
   bool _pickingPhotos = false;
 
@@ -35,12 +38,22 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
   void initState() {
     super.initState();
     _controller.text = ref.read(reviewComposerProvider).draft?.text ?? '';
+    _controller.addListener(_onTextChanged);
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_onTextChanged);
     _controller.dispose();
+    _focus.dispose();
     super.dispose();
+  }
+
+  /// Rebuilds so the hint and the character counter follow the text.
+  void _onTextChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -54,8 +67,7 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
     ) {
       if (next.isPublished) {
         ref.read(reviewComposerProvider.notifier).close();
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Review published')));
+        showPlayToast(context, 'Review published');
       }
     });
 
@@ -63,7 +75,6 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
     if (place == null) {
       return const SizedBox.shrink();
     }
-    final ColorScheme scheme = Theme.of(context).colorScheme;
     // The map-home Scaffold deliberately does not resize for the keyboard (the
     // map must not move), so the composer lifts itself above it instead: the
     // reduced height keeps the focused field and the Publish button reachable.
@@ -76,33 +87,17 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
         snap: true,
         snapSizes: const <double>[0.9, 0.95],
         builder: (BuildContext context, ScrollController scrollController) {
-          return Material(
-            color: scheme.surface,
-            elevation: 12,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(AppSpacing.sheetRadius),
-            ),
-            clipBehavior: Clip.antiAlias,
+          return PlaySheet(
             child: ListView(
               controller: scrollController,
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.md,
-                AppSpacing.sm,
+                0,
                 AppSpacing.md,
                 AppSpacing.lg,
               ),
               children: <Widget>[
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: scheme.outlineVariant,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
+                const PlaySheetHandle(),
                 _header(context, place),
                 const SizedBox(height: AppSpacing.lg),
                 _rating(context, composer),
@@ -118,7 +113,9 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
                 Center(
                   child: Text(
                     'You can edit your review anytime.',
-                    style: Theme.of(context).textTheme.bodySmall,
+                    style: PlayType.caption.copyWith(
+                      color: PlayColors.of(context).inkMuted,
+                    ),
                   ),
                 ),
               ],
@@ -130,7 +127,7 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
   }
 
   Widget _header(BuildContext context, Place place) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -140,7 +137,7 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
             children: <Widget>[
               Text(
                 place.name,
-                style: theme.textTheme.headlineSmall,
+                style: PlayType.headline.copyWith(color: colors.ink),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -152,7 +149,7 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
                       if (place.category != null) place.category!,
                       if (place.address != null) place.address!,
                     ].join(' · '),
-                    style: theme.textTheme.bodySmall,
+                    style: PlayType.caption.copyWith(color: colors.inkMuted),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -160,9 +157,10 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
             ],
           ),
         ),
-        IconButton(
-          icon: const Icon(Icons.close),
-          tooltip: 'Close',
+        PlayIconButton(
+          icon: PlayIcons.close,
+          semanticLabel: 'Close',
+          size: 40,
           onPressed: () => ref.read(reviewComposerProvider.notifier).close(),
         ),
       ],
@@ -170,12 +168,15 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
   }
 
   Widget _rating(BuildContext context, ReviewComposerState composer) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     final int stars = composer.stars;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('How was your visit?', style: theme.textTheme.titleMedium),
+        Text(
+          'How was your visit?',
+          style: PlayType.title.copyWith(color: colors.ink),
+        ),
         const SizedBox(height: AppSpacing.sm),
         Row(
           children: <Widget>[
@@ -196,12 +197,12 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
                 children: <Widget>[
                   Text(
                     _ratingLabel(stars),
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: PlayType.bodyStrong.copyWith(color: colors.primary),
                   ),
-                  Text('$stars out of 5', style: theme.textTheme.bodySmall),
+                  Text(
+                    '$stars out of 5',
+                    style: PlayType.caption.copyWith(color: colors.inkMuted),
+                  ),
                 ],
               ),
           ],
@@ -211,36 +212,63 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
   }
 
   Widget _reviewField(BuildContext context, ReviewComposerState composer) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
+    final bool hasText = _controller.text.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        Text('Your review', style: theme.textTheme.titleMedium),
+        Text('Your review', style: PlayType.title.copyWith(color: colors.ink)),
         const SizedBox(height: AppSpacing.sm),
-        TextField(
-          controller: _controller,
-          minLines: 4,
-          maxLines: 8,
-          maxLength: ReviewDraft.maxTextLength,
-          textInputAction: TextInputAction.newline,
-          decoration: InputDecoration(
-            hintText: 'Share details of your own experience at this place',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        PlaySurface(
+          radius: PlayRadii.md,
+          borderWidth: 1,
+          shadow: PlayShadow.none,
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Stack(
+                children: <Widget>[
+                  if (!hasText)
+                    Text(
+                      'Share details of your own experience at this place',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: PlayType.body.copyWith(color: colors.inkFaint),
+                    ),
+                  EditableText(
+                    controller: _controller,
+                    focusNode: _focus,
+                    style: PlayType.body.copyWith(color: colors.ink),
+                    cursorColor: colors.primary,
+                    backgroundCursorColor: colors.inkFaint,
+                    selectionColor: colors.primary.withValues(alpha: 0.25),
+                    minLines: 4,
+                    maxLines: 8,
+                    keyboardType: TextInputType.multiline,
+                    textInputAction: TextInputAction.newline,
+                    inputFormatters: <TextInputFormatter>[
+                      LengthLimitingTextInputFormatter(
+                        ReviewDraft.maxTextLength,
+                      ),
+                    ],
+                    onChanged: (String value) => ref
+                        .read(reviewComposerProvider.notifier)
+                        .setText(value),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '${_controller.text.length} / '
+                  '${_group(ReviewDraft.maxTextLength)}',
+                  style: PlayType.caption.copyWith(color: colors.inkMuted),
+                ),
+              ),
+            ],
           ),
-          onChanged: (String value) =>
-              ref.read(reviewComposerProvider.notifier).setText(value),
-          buildCounter:
-              (
-                BuildContext context, {
-                required int currentLength,
-                required int? maxLength,
-                required bool isFocused,
-              }) {
-                return Text(
-                  '$currentLength / ${_group(maxLength ?? 0)}',
-                  style: theme.textTheme.bodySmall,
-                );
-              },
         ),
       ],
     );
@@ -254,20 +282,14 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        OutlinedButton.icon(
-          onPressed: composer.isPublishing ? null : _pickPhotos,
+        PlayButton(
+          label: 'Add photos',
           icon: _pickingPhotos
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.add_a_photo_outlined),
-          label: const Text('Add photos'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
-            alignment: Alignment.centerLeft,
-          ),
+              ? PlayIcons.loading
+              : PhosphorIconsRegular.camera,
+          variant: PlayButtonVariant.ghost,
+          expand: true,
+          onPressed: composer.isPublishing ? null : _pickPhotos,
         ),
         if (draft.photoCount > 0) ...<Widget>[
           const SizedBox(height: AppSpacing.sm),
@@ -303,6 +325,7 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
     String? url,
     required VoidCallback onRemove,
   }) {
+    final PlayColors colors = PlayColors.of(context);
     final ImageProvider<Object>? image = bytes != null
         ? MemoryImage(bytes)
         : (url != null ? NetworkImage(url) : null);
@@ -320,9 +343,12 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
                   : Image(
                       image: image,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const ColoredBox(
-                        color: Color(0xFFE0E0E0),
-                        child: Icon(Icons.broken_image_outlined),
+                      errorBuilder: (_, _, _) => ColoredBox(
+                        color: const Color(0xFFE0E0E0),
+                        child: Icon(
+                          PlayIcons.brokenImage,
+                          color: colors.inkFaint,
+                        ),
                       ),
                     ),
             ),
@@ -330,10 +356,12 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
           Positioned(
             top: -4,
             right: -4,
-            child: IconButton(
+            child: PlayIconButton(
+              icon: PlayIcons.close,
+              variant: PlayIconButtonVariant.plain,
+              size: 32,
               iconSize: 16,
-              icon: const Icon(Icons.cancel),
-              tooltip: 'Remove photo',
+              semanticLabel: 'Remove photo',
               onPressed: onRemove,
             ),
           ),
@@ -346,48 +374,47 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
     final ReviewVisibility visibility =
         composer.draft?.visibility ?? ReviewVisibility.public;
     final bool friends = visibility == ReviewVisibility.friends;
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(friends ? Icons.people_outline : Icons.public),
-      title: Text(friends ? 'Share with friends' : 'Public review'),
-      subtitle: Text(
-        friends
-            ? 'Only your friends can see this review.'
-            : 'Anyone can see this review.',
-      ),
-      trailing: const Icon(Icons.chevron_right),
+    return PlayRow(
+      icon: friends ? PlayIcons.friends : PlayIcons.globe,
+      label: friends ? 'Share with friends' : 'Public review',
+      subtitle: friends
+          ? 'Only your friends can see this review.'
+          : 'Anyone can see this review.',
       onTap: composer.isPublishing ? null : () => _chooseVisibility(visibility),
     );
   }
 
   Future<void> _chooseVisibility(ReviewVisibility current) async {
-    final ReviewVisibility? choice =
-        await showModalBottomSheet<ReviewVisibility>(
-          context: context,
-          showDragHandle: true,
-          builder: (BuildContext context) => SafeArea(
-            child: RadioGroup<ReviewVisibility>(
-              groupValue: current,
-              onChanged: (ReviewVisibility? value) =>
-                  Navigator.of(context).pop(value),
-              child: const Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  RadioListTile<ReviewVisibility>(
-                    value: ReviewVisibility.public,
-                    title: Text('Public review'),
-                    subtitle: Text('Anyone can see this review.'),
-                  ),
-                  RadioListTile<ReviewVisibility>(
-                    value: ReviewVisibility.friends,
-                    title: Text('Share with friends'),
-                    subtitle: Text('Only your friends can see this review.'),
-                  ),
-                ],
-              ),
+    final ReviewVisibility? choice = await showPlaySheet<ReviewVisibility>(
+      context,
+      builder: (BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          0,
+          AppSpacing.lg,
+          AppSpacing.lg,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            PlayRow(
+              leading: PlayRadio(selected: current == ReviewVisibility.public),
+              label: 'Public review',
+              subtitle: 'Anyone can see this review.',
+              showChevron: false,
+              onTap: () => Navigator.of(context).pop(ReviewVisibility.public),
             ),
-          ),
-        );
+            PlayRow(
+              leading: PlayRadio(selected: current == ReviewVisibility.friends),
+              label: 'Share with friends',
+              subtitle: 'Only your friends can see this review.',
+              showChevron: false,
+              onTap: () => Navigator.of(context).pop(ReviewVisibility.friends),
+            ),
+          ],
+        ),
+      ),
+    );
     if (choice == null || !mounted) {
       return;
     }
@@ -395,6 +422,7 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
   }
 
   Widget _publishButton(BuildContext context, ReviewComposerState composer) {
+    final PlayColors colors = PlayColors.of(context);
     final ReviewDraft? draft = composer.draft;
     final bool canPublish = draft?.canPublish ?? false;
     final bool friendsOnly = draft?.visibility == ReviewVisibility.friends;
@@ -408,10 +436,7 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
             child: Text(
               'Friends-only reviews are not available yet.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-                fontSize: 12,
-              ),
+              style: TextStyle(color: colors.coral, fontSize: 12),
             ),
           ),
         if (error != null)
@@ -420,24 +445,19 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
             child: Text(
               error,
               textAlign: TextAlign.center,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+              style: TextStyle(color: colors.coral),
             ),
           ),
-        FilledButton.icon(
+        PlayButton(
+          label: 'Publish review',
+          icon: PlayIcons.check,
+          size: PlayButtonSize.lg,
+          expand: true,
           onPressed: (canPublish && !composer.isPublishing)
               ? () => unawaited(
                   ref.read(reviewComposerProvider.notifier).publish(),
                 )
               : null,
-          icon: composer.isPublishing
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.check),
-          label: const Text('Publish review'),
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
         ),
       ],
     );
@@ -473,15 +493,11 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
       }
       ref.read(reviewComposerProvider.notifier).addPhotos(photos);
       if (photos.isEmpty && files.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not read that photo')),
-        );
+        showPlayToast(context, 'Could not read that photo');
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open the photo picker')),
-        );
+        showPlayToast(context, 'Could not open the photo picker');
       }
     } finally {
       if (mounted) {

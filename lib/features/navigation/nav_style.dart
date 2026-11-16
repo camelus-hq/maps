@@ -1,4 +1,5 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../domain/entities/travel_mode.dart';
 
@@ -76,7 +77,7 @@ class NavStyle {
         return const NavStyle(
           banner: Color(0xFF0B4740),
           bannerNow: Color(0xFF0E6B5E),
-          bannerAccent: Colors.white,
+          bannerAccent: Color(0xFFFFFFFF),
           laneStrip: Color(0xFF083A34),
           soonMeters: 350,
           nowMeters: 80,
@@ -90,7 +91,7 @@ class NavStyle {
         return const NavStyle(
           banner: Color(0xFF116B5B),
           bannerNow: Color(0xFF0E8A6E),
-          bannerAccent: Colors.white,
+          bannerAccent: Color(0xFFFFFFFF),
           laneStrip: Color(0xFF0C5245),
           soonMeters: 200,
           nowMeters: 50,
@@ -102,7 +103,7 @@ class NavStyle {
         return const NavStyle(
           banner: Color(0xFF0F5F73),
           bannerNow: Color(0xFF13808C),
-          bannerAccent: Colors.white,
+          bannerAccent: Color(0xFFFFFFFF),
           laneStrip: Color(0xFF0B4A59),
           soonMeters: 60,
           nowMeters: 18,
@@ -114,7 +115,7 @@ class NavStyle {
         return const NavStyle(
           banner: Color(0xFF26306E),
           bannerNow: Color(0xFF33409A),
-          bannerAccent: Colors.white,
+          bannerAccent: Color(0xFFFFFFFF),
           laneStrip: Color(0xFF1C2452),
           soonMeters: 120,
           nowMeters: 40,
@@ -134,10 +135,10 @@ String travelModeLabel(TravelMode mode) => switch (mode) {
   TravelMode.transit => 'Transit',
 };
 
-/// The mode glyph (our own Material symbols; no proprietary iconography).
+/// The mode glyph (our own icon vocabulary; no proprietary iconography).
 IconData travelModeIcon(TravelMode mode) => switch (mode) {
-  TravelMode.drive => Icons.directions_car,
-  TravelMode.walk => Icons.directions_walk,
-  TravelMode.cycle => Icons.directions_bike,
-  TravelMode.transit => Icons.directions_transit,
+  TravelMode.drive => PhosphorIconsRegular.car,
+  TravelMode.walk => PhosphorIconsRegular.personSimpleWalk,
+  TravelMode.cycle => PhosphorIconsRegular.bicycle,
+  TravelMode.transit => PhosphorIconsRegular.bus,
 };

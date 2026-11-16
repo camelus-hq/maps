@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/data/fakes/fake_social_service.dart';
 import 'package:openmaps/domain/entities/friend.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/social/screens/add_friend_screen.dart';
 import 'package:openmaps/features/social/widgets/qr_code_view.dart';
 import 'package:openmaps/state/ports.dart';
@@ -32,9 +33,9 @@ void main() {
           home: AddFriendScreen(
             cameraBuilder: (BuildContext context, void Function(String) scan) {
               return Center(
-                child: ElevatedButton(
+                child: PlayButton(
+                  label: 'stub-scan',
                   onPressed: () => scan(other),
-                  child: const Text('stub-scan'),
                 ),
               );
             },
@@ -106,7 +107,7 @@ void main() {
     await tester.tap(find.text('Scan'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField), ' nostr:$other ');
+    await tester.enterText(find.byType(PlayTextField), ' nostr:$other ');
     await tester.pumpAndSettle();
     await tester.tap(find.text('Add this friend'));
     await tester.pumpAndSettle();
@@ -122,7 +123,7 @@ void main() {
     await tester.tap(find.text('Scan'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField), 'not-a-key');
+    await tester.enterText(find.byType(PlayTextField), 'not-a-key');
     await tester.pumpAndSettle();
     await tester.tap(find.text('Add this friend'));
     await tester.pumpAndSettle();

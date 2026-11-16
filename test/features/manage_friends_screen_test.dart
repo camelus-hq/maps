@@ -4,8 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/data/fakes/fake_social_service.dart';
 import 'package:openmaps/domain/entities/friend.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/social/screens/manage_friends_screen.dart';
 import 'package:openmaps/state/ports.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 void main() {
   Future<FakeSocialService> pumpManage(
@@ -37,11 +39,11 @@ void main() {
     expect(find.text('Mira'), findsOneWidget);
     expect(await social.loadFriends(), hasLength(4));
 
-    await tester.tap(find.byTooltip('Remove').first);
+    await tester.tap(find.byIcon(PhosphorIconsRegular.userMinus).first);
     await tester.pumpAndSettle();
     expect(find.textContaining('Remove '), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Remove'));
+    await tester.tap(find.widgetWithText(PlayButton, 'Remove'));
     await tester.pumpAndSettle();
 
     final List<Friend> left = await social.loadFriends();
@@ -65,7 +67,7 @@ void main() {
     expect(find.text('Sam'), findsOneWidget);
     expect(await social.loadFriends(), isEmpty);
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Add').first);
+    await tester.tap(find.widgetWithText(PlayButton, 'Add').first);
     await tester.pumpAndSettle();
 
     final List<Friend> friends = await social.loadFriends();
@@ -83,12 +85,12 @@ void main() {
     await tester.tap(find.text('Following'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField), 'rob');
+    await tester.enterText(find.byType(PlayTextField), 'rob');
     await tester.pumpAndSettle();
     expect(find.text('Robin'), findsOneWidget);
     expect(find.text('Sam'), findsNothing);
 
-    await tester.enterText(find.byType(TextField), 'zzz');
+    await tester.enterText(find.byType(PlayTextField), 'zzz');
     await tester.pumpAndSettle();
     expect(find.text('No matches'), findsOneWidget);
   });

@@ -1,10 +1,12 @@
 import 'dart:math' as math;
 
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format.dart';
 import '../../../../domain/entities/transit.dart';
+import '../../../design/play.dart';
 import 'transit_common.dart';
 import 'transit_line_badge.dart';
 
@@ -72,13 +74,13 @@ class _TransitTimelineState extends State<TransitTimeline> {
   @override
   Widget build(BuildContext context) {
     _syncKeys();
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final TransitItinerary itinerary = widget.itinerary;
     final bool imperial = widget.imperial;
     final int? liveLegIndex = widget.liveLegIndex;
     final List<TransitLeg> legs = itinerary.legs;
     final _TimelineConnector dotted = _TimelineConnector(
-      color: scheme.outlineVariant,
+      color: colors.line,
       dashed: true,
     );
     final List<Widget> rows = <Widget>[];
@@ -88,7 +90,7 @@ class _TransitTimelineState extends State<TransitTimeline> {
     rows.add(
       _TimelineRow(
         entry: _TimelineEntry(
-          node: _OriginNode(color: scheme.primary),
+          node: _OriginNode(color: colors.primary),
           below: dotted,
           child: _StopPointRow(
             name: widget.originName,
@@ -107,13 +109,12 @@ class _TransitTimelineState extends State<TransitTimeline> {
         rows.add(
           _TimelineRow(
             entry: _TimelineEntry(
-              node: Icon(Icons.schedule, size: 18, color: scheme.outline),
+              node: Icon(PlayIcons.clock, size: 18, color: colors.inkFaint),
               above: dotted,
               below: dotted,
               child: Text(
                 'Wait ${formatDuration(wait)}',
-                style: Theme.of(context).textTheme.bodySmall
-                    ?.copyWith(color: scheme.outline),
+                style: PlayType.caption.copyWith(color: colors.inkFaint),
               ),
             ),
           ),
@@ -176,7 +177,7 @@ class _TransitTimelineState extends State<TransitTimeline> {
               node: Icon(
                 transitModeIcon(leg.mode),
                 size: 20,
-                color: scheme.onSurfaceVariant,
+                color: colors.inkMuted,
               ),
               above: dotted,
               below: dotted,
@@ -195,7 +196,7 @@ class _TransitTimelineState extends State<TransitTimeline> {
     rows.add(
       _TimelineRow(
         entry: _TimelineEntry(
-          node: Icon(Icons.place, size: 22, color: scheme.error),
+          node: Icon(PlayIcons.place, size: 22, color: colors.coral),
           above: dotted,
           child: _StopPointRow(
             name: widget.destinationName,
@@ -503,10 +504,7 @@ class _OriginNode extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: color,
-        border: Border.all(
-          color: Theme.of(context).colorScheme.surface,
-          width: 3,
-        ),
+        border: Border.all(color: PlayColors.of(context).surface, width: 3),
       ),
     );
   }
@@ -548,7 +546,7 @@ class _AlightNode extends StatelessWidget {
       height: 18,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Theme.of(context).colorScheme.surface,
+        color: PlayColors.of(context).surface,
         border: Border.all(color: color, width: 3),
       ),
     );
@@ -562,17 +560,17 @@ class _LiveNode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     return Container(
       width: 24,
       height: 24,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: scheme.primary,
-        border: Border.all(color: scheme.surface, width: 3),
+        color: colors.primary,
+        border: Border.all(color: colors.surface, width: 3),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: scheme.primary.withValues(alpha: 0.35),
+            color: colors.primary.withValues(alpha: 0.35),
             blurRadius: 8,
             spreadRadius: 2,
           ),
@@ -582,9 +580,9 @@ class _LiveNode extends StatelessWidget {
       child: Transform.rotate(
         angle: math.pi,
         child: Icon(
-          Icons.navigation,
+          PlayIcons.navigation,
           size: 12,
-          color: scheme.onPrimary,
+          color: colors.onPrimary,
           semanticLabel: 'Current position',
         ),
       ),
@@ -608,26 +606,32 @@ class _StopPointRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final PlayColors colors = PlayColors.of(context);
     final Widget row = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Expanded(
-          child: Text(name, style: Theme.of(context).textTheme.titleSmall),
+          child: Text(
+            name,
+            style: PlayType.bodyStrong.copyWith(color: colors.ink),
+          ),
         ),
         if (track != null) ...<Widget>[
           _TrackChip(track: track!),
           const SizedBox(width: AppSpacing.sm),
         ],
-        Text(trailing, style: Theme.of(context).textTheme.bodySmall),
+        Text(
+          trailing,
+          style: PlayType.caption.copyWith(color: colors.inkMuted),
+        ),
       ],
     );
     final VoidCallback? tap = onTap;
     if (tap == null) {
       return row;
     }
-    return InkWell(
+    return PlayPressable(
       onTap: tap,
-      borderRadius: BorderRadius.circular(6),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: row,
@@ -646,6 +650,7 @@ class _WalkLegRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final PlayColors colors = PlayColors.of(context);
     final Widget row = Row(
       children: <Widget>[
         Expanded(
@@ -656,7 +661,7 @@ class _WalkLegRow extends StatelessWidget {
         ),
         Text(
           transitClock(context, leg.endTime.toLocal()),
-          style: Theme.of(context).textTheme.bodySmall,
+          style: PlayType.caption.copyWith(color: colors.inkMuted),
         ),
       ],
     );
@@ -664,9 +669,8 @@ class _WalkLegRow extends StatelessWidget {
     if (tap == null) {
       return row;
     }
-    return InkWell(
+    return PlayPressable(
       onTap: tap,
-      borderRadius: BorderRadius.circular(6),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: row,
@@ -691,7 +695,7 @@ class _RideDetailsState extends State<_RideDetails> {
   @override
   Widget build(BuildContext context) {
     final TransitLeg leg = widget.leg;
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final List<TransitStop> stops = leg.intermediateStops;
     final Duration? delay = leg.departureDelay;
     final bool delayed = delay != null && delay.inMinutes.abs() >= 1;
@@ -717,15 +721,16 @@ class _RideDetailsState extends State<_RideDetails> {
             const SizedBox(width: AppSpacing.sm),
             Text(
               formatDuration(leg.duration),
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: PlayType.body.copyWith(color: colors.ink),
             ),
           ],
         ),
         if (status != null)
           Text(
             status,
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: delayed ? scheme.error : scheme.primary),
+            style: PlayType.caption.copyWith(
+              color: delayed ? colors.coral : colors.primary,
+            ),
           ),
         Row(
           children: <Widget>[
@@ -735,24 +740,19 @@ class _RideDetailsState extends State<_RideDetails> {
                   context,
                   (leg.scheduledStartTime ?? leg.startTime).toLocal(),
                 ),
-                style: Theme.of(context).textTheme.bodySmall
-                    ?.copyWith(color: scheme.outline),
+                style: PlayType.caption.copyWith(color: colors.inkFaint),
               ),
             ),
             if (stops.isNotEmpty)
-              TextButton.icon(
+              PlayButton(
+                label:
+                    '${stops.length} ${stops.length == 1 ? 'stop' : 'stops'}',
+                icon: _expanded
+                    ? PhosphorIconsRegular.caretUp
+                    : PhosphorIconsRegular.caretDown,
+                variant: PlayButtonVariant.ghost,
+                size: PlayButtonSize.sm,
                 onPressed: () => setState(() => _expanded = !_expanded),
-                style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                ),
-                icon: Icon(
-                  _expanded ? Icons.expand_less : Icons.expand_more,
-                  size: 18,
-                ),
-                label: Text(
-                  '${stops.length} ${stops.length == 1 ? 'stop' : 'stops'}',
-                ),
               ),
           ],
         ),
@@ -796,7 +796,7 @@ class _IntermediateStopRow extends StatelessWidget {
               stop.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: PlayType.body.copyWith(color: PlayColors.of(context).ink),
             ),
           ),
           if (stop.hasTrack) ...<Widget>[
@@ -840,17 +840,17 @@ class _TrackChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
+        color: colors.surfaceSunken,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: scheme.outlineVariant),
+        border: Border.all(color: colors.line),
       ),
       child: Text(
         'Platform $track',
-        style: Theme.of(context).textTheme.labelSmall,
+        style: PlayType.caption.copyWith(color: colors.inkMuted),
       ),
     );
   }

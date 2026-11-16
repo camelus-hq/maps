@@ -1,7 +1,9 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../domain/entities/transit.dart';
+import '../../../design/play.dart';
 import 'transit_common.dart';
 import 'transit_line_chip.dart';
 
@@ -20,7 +22,7 @@ class TransitDepartureRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final String status = transitDepartureStatus(departure);
     final bool bad = departure.cancelled;
     final DateTime when = departure.displayDeparture.toLocal();
@@ -52,8 +54,9 @@ class TransitDepartureRow extends StatelessWidget {
                   departure.headsign ?? departure.routeLongName ?? '—',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall
-                      ?.copyWith(color: past ? scheme.outline : null),
+                  style: PlayType.bodyStrong.copyWith(
+                    color: past ? colors.inkFaint : null,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Row(
@@ -68,14 +71,14 @@ class TransitDepartureRow extends StatelessWidget {
                         ].join(' · '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        style: PlayType.caption.copyWith(
                           color: bad
-                              ? scheme.error
+                              ? colors.coral
                               : past
-                              ? scheme.outline
+                              ? colors.inkFaint
                               : (departure.realTime
-                                    ? scheme.primary
-                                    : scheme.outline),
+                                    ? colors.primary
+                                    : colors.inkFaint),
                         ),
                       ),
                     ),
@@ -90,8 +93,7 @@ class TransitDepartureRow extends StatelessWidget {
                     departure.agencyName!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall
-                        ?.copyWith(color: scheme.outline),
+                    style: PlayType.caption.copyWith(color: colors.inkFaint),
                   ),
               ],
             ),
@@ -103,9 +105,17 @@ class TransitDepartureRow extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   if (departure.wheelchairAccessible)
-                    Icon(Icons.accessible, size: 16, color: scheme.outline),
+                    Icon(
+                      PhosphorIconsRegular.wheelchair,
+                      size: 16,
+                      color: colors.inkFaint,
+                    ),
                   if (departure.bikesAllowed)
-                    Icon(Icons.pedal_bike, size: 16, color: scheme.outline),
+                    Icon(
+                      PhosphorIconsRegular.bicycle,
+                      size: 16,
+                      color: colors.inkFaint,
+                    ),
                 ],
               ),
             ),
@@ -115,6 +125,6 @@ class TransitDepartureRow extends StatelessWidget {
     if (onTap == null) {
       return content;
     }
-    return InkWell(onTap: onTap, child: content);
+    return PlayPressable(onTap: onTap, child: content);
   }
 }

@@ -1,8 +1,9 @@
 import 'dart:math' as math;
 
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../../domain/entities/route.dart';
+import '../../design/play.dart';
 
 /// Our own turn-by-turn maneuver glyph, drawn in code (no Google iconography).
 ///
@@ -30,7 +31,7 @@ class ManeuverGlyph extends StatelessWidget {
       child: CustomPaint(
         painter: _ManeuverGlyphPainter(
           type: type,
-          color: color ?? Theme.of(context).colorScheme.onSurface,
+          color: color ?? PlayColors.of(context).ink,
         ),
       ),
     );

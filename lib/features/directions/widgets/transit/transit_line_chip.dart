@@ -1,4 +1,6 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+
+import '../../../design/play.dart';
 
 /// A coloured line chip ("S41", "U8", "Bus 100"): the operator's own colour
 /// with the line's label, used for the lines serving a stop and for departure
@@ -43,8 +45,10 @@ class TransitLineChip extends StatelessWidget {
         textAlign: TextAlign.center,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.labelMedium
-            ?.copyWith(color: foreground, fontWeight: FontWeight.w600),
+        style: PlayType.caption.copyWith(
+          color: foreground,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

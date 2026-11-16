@@ -1,10 +1,12 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/osm_payments.dart';
+import '../../design/play.dart';
 import 'osm_payment_icons.dart';
 
-/// A tooltip describing an accepted payment method, including OSM's qualifiers
+/// A label describing an accepted payment method, including OSM's qualifiers
 /// (`only`, or an `opening_hours` interval).
 String osmPaymentTooltip(OsmPaymentMethod method) {
   final String value = method.value.toLowerCase();
@@ -51,8 +53,7 @@ class OsmPaymentMethods extends StatelessWidget {
     if (!hasContent) {
       return const SizedBox.shrink();
     }
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme scheme = theme.colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final List<String> notAcceptedCards = _notAcceptedCards;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
@@ -62,13 +63,16 @@ class OsmPaymentMethods extends StatelessWidget {
           Row(
             children: <Widget>[
               Icon(
-                Icons.payments_outlined,
+                PhosphorIconsRegular.money,
                 size: 20,
-                color: scheme.onSurfaceVariant,
+                color: colors.inkMuted,
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
-                child: Text('Payment', style: theme.textTheme.bodyLarge),
+                child: Text(
+                  'Payment',
+                  style: PlayType.body.copyWith(color: colors.ink),
+                ),
               ),
             ],
           ),
@@ -90,9 +94,7 @@ class OsmPaymentMethods extends StatelessWidget {
               padding: const EdgeInsets.only(left: AppSpacing.md + 20),
               child: Text(
                 'Payment options not listed',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
+                style: PlayType.body.copyWith(color: colors.inkMuted),
               ),
             ),
           if (notAcceptedCards.isNotEmpty)
@@ -110,8 +112,7 @@ class _NotAcceptedCardMethods extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme scheme = theme.colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     return Padding(
       padding: const EdgeInsets.only(
         left: AppSpacing.md + 20,
@@ -119,14 +120,16 @@ class _NotAcceptedCardMethods extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          Icon(Icons.credit_card_off, size: 18, color: scheme.onSurfaceVariant),
+          Icon(
+            PhosphorIconsRegular.creditCard,
+            size: 18,
+            color: colors.inkMuted,
+          ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               'Not accepted: ${methods.join(', ')}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
+              style: PlayType.body.copyWith(color: colors.inkMuted),
             ),
           ),
         ],
@@ -136,7 +139,7 @@ class _NotAcceptedCardMethods extends StatelessWidget {
 }
 
 /// A single accepted payment method: a bordered tile with its icon and a
-/// tooltip naming the method.
+/// semantic label naming the method.
 class _PaymentIcon extends StatelessWidget {
   const _PaymentIcon({required this.method});
 
@@ -144,22 +147,23 @@ class _PaymentIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    return Tooltip(
-      message: osmPaymentTooltip(method),
+    final PlayColors colors = PlayColors.of(context);
+    return Semantics(
+      container: true,
+      label: osmPaymentTooltip(method),
       child: Container(
         width: 42,
         height: 42,
         decoration: BoxDecoration(
-          color: scheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: scheme.outlineVariant),
+          color: colors.surfaceSunken,
+          borderRadius: BorderRadius.circular(PlayRadii.xs),
+          border: Border.all(color: colors.line),
         ),
         alignment: Alignment.center,
         child: Icon(
           osmPaymentIcon(method.suffix),
           size: 22,
-          color: scheme.onSurfaceVariant,
+          color: colors.inkMuted,
         ),
       ),
     );
@@ -179,7 +183,7 @@ class OsmCryptoBadges extends StatelessWidget {
     if (methods.isEmpty) {
       return const SizedBox.shrink();
     }
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.xs),
       child: Wrap(
@@ -188,15 +192,16 @@ class OsmCryptoBadges extends StatelessWidget {
         crossAxisAlignment: WrapCrossAlignment.center,
         children: <Widget>[
           for (final OsmPaymentMethod method in methods)
-            Tooltip(
-              message: osmPaymentTooltip(method),
+            Semantics(
+              container: true,
+              label: osmPaymentTooltip(method),
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.sm + 2,
                   vertical: AppSpacing.xs + 1,
                 ),
                 decoration: BoxDecoration(
-                  color: scheme.secondaryContainer,
+                  color: colors.primarySoft,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -205,13 +210,13 @@ class OsmCryptoBadges extends StatelessWidget {
                     Icon(
                       osmPaymentIcon(method.suffix),
                       size: 16,
-                      color: scheme.onSecondaryContainer,
+                      color: colors.onPrimarySoft,
                     ),
                     const SizedBox(width: AppSpacing.xs + 2),
                     Text(
                       method.label,
                       style: TextStyle(
-                        color: scheme.onSecondaryContainer,
+                        color: colors.onPrimarySoft,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
                       ),

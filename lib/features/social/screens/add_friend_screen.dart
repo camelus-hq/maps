@@ -1,17 +1,18 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/errors/app_exception.dart';
-import '../../../core/theme/app_spacing.dart';
 import '../../../domain/entities/friend.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/ports.dart';
 import '../../../state/social.dart';
+import '../../design/play.dart';
 import '../widgets/friend_avatar.dart';
 import '../widgets/qr_code_view.dart';
 
@@ -19,7 +20,7 @@ import '../widgets/qr_code_view.dart';
 ///
 /// * **My code** — the signed-in profile with a scannable QR of the user's npub.
 /// * **Scan** — the camera, plus a paste field so it also works without one.
-class AddFriendScreen extends StatelessWidget {
+class AddFriendScreen extends StatefulWidget {
   const AddFriendScreen({super.key, this.cameraBuilder});
 
   /// Test seam: builds the camera preview and reports a scanned raw value.
@@ -27,25 +28,49 @@ class AddFriendScreen extends StatelessWidget {
   cameraBuilder;
 
   @override
+  State<AddFriendScreen> createState() => _AddFriendScreenState();
+}
+
+class _AddFriendScreenState extends State<AddFriendScreen> {
+  final PageController _pages = PageController();
+  int _tab = 0;
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
+
+  void _select(int index) {
+    setState(() => _tab = index);
+    _pages.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Add friend'),
-          bottom: const TabBar(
-            tabs: <Widget>[
-              Tab(text: 'My code'),
-              Tab(text: 'Scan'),
-            ],
+    return PlayScaffold(
+      appBar: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const PlayAppBar(title: 'Add friend'),
+          PlayTabs(
+            tabs: const <String>['My code', 'Scan'],
+            selectedIndex: _tab,
+            onSelected: _select,
           ),
-        ),
-        body: TabBarView(
-          children: <Widget>[
-            const _MyCodeTab(),
-            _ScanTab(cameraBuilder: cameraBuilder),
-          ],
-        ),
+        ],
+      ),
+      child: PageView(
+        controller: _pages,
+        onPageChanged: (int index) => setState(() => _tab = index),
+        children: <Widget>[
+          const _MyCodeTab(),
+          _ScanTab(cameraBuilder: widget.cameraBuilder),
+        ],
       ),
     );
   }
@@ -57,7 +82,7 @@ class _MyCodeTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     final String? pubkey = ref.watch(nostrPubkeyProvider).value;
     final String? npub = pubkey == null
         ? null
@@ -66,26 +91,30 @@ class _MyCodeTab extends ConsumerWidget {
     if (pubkey == null || npub == null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: const EdgeInsets.all(PlaySpace.xl),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(Icons.qr_code_2, size: 56, color: theme.colorScheme.outline),
-              const SizedBox(height: AppSpacing.md),
+              Icon(
+                PhosphorIconsRegular.qrCode,
+                size: 56,
+                color: colors.inkFaint,
+              ),
+              const SizedBox(height: PlaySpace.md),
               Text(
                 'Sign in to show your code',
-                style: theme.textTheme.titleMedium,
+                style: PlayType.subtitle.copyWith(color: colors.ink),
               ),
-              const SizedBox(height: AppSpacing.xs),
+              const SizedBox(height: PlaySpace.xs),
               Text(
                 'Your friends add you by scanning your Nostr public key.',
                 textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall,
+                style: PlayType.caption.copyWith(color: colors.inkMuted),
               ),
-              const SizedBox(height: AppSpacing.lg),
-              FilledButton(
+              const SizedBox(height: PlaySpace.lg),
+              PlayButton(
+                label: 'Sign in with Nostr',
                 onPressed: () => context.push('/profile'),
-                child: const Text('Sign in with Nostr'),
               ),
             ],
           ),
@@ -97,7 +126,7 @@ class _MyCodeTab extends ConsumerWidget {
     final String name = profile?.label ?? 'You';
 
     return ListView(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(PlaySpace.lg),
       children: <Widget>[
         Row(
           children: <Widget>[
@@ -105,66 +134,66 @@ class _MyCodeTab extends ConsumerWidget {
               label: name,
               pictureUrl: profile?.pictureUrl,
               size: 56,
-              borderColor: theme.colorScheme.primary,
+              borderColor: colors.primary,
             ),
-            const SizedBox(width: AppSpacing.md),
+            const SizedBox(width: PlaySpace.lg),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
                     name,
-                    style: theme.textTheme.titleLarge,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    style: PlayType.title.copyWith(color: colors.ink),
                   ),
                   Text(
                     'Let a friend scan this to add you',
-                    style: theme.textTheme.bodySmall,
+                    style: PlayType.caption.copyWith(color: colors.inkMuted),
                   ),
                 ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: PlaySpace.lg),
         Center(
-          child: Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(AppSpacing.sheetRadius),
-              border: Border.all(color: theme.colorScheme.outlineVariant),
-            ),
+          child: PlaySurface(
+            radius: PlayRadii.md,
+            borderWidth: 1,
+            shadow: PlayShadow.none,
+            padding: const EdgeInsets.all(PlaySpace.md),
             child: QrCodeView(data: npub, size: 240),
           ),
         ),
-        const SizedBox(height: AppSpacing.lg),
+        const SizedBox(height: PlaySpace.lg),
         Text(
           'YOUR PUBLIC KEY',
-          style: theme.textTheme.labelSmall?.copyWith(
-            letterSpacing: 0.8,
-            fontWeight: FontWeight.w600,
+          style: PlayType.overline.copyWith(color: colors.inkMuted),
+        ),
+        const SizedBox(height: PlaySpace.xs),
+        SelectableRegion(
+          selectionControls: emptyTextSelectionControls,
+          child: Text(
+            npub,
+            style: PlayType.caption.copyWith(
+              color: colors.inkMuted,
+              fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+            ),
           ),
         ),
-        const SizedBox(height: AppSpacing.xs),
-        SelectableText(
-          npub,
-          style: theme.textTheme.bodySmall?.copyWith(
-            fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        OutlinedButton.icon(
+        const SizedBox(height: PlaySpace.sm),
+        PlayButton(
+          label: 'Copy my public key',
+          icon: PlayIcons.copy,
+          variant: PlayButtonVariant.ghost,
           onPressed: () => unawaited(_copy(context, npub)),
-          icon: const Icon(Icons.copy_all_outlined),
-          label: const Text('Copy my public key'),
         ),
-        const SizedBox(height: AppSpacing.md),
+        const SizedBox(height: PlaySpace.md),
         Text(
           'This is your public key — it is safe to share. Your private key never '
           'leaves this device.',
-          style: theme.textTheme.bodySmall,
+          style: PlayType.caption.copyWith(color: colors.inkMuted),
         ),
       ],
     );
@@ -174,8 +203,7 @@ class _MyCodeTab extends ConsumerWidget {
     try {
       await Clipboard.setData(ClipboardData(text: npub));
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Public key copied')));
+        showPlayToast(context, 'Public key copied');
       }
     } catch (_) {
       // Clipboard is best-effort (unavailable in some test environments).
@@ -225,82 +253,67 @@ class _ScanTabState extends ConsumerState<_ScanTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final ThemeData theme = Theme.of(context);
-    return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          // The camera fills the free space; the input stays pinned below so it
-          // is always reachable without scrolling.
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.sm,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppSpacing.sheetRadius),
-                child:
-                    widget.cameraBuilder?.call(context, _onScanned) ??
-                    _camera(context),
-              ),
+    final PlayColors colors = PlayColors.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        // The camera fills the free space; the input stays pinned below so it
+        // is always reachable without scrolling.
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              PlaySpace.lg,
+              PlaySpace.lg,
+              PlaySpace.lg,
+              PlaySpace.sm,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(PlayRadii.lg),
+              child:
+                  widget.cameraBuilder?.call(context, _onScanned) ??
+                  _camera(context),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.xs,
-              AppSpacing.md,
-              AppSpacing.md,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            PlaySpace.lg,
+            PlaySpace.xs,
+            PlaySpace.lg,
+            PlaySpace.lg,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Text(
+                'Point the camera at your friend\'s Nostr public key (npub) QR '
+                'code, or paste the key below.',
+                style: PlayType.caption.copyWith(color: colors.inkMuted),
+              ),
+              const SizedBox(height: PlaySpace.sm),
+              PlayTextField(
+                controller: _manual,
+                hint: 'npub or hex public key',
+                onSubmitted: (String value) => unawaited(_add(value)),
+              ),
+              if (_error != null) ...<Widget>[
+                const SizedBox(height: PlaySpace.xs),
                 Text(
-                  'Point the camera at your friend\'s Nostr public key (npub) QR '
-                  'code, or paste the key below.',
-                  style: theme.textTheme.bodySmall,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                TextField(
-                  controller: _manual,
-                  autocorrect: false,
-                  decoration: const InputDecoration(
-                    labelText: 'npub or hex public key',
-                    border: OutlineInputBorder(),
-                  ),
-                  onSubmitted: (String value) => unawaited(_add(value)),
-                ),
-                if (_error != null) ...<Widget>[
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    _error!,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.error,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: AppSpacing.sm),
-                FilledButton.icon(
-                  onPressed: _adding
-                      ? null
-                      : () => unawaited(_add(_manual.text)),
-                  icon: _adding
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.person_add_alt),
-                  label: const Text('Add this friend'),
+                  _error!,
+                  style: PlayType.caption.copyWith(color: colors.coral),
                 ),
               ],
-            ),
+              const SizedBox(height: PlaySpace.sm),
+              PlayButton(
+                label: 'Add this friend',
+                icon: PhosphorIconsRegular.userPlus,
+                expand: true,
+                onPressed: _adding ? null : () => unawaited(_add(_manual.text)),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -364,8 +377,7 @@ class _ScanTabState extends ConsumerState<_ScanTab>
         // Stop the button spinner before the screen leaves (and so a screen
         // that stays mounted settles instead of animating forever).
         setState(() => _adding = false);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Friend added')));
+        showPlayToast(context, 'Friend added');
         if (Navigator.of(context).canPop()) {
           Navigator.of(context).pop(true);
         }
@@ -389,29 +401,32 @@ class _CameraUnavailable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     return ColoredBox(
-      color: theme.colorScheme.surfaceContainerHighest,
+      color: colors.surfaceSunken,
       child: Center(
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
+          padding: const EdgeInsets.all(PlaySpace.lg),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               Icon(
-                Icons.no_photography_outlined,
+                PhosphorIconsRegular.cameraSlash,
                 size: 40,
-                color: theme.colorScheme.outline,
+                color: colors.inkFaint,
               ),
-              const SizedBox(height: AppSpacing.sm),
-              Text('Camera unavailable', style: theme.textTheme.titleSmall),
-              const SizedBox(height: AppSpacing.xs),
+              const SizedBox(height: PlaySpace.sm),
+              Text(
+                'Camera unavailable',
+                style: PlayType.bodyStrong.copyWith(color: colors.ink),
+              ),
+              const SizedBox(height: PlaySpace.xs),
               Text(
                 message ??
                     'This device has no usable camera. Paste the npub below '
                         'instead.',
                 textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall,
+                style: PlayType.caption.copyWith(color: colors.inkMuted),
               ),
             ],
           ),

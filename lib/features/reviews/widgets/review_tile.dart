@@ -1,13 +1,15 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format.dart';
 import '../../../domain/entities/review.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/reviews.dart';
+import '../../design/play.dart';
 import '../../social/widgets/friend_avatar.dart';
 import 'star_rating.dart';
 
@@ -44,7 +46,7 @@ class _ReviewTileState extends ConsumerState<ReviewTile> {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     final Review review = widget.review;
     final String name = review.authorName ?? _shorten(review.authorPubkey);
     final String text = review.bodyText;
@@ -71,7 +73,9 @@ class _ReviewTileState extends ConsumerState<ReviewTile> {
                         Flexible(
                           child: Text(
                             name,
-                            style: theme.textTheme.titleSmall,
+                            style: PlayType.bodyStrong.copyWith(
+                              color: colors.ink,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -88,7 +92,9 @@ class _ReviewTileState extends ConsumerState<ReviewTile> {
                         const SizedBox(width: AppSpacing.xs),
                         Text(
                           formatTimeAgo(review.createdAt),
-                          style: theme.textTheme.bodySmall,
+                          style: PlayType.caption.copyWith(
+                            color: colors.inkMuted,
+                          ),
                         ),
                       ],
                     ),
@@ -103,18 +109,19 @@ class _ReviewTileState extends ConsumerState<ReviewTile> {
               padding: const EdgeInsets.only(top: AppSpacing.sm),
               child: Text(
                 widget.headline ? '“$text”' : text,
-                style: widget.headline
-                    ? theme.textTheme.titleMedium
-                    : theme.textTheme.bodyMedium,
+                style: (widget.headline ? PlayType.title : PlayType.body)
+                    .copyWith(color: colors.ink),
               ),
             ),
-          if (review.photos.isNotEmpty) _photos(review),
+          if (review.photos.isNotEmpty) _photos(context, review),
           const SizedBox(height: AppSpacing.sm),
           Row(
             children: <Widget>[
               _pillAction(
                 context,
-                icon: _helpful ? Icons.thumb_up : Icons.thumb_up_outlined,
+                icon: _helpful
+                    ? PhosphorIconsFill.thumbsUp
+                    : PhosphorIconsRegular.thumbsUp,
                 label: 'Helpful',
                 selected: _helpful,
                 onTap: () => unawaited(
@@ -127,7 +134,7 @@ class _ReviewTileState extends ConsumerState<ReviewTile> {
               const SizedBox(width: AppSpacing.sm),
               _pillAction(
                 context,
-                icon: Icons.share_outlined,
+                icon: PlayIcons.share,
                 label: 'Share review',
                 onTap: () => unawaited(_share(review)),
               ),
@@ -138,7 +145,8 @@ class _ReviewTileState extends ConsumerState<ReviewTile> {
     );
   }
 
-  Widget _photos(Review review) {
+  Widget _photos(BuildContext context, Review review) {
+    final PlayColors colors = PlayColors.of(context);
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.sm),
       child: SizedBox(
@@ -156,12 +164,12 @@ class _ReviewTileState extends ConsumerState<ReviewTile> {
                 width: 84,
                 height: 84,
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const ColoredBox(
-                  color: Color(0xFFE0E0E0),
+                errorBuilder: (_, _, _) => ColoredBox(
+                  color: const Color(0xFFE0E0E0),
                   child: SizedBox(
                     width: 84,
                     height: 84,
-                    child: Icon(Icons.broken_image_outlined),
+                    child: Icon(PlayIcons.brokenImage, color: colors.inkFaint),
                   ),
                 ),
               ),
@@ -173,31 +181,23 @@ class _ReviewTileState extends ConsumerState<ReviewTile> {
   }
 
   Widget _menu(BuildContext context, Review review) {
-    return PopupMenuButton<String>(
-      tooltip: 'Review options',
-      icon: const Icon(Icons.more_horiz),
+    return PlayMenuButton<String>(
+      semanticLabel: 'Review options',
+      icon: PlayIcons.more,
       onSelected: (String value) {
         if (value == 'edit') {
           widget.onEdit?.call(review);
         } else if (value == 'share') {
-          _share(review);
+          unawaited(_share(review));
         } else if (value == 'report') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Thanks — this review was reported')),
-          );
+          showPlayToast(context, 'Thanks — this review was reported');
         }
       },
-      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+      items: <PlayMenuItem<String>>[
         if (widget.onEdit != null)
-          const PopupMenuItem<String>(
-            value: 'edit',
-            child: Text('Edit review'),
-          ),
-        const PopupMenuItem<String>(
-          value: 'share',
-          child: Text('Share review'),
-        ),
-        const PopupMenuItem<String>(value: 'report', child: Text('Report')),
+          const PlayMenuItem<String>(value: 'edit', label: 'Edit review'),
+        const PlayMenuItem<String>(value: 'share', label: 'Share review'),
+        const PlayMenuItem<String>(value: 'report', label: 'Report'),
       ],
     );
   }
@@ -209,30 +209,24 @@ class _ReviewTileState extends ConsumerState<ReviewTile> {
     required VoidCallback onTap,
     bool selected = false,
   }) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    final Color foreground = selected
-        ? scheme.primary
-        : scheme.onSurfaceVariant;
-    return Material(
-      color: scheme.surfaceContainerHighest,
-      shape: const StadiumBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.xs + 2,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(icon, size: 16, color: foreground),
-              const SizedBox(width: AppSpacing.xs),
-              Text(label, style: TextStyle(fontSize: 12, color: foreground)),
-            ],
-          ),
-        ),
+    final PlayColors colors = PlayColors.of(context);
+    final Color foreground = selected ? colors.primary : colors.inkMuted;
+    return PlaySurface(
+      radius: PlayRadii.pill,
+      backgroundColor: colors.surfaceSunken,
+      shadow: PlayShadow.none,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.xs + 2,
+      ),
+      onTap: onTap,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(icon, size: 16, color: foreground),
+          const SizedBox(width: AppSpacing.xs),
+          Text(label, style: PlayType.caption.copyWith(color: foreground)),
+        ],
       ),
     );
   }
@@ -247,8 +241,7 @@ class _ReviewTileState extends ConsumerState<ReviewTile> {
       <String, Object?>{'text': text},
     );
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Review copied')));
+      showPlayToast(context, 'Review copied');
     }
   }
 
@@ -261,11 +254,11 @@ class _FriendBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
       decoration: BoxDecoration(
-        color: scheme.primaryContainer,
+        color: colors.primarySoft,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
@@ -273,7 +266,7 @@ class _FriendBadge extends StatelessWidget {
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
-          color: scheme.onPrimaryContainer,
+          color: colors.onPrimarySoft,
         ),
       ),
     );

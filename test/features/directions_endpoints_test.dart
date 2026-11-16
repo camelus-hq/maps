@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/app/app.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/directions/widgets/directions_endpoint_card.dart';
 import 'package:openmaps/state/commands/commands_provider.dart';
 import 'package:openmaps/state/route.dart';
@@ -84,7 +84,7 @@ void main() {
       const RouteEndpointTarget.origin(),
     );
 
-    await tester.enterText(find.byType(TextField), 'park');
+    await tester.enterText(find.byType(PlayTextField), 'park');
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Willow Park'));
@@ -117,11 +117,12 @@ void main() {
   testWidgets('the overflow menu adds a stop through the picker', (
     WidgetTester tester,
   ) async {
+    // The menu and stop-remove controls.
     final ProviderContainer container = await pumpApp(tester);
     await planCoffee(container);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Route options'));
+    await tester.tap(find.byType(PlayMenuButton<RouteMenu>));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Add stop'));
     await tester.pumpAndSettle();
@@ -131,7 +132,7 @@ void main() {
       RouteEndpointField.stop,
     );
 
-    await tester.enterText(find.byType(TextField), 'park');
+    await tester.enterText(find.byType(PlayTextField), 'park');
     await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Willow Park'));
@@ -144,7 +145,12 @@ void main() {
     expect(cardText('Willow Park'), findsOneWidget);
 
     // The ✕ removes the stop; it must not open the stop editor.
-    await tester.tap(find.byTooltip('Remove stop'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(DirectionsEndpointCard),
+        matching: find.byIcon(PlayIcons.close),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(container.read(routeControllerProvider).stops, isEmpty);
     expect(container.read(routeControllerProvider).editingEndpoint, isNull);

@@ -1,11 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/errors/app_exception.dart';
-import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format.dart';
 import '../../../domain/entities/friend.dart';
 import '../../../domain/entities/friend_location.dart';
@@ -13,14 +13,13 @@ import '../../../domain/entities/live_share.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/ports.dart';
 import '../../../state/social.dart';
+import '../../design/play.dart';
 import '../widgets/friend_avatar.dart';
 
 /// Shows the "Let friends find you" sheet (who can see you, and for how long).
 Future<void> showShareLiveLocationSheet(BuildContext context) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
+  return showPlaySheet<void>(
+    context,
     builder: (BuildContext context) => const ShareLiveLocationSheet(),
   );
 }
@@ -53,7 +52,6 @@ class _ShareLiveLocationSheetState
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
     final bool signedIn = ref.watch(socialServiceProvider).isLoggedIn;
     final AsyncValue<List<Friend>> friends = ref.watch(friendsProvider);
     final LiveShareState share = ref.watch(liveShareProvider);
@@ -64,101 +62,94 @@ class _ShareLiveLocationSheetState
     final Duration duration = liveShareDurations[_durationIndex].duration;
     final DateTime stopAt = DateTime.now().add(duration);
 
-    return SafeArea(
-      top: false,
-      child: ConstrainedBox(
-        // Leave room for the sticky footer even on a small screen.
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    Text(
-                      'Let friends find you',
-                      style: theme.textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      'You choose who sees it and for how long.',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    if (!signedIn)
-                      _signedOutNotice(context)
-                    else ...<Widget>[
-                      _sectionLabel(context, 'SHARE WITH', _selectionSummary()),
-                      const SizedBox(height: AppSpacing.xs),
-                      ..._friendRows(friends, livePubkeys),
-                      const SizedBox(height: AppSpacing.md),
-                      _sectionLabel(context, 'FOR HOW LONG?', null),
-                      const SizedBox(height: AppSpacing.sm),
-                      _durationRow(),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        'Sharing will stop automatically at '
-                        '${formatClockTime(stopAt)}.',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                    ],
-                  ],
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: PlaySpace.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  'Let friends find you',
+                  style: PlayType.headline.copyWith(
+                    color: PlayColors.of(context).ink,
+                  ),
                 ),
-              ),
+                const SizedBox(height: PlaySpace.xs),
+                Text(
+                  'You choose who sees it and for how long.',
+                  style: PlayType.body.copyWith(
+                    color: PlayColors.of(context).inkMuted,
+                  ),
+                ),
+                const SizedBox(height: PlaySpace.md),
+                if (!signedIn)
+                  _signedOutNotice(context)
+                else ...<Widget>[
+                  _sectionLabel(context, 'SHARE WITH', _selectionSummary()),
+                  const SizedBox(height: PlaySpace.xs),
+                  ..._friendRows(friends, livePubkeys),
+                  const SizedBox(height: PlaySpace.md),
+                  _sectionLabel(context, 'FOR HOW LONG?', null),
+                  const SizedBox(height: PlaySpace.sm),
+                  _durationRow(),
+                  const SizedBox(height: PlaySpace.md),
+                  Text(
+                    'Sharing will stop automatically at '
+                    '${formatClockTime(stopAt)}.',
+                    style: PlayType.caption.copyWith(
+                      color: PlayColors.of(context).inkMuted,
+                    ),
+                  ),
+                  const SizedBox(height: PlaySpace.md),
+                ],
+              ],
             ),
-            // Sticky footer: the consent note and the action stay put while the
-            // friend list scrolls.
-            if (signedIn)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.sm,
-                  AppSpacing.md,
-                  AppSpacing.md,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    _consentNote(context, friends),
-                    const SizedBox(height: AppSpacing.sm),
-                    FilledButton.icon(
-                      onPressed: _selected.isEmpty || _starting
-                          ? null
-                          : () => unawaited(_start(duration)),
-                      icon: _starting
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.share_location_outlined),
-                      label: Text(_startLabel()),
-                    ),
-                    if (share.isActive) ...<Widget>[
-                      const SizedBox(height: AppSpacing.xs),
-                      TextButton.icon(
-                        onPressed: () => unawaited(
-                          ref.read(liveShareProvider.notifier).stop(),
-                        ),
-                        icon: const Icon(Icons.stop_circle_outlined),
-                        label: const Text('Stop sharing'),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-          ],
+          ),
         ),
-      ),
+        // Sticky footer: the consent note and the action stay put while the
+        // friend list scrolls.
+        if (signedIn)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              PlaySpace.lg,
+              PlaySpace.sm,
+              PlaySpace.lg,
+              PlaySpace.lg,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                _consentNote(context, friends),
+                const SizedBox(height: PlaySpace.sm),
+                PlayButton(
+                  label: _startLabel(),
+                  icon: PhosphorIconsRegular.broadcast,
+                  expand: true,
+                  onPressed: _selected.isEmpty || _starting
+                      ? null
+                      : () => unawaited(_start(duration)),
+                ),
+                if (share.isActive) ...<Widget>[
+                  const SizedBox(height: PlaySpace.xs),
+                  PlayButton(
+                    label: 'Stop sharing',
+                    icon: PhosphorIconsRegular.stopCircle,
+                    variant: PlayButtonVariant.ghost,
+                    expand: true,
+                    onPressed: () =>
+                        unawaited(ref.read(liveShareProvider.notifier).stop()),
+                  ),
+                ],
+              ],
+            ),
+          ),
+      ],
     );
   }
 
@@ -180,18 +171,16 @@ class _ShareLiveLocationSheetState
   }
 
   Widget _sectionLabel(BuildContext context, String text, String? trailing) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     return Row(
       children: <Widget>[
-        Text(
-          text,
-          style: theme.textTheme.labelSmall?.copyWith(
-            letterSpacing: 0.8,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        Text(text, style: PlayType.overline.copyWith(color: colors.inkMuted)),
         const Spacer(),
-        if (trailing != null) Text(trailing, style: theme.textTheme.bodySmall),
+        if (trailing != null)
+          Text(
+            trailing,
+            style: PlayType.caption.copyWith(color: colors.inkMuted),
+          ),
       ],
     );
   }
@@ -203,60 +192,58 @@ class _ShareLiveLocationSheetState
     return friends.when(
       loading: () => <Widget>[
         const Padding(
-          padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
-          child: Center(child: CircularProgressIndicator()),
+          padding: EdgeInsets.symmetric(vertical: PlaySpace.md),
+          child: Center(child: PlaySpinner()),
         ),
       ],
       error: (Object error, StackTrace stack) => <Widget>[
-        const ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(Icons.error_outline),
-          title: Text('Could not load your friends'),
-          subtitle: Text('Check your connection and try again.'),
+        const PlayRow(
+          icon: PlayIcons.error,
+          label: 'Could not load your friends',
+          subtitle: 'Check your connection and try again.',
+          showChevron: false,
         ),
       ],
       data: (List<Friend> list) {
         if (list.isEmpty) {
           return <Widget>[
-            const ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.people_outline),
-              title: Text('No friends yet'),
-              subtitle: Text(
-                'Add people to your friends list to share your location with '
-                'them.',
-              ),
+            const PlayRow(
+              icon: PlayIcons.friends,
+              label: 'No friends yet',
+              subtitle:
+                  'Add people to your friends list to share your location with '
+                  'them.',
+              showChevron: false,
             ),
           ];
         }
         return <Widget>[
           for (final Friend friend in list)
-            CheckboxListTile(
-              value: _selected.contains(friend.pubkey),
-              onChanged: _starting
-                  ? null
-                  : (bool? checked) => setState(() {
-                      if (checked == true) {
-                        _selected.add(friend.pubkey);
-                      } else {
-                        _selected.remove(friend.pubkey);
-                      }
-                    }),
-              controlAffinity: ListTileControlAffinity.trailing,
-              contentPadding: EdgeInsets.zero,
-              secondary: FriendAvatar(
+            PlayRow(
+              leading: FriendAvatar(
                 label: friend.label,
                 pictureUrl: friend.pictureUrl,
                 borderColor: livePubkeys.contains(friend.pubkey)
                     ? const Color(0xFF1B9C6B)
                     : null,
               ),
-              title: Text(friend.label),
-              subtitle: Text(
-                livePubkeys.contains(friend.pubkey)
-                    ? 'Sharing live with you'
-                    : 'Friend',
+              label: friend.label,
+              subtitle: livePubkeys.contains(friend.pubkey)
+                  ? 'Sharing live with you'
+                  : 'Friend',
+              showChevron: false,
+              trailing: _SelectionDot(
+                selected: _selected.contains(friend.pubkey),
               ),
+              onTap: _starting
+                  ? null
+                  : () => setState(() {
+                      if (_selected.contains(friend.pubkey)) {
+                        _selected.remove(friend.pubkey);
+                      } else {
+                        _selected.add(friend.pubkey);
+                      }
+                    }),
             ),
         ];
       },
@@ -265,22 +252,21 @@ class _ShareLiveLocationSheetState
 
   Widget _durationRow() {
     return Wrap(
-      spacing: AppSpacing.sm,
+      spacing: PlaySpace.sm,
+      runSpacing: PlaySpace.sm,
       children: <Widget>[
         for (int i = 0; i < liveShareDurations.length; i++)
-          ChoiceChip(
-            label: Text(liveShareDurations[i].label),
+          PlayChip(
+            label: liveShareDurations[i].label,
             selected: _durationIndex == i,
-            onSelected: _starting
-                ? null
-                : (bool _) => setState(() => _durationIndex = i),
+            onTap: _starting ? null : () => setState(() => _durationIndex = i),
           ),
       ],
     );
   }
 
   Widget _consentNote(BuildContext context, AsyncValue<List<Friend>> friends) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     final List<String> names = <String>[
       for (final Friend friend in friends.value ?? const <Friend>[])
         if (_selected.contains(friend.pubkey)) friend.label,
@@ -296,35 +282,30 @@ class _ShareLiveLocationSheetState
           ? 'Only $head and ${names.length - 2} more'
           : 'Only $head';
     }
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return PlaySurface(
+      tone: PlayTone.sunken,
+      radius: PlayRadii.md,
+      shadow: PlayShadow.none,
+      padding: const EdgeInsets.all(PlaySpace.sm),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Icon(
-            Icons.shield_outlined,
-            size: 20,
-            color: theme.colorScheme.primary,
-          ),
-          const SizedBox(width: AppSpacing.sm),
+          Icon(PlayIcons.lock, size: 20, color: colors.primary),
+          const SizedBox(width: PlaySpace.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
                   '$who can see your location',
-                  style: theme.textTheme.bodyMedium,
+                  style: PlayType.body.copyWith(color: colors.ink),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'The share is gift-wrap encrypted to each friend, and your '
                   'friends list is private. Anyone you do not select cannot see '
                   'it.',
-                  style: theme.textTheme.bodySmall,
+                  style: PlayType.caption.copyWith(color: colors.inkMuted),
                 ),
               ],
             ),
@@ -338,20 +319,16 @@ class _ShareLiveLocationSheetState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: Icon(Icons.lock_outline),
-          title: Text('Sign in to share your location'),
-          subtitle: Text(
-            'Live location is shared with friends over Nostr, encrypted to each '
-            'of them.',
-          ),
+        const PlayRow(
+          icon: PlayIcons.lock,
+          label: 'Sign in to share your location',
+          subtitle:
+              'Live location is shared with friends over Nostr, encrypted to '
+              'each of them.',
+          showChevron: false,
         ),
-        const SizedBox(height: AppSpacing.sm),
-        FilledButton(
-          onPressed: _openProfile,
-          child: const Text('Sign in with Nostr'),
-        ),
+        const SizedBox(height: PlaySpace.sm),
+        PlayButton(label: 'Sign in with Nostr', onPressed: _openProfile),
       ],
     );
   }
@@ -381,16 +358,30 @@ class _ShareLiveLocationSheetState
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You are sharing your live location')),
-      );
+      showPlayToast(context, 'You are sharing your live location');
     } on AppException catch (error) {
       if (!mounted) {
         return;
       }
       setState(() => _starting = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(error.message)));
+      showPlayToast(context, error.message);
     }
+  }
+}
+
+/// The trailing on/off marker on a selectable friend row.
+class _SelectionDot extends StatelessWidget {
+  const _SelectionDot({required this.selected});
+
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final PlayColors colors = PlayColors.of(context);
+    return Icon(
+      selected ? PlayIcons.check : PlayIcons.dot,
+      size: 24,
+      color: selected ? colors.primary : colors.inkFaint,
+    );
   }
 }

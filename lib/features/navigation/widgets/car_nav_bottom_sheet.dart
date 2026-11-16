@@ -1,4 +1,4 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../../state/navigation.dart';
 import 'nav_sheet.dart';

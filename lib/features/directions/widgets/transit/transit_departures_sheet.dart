@@ -1,11 +1,12 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../domain/entities/transit.dart';
 import '../../../../state/commands/commands_provider.dart';
 import '../../../../state/transit_departures.dart';
 import '../../../common/error_text.dart';
+import '../../../design/play.dart';
 import 'transit_departure_row.dart';
 
 /// The "Departures" board — the next departures from a stop, opened by tapping a
@@ -16,7 +17,7 @@ class TransitDeparturesSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final TransitDeparturesState state = ref.watch(transitDeparturesProvider);
     if (!state.isOpen) {
       return const SizedBox.shrink();
@@ -31,29 +32,15 @@ class TransitDeparturesSheet extends ConsumerWidget {
       snap: true,
       snapSizes: const <double>[0.2, 0.5, 0.85],
       builder: (BuildContext context, ScrollController scrollController) {
-        return Material(
-          color: scheme.surface,
-          elevation: 16,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-          clipBehavior: Clip.antiAlias,
+        return PlaySheet(
+          radius: PlayRadii.lg,
           child: ListView(
             controller: scrollController,
             padding: EdgeInsets.only(
               bottom: MediaQuery.viewPaddingOf(context).bottom + AppSpacing.md,
             ),
             children: <Widget>[
-              const SizedBox(height: AppSpacing.sm),
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: scheme.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
+              const PlaySheetHandle(),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                 child: Row(
@@ -65,18 +52,22 @@ class TransitDeparturesSheet extends ConsumerWidget {
                         children: <Widget>[
                           Text(
                             'Departures',
-                            style: Theme.of(context).textTheme.titleLarge,
+                            style: PlayType.title.copyWith(color: colors.ink),
                           ),
                           Text(
                             'From ${state.stopName ?? state.stopId ?? ''}',
-                            style: Theme.of(context).textTheme.bodySmall,
+                            style: PlayType.caption.copyWith(
+                              color: colors.inkMuted,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    IconButton(
-                      tooltip: 'Close',
-                      icon: const Icon(Icons.close),
+                    PlayIconButton(
+                      icon: PlayIcons.close,
+                      variant: PlayIconButtonVariant.plain,
+                      size: 40,
+                      semanticLabel: 'Close',
                       onPressed: () => ref
                           .read(commandRegistryProvider)
                           .dispatch(
@@ -87,7 +78,10 @@ class TransitDeparturesSheet extends ConsumerWidget {
                   ],
                 ),
               ),
-              const Divider(height: AppSpacing.md),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                child: PlayDivider(),
+              ),
               ..._body(context, ref, state),
             ],
           ),
@@ -101,13 +95,14 @@ class TransitDeparturesSheet extends ConsumerWidget {
     WidgetRef ref,
     TransitDeparturesState state,
   ) {
+    final PlayColors colors = PlayColors.of(context);
     switch (state.status) {
       case DeparturesStatus.loading:
       case DeparturesStatus.idle:
         return const <Widget>[
           Padding(
             padding: EdgeInsets.all(AppSpacing.lg),
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(child: PlaySpinner()),
           ),
         ];
       case DeparturesStatus.error:
@@ -120,18 +115,16 @@ class TransitDeparturesSheet extends ConsumerWidget {
             padding: const EdgeInsets.all(AppSpacing.md),
             child: Column(
               children: <Widget>[
-                Icon(
-                  presentation.icon,
-                  color: Theme.of(context).colorScheme.outline,
-                ),
+                Icon(presentation.icon, color: colors.inkFaint),
                 const SizedBox(height: AppSpacing.sm),
                 Text(presentation.text, textAlign: TextAlign.center),
                 const SizedBox(height: AppSpacing.sm),
-                OutlinedButton.icon(
+                PlayButton(
+                  label: 'Retry',
+                  icon: PlayIcons.refresh,
+                  variant: PlayButtonVariant.ghost,
                   onPressed: () =>
                       ref.read(transitDeparturesProvider.notifier).retry(),
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Retry'),
                 ),
               ],
             ),
@@ -145,7 +138,7 @@ class TransitDeparturesSheet extends ConsumerWidget {
               child: Center(
                 child: Text(
                   'No more departures today',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: PlayType.body.copyWith(color: colors.ink),
                 ),
               ),
             ),

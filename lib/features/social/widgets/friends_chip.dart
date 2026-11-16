@@ -1,13 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:material_ui/material_ui.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/ports.dart';
 import '../../../state/social.dart';
+import '../../design/play.dart';
 
 /// The green "Friends" chip under the search bar, with a live-count badge.
 ///
@@ -21,22 +21,17 @@ class FriendsChip extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final int liveCount = ref.watch(friendLocationsProvider).length;
     final bool signedIn = ref.watch(socialServiceProvider).isLoggedIn;
-    final ColorScheme scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(horizontal: PlaySpace.md),
       child: Row(
         children: <Widget>[
-          ActionChip(
-            avatar: Icon(
-              Icons.people_alt_outlined,
-              size: 18,
-              color: scheme.primary,
-            ),
-            label: const Text('Friends'),
-            onPressed: () => context.push('/friends'),
+          PlayChip(
+            label: 'Friends',
+            icon: PlayIcons.friends,
+            onTap: () => context.push('/friends'),
           ),
           if (liveCount > 0) ...<Widget>[
-            const SizedBox(width: AppSpacing.sm),
+            const SizedBox(width: PlaySpace.sm),
             _LiveCountBadge(
               count: liveCount,
               onTap: () => unawaited(
@@ -45,10 +40,9 @@ class FriendsChip extends ConsumerWidget {
                     .dispatch('map.fitFriends', const <String, Object?>{})
                     .catchError((Object error) {
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('No friend is sharing right now'),
-                          ),
+                        showPlayToast(
+                          context,
+                          'No friend is sharing right now',
                         );
                       }
                       return null;
@@ -58,9 +52,11 @@ class FriendsChip extends ConsumerWidget {
           ],
           if (!signedIn) ...<Widget>[
             const Spacer(),
-            TextButton(
+            PlayButton(
+              label: 'Sign in',
+              variant: PlayButtonVariant.ghost,
+              size: PlayButtonSize.sm,
               onPressed: () => context.push('/profile'),
-              child: const Text('Sign in'),
             ),
           ],
         ],
@@ -78,41 +74,36 @@ class _LiveCountBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.primaryContainer,
-      shape: const StadiumBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.xs,
+    final PlayColors colors = PlayColors.of(context);
+    return PlaySurface(
+      tone: PlayTone.soft,
+      radius: PlayRadii.pill,
+      shadow: PlayShadow.none,
+      padding: const EdgeInsets.symmetric(
+        horizontal: PlaySpace.sm,
+        vertical: PlaySpace.xs,
+      ),
+      onTap: onTap,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: Color(0xFF1B9C6B),
+              shape: BoxShape.circle,
+            ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF1B9C6B),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Text(
-                count == 1 ? '1 friend live' : '$count friends live',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: scheme.onPrimaryContainer,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+          const SizedBox(width: PlaySpace.xs),
+          Text(
+            count == 1 ? '1 friend live' : '$count friends live',
+            style: PlayType.caption.copyWith(
+              color: colors.onPrimarySoft,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

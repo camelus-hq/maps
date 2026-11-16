@@ -1,7 +1,9 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+
+import '../../design/play.dart';
 
 /// A round friend avatar: the Nostr profile picture when there is one, else a
-/// monogram on the theme's container colour.
+/// monogram on the brand wash.
 ///
 /// Network images are best-effort — a broken or hostile URL falls back to the
 /// monogram instead of throwing (AGENTS.md "Never crash").
@@ -53,17 +55,17 @@ class FriendAvatar extends StatelessWidget {
   }
 
   Widget _monogram(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final String initial = _initial();
     return Container(
       width: size,
       height: size,
       alignment: Alignment.center,
-      color: scheme.primaryContainer,
+      color: colors.primarySoft,
       child: Text(
         initial,
         style: TextStyle(
-          color: scheme.onPrimaryContainer,
+          color: colors.onPrimarySoft,
           fontWeight: FontWeight.w600,
           fontSize: size * 0.42,
         ),
@@ -78,4 +80,22 @@ class FriendAvatar extends StatelessWidget {
     }
     return String.fromCharCode(trimmed.runes.first).toUpperCase();
   }
+}
+
+@PlayPreview(name: 'FriendAvatar', size: Size(360, 140))
+Widget friendAvatarPreview() {
+  return PlayPreviewFrame(
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        const FriendAvatar(label: 'Ada Lovelace', size: 56),
+        const SizedBox(width: PlaySpace.lg),
+        const FriendAvatar(
+          label: 'Mira',
+          size: 48,
+          borderColor: Color(0xFF1B9C6B),
+        ),
+      ],
+    ),
+  );
 }

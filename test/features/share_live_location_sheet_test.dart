@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/data/fakes/fake_live_share_notifications.dart';
 import 'package:openmaps/data/fakes/fake_social_service.dart';
 import 'package:openmaps/domain/entities/friend.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/social/screens/share_live_location_sheet.dart';
 import 'package:openmaps/state/ports.dart';
 import 'package:openmaps/state/social.dart';
@@ -54,10 +55,10 @@ void main() {
 
     // Nothing selected: the primary action is disabled.
     final Finder action = find.widgetWithText(
-      FilledButton,
+      PlayButton,
       'Select friends to share with',
     );
-    expect(tester.widget<FilledButton>(action).onPressed, isNull);
+    expect(tester.widget<PlayButton>(action).onPressed, isNull);
 
     await tester.tap(find.text('Mira'));
     await tester.tap(find.text('Timo'));
@@ -123,8 +124,8 @@ void main() {
     await tester.tap(find.text('4 hours'));
     await tester.pumpAndSettle();
 
-    final ChoiceChip fourHours = tester.widget<ChoiceChip>(
-      find.widgetWithText(ChoiceChip, '4 hours'),
+    final PlayChip fourHours = tester.widget<PlayChip>(
+      find.widgetWithText(PlayChip, '4 hours'),
     );
     expect(fourHours.selected, isTrue);
     final String after = tester

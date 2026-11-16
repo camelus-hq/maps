@@ -1,13 +1,15 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../domain/entities/transit.dart';
 import '../../../../state/route.dart';
 import '../../../common/error_text.dart';
 import '../../../common/shimmer.dart';
+import '../../../design/play.dart';
 import 'transit_common.dart';
 import 'transit_itinerary_card.dart';
 
@@ -55,10 +57,10 @@ class _TimeChips extends ConsumerWidget {
             children: <Widget>[
               Padding(
                 padding: const EdgeInsets.only(right: AppSpacing.sm),
-                child: ChoiceChip(
-                  label: const Text('Leave now'),
+                child: PlayChip(
+                  label: 'Leave now',
                   selected: state.transitTimeMode == TransitTimeMode.leaveNow,
-                  onSelected: (bool _) => unawaited(
+                  onTap: () => unawaited(
                     controller.setTransitTimeOfDay(
                       TransitTimeMode.leaveNow,
                       null,
@@ -73,10 +75,10 @@ class _TimeChips extends ConsumerWidget {
                   ])
                 Padding(
                   padding: const EdgeInsets.only(right: AppSpacing.sm),
-                  child: ChoiceChip(
-                    label: Text(label),
+                  child: PlayChip(
+                    label: label,
                     selected: state.transitTimeMode == mode,
-                    onSelected: (bool _) => unawaited(
+                    onTap: () => unawaited(
                       _pickDateTime(context, ref, controller, mode),
                     ),
                   ),
@@ -87,16 +89,16 @@ class _TimeChips extends ConsumerWidget {
         if (state.transitTimeMode != TransitTimeMode.leaveNow)
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(
+            child: PlayButton(
+              label: transitClock(
+                context,
+                (state.transitTime ?? DateTime.now()).toLocal(),
+              ),
+              icon: PlayIcons.clock,
+              variant: PlayButtonVariant.ghost,
+              size: PlayButtonSize.sm,
               onPressed: () => unawaited(
                 _pickDateTime(context, ref, controller, state.transitTimeMode),
-              ),
-              icon: const Icon(Icons.schedule),
-              label: Text(
-                transitClock(
-                  context,
-                  (state.transitTime ?? DateTime.now()).toLocal(),
-                ),
               ),
             ),
           ),
@@ -104,7 +106,7 @@ class _TimeChips extends ConsumerWidget {
     );
   }
 
-  /// Opens a date picker then a time picker and re-plans with the result.
+  /// Opens the date-and-time picker and re-plans with the result.
   Future<void> _pickDateTime(
     BuildContext context,
     WidgetRef ref,
@@ -114,25 +116,275 @@ class _TimeChips extends ConsumerWidget {
     final DateTime now = DateTime.now();
     final DateTime initial =
         state.transitTime ?? now.add(const Duration(minutes: 5));
-    final DateTime? date = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime(now.year, now.month, now.day),
-      lastDate: now.add(const Duration(days: 365)),
+    final DateTime? picked = await showPlaySheet<DateTime>(
+      context,
+      builder: (BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(
+          PlaySpace.lg,
+          0,
+          PlaySpace.lg,
+          PlaySpace.lg,
+        ),
+        child: _PlayDateTimePicker(initial: initial),
+      ),
     );
-    if (date == null || !context.mounted) {
+    if (picked == null) {
       return;
     }
-    final TimeOfDay? time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(initial),
+    await controller.setTransitTimeOfDay(mode, picked);
+  }
+}
+
+/// A play date-and-time picker: a month grid over hour/minute steppers. It
+/// replaces the Material `showDatePicker`/`showTimePicker` pair (the play kit
+/// has no pickers of its own yet).
+class _PlayDateTimePicker extends StatefulWidget {
+  const _PlayDateTimePicker({required this.initial});
+
+  final DateTime initial;
+
+  @override
+  State<_PlayDateTimePicker> createState() => _PlayDateTimePickerState();
+}
+
+class _PlayDateTimePickerState extends State<_PlayDateTimePicker> {
+  static const List<String> _months = <String>[
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+  static const List<String> _weekdays = <String>[
+    'M',
+    'T',
+    'W',
+    'T',
+    'F',
+    'S',
+    'S',
+  ];
+
+  late DateTime _value = widget.initial;
+  late int _year = widget.initial.year;
+  late int _month = widget.initial.month;
+
+  void _shiftMonth(int delta) {
+    final int index = _year * 12 + (_month - 1) + delta;
+    setState(() {
+      _year = index ~/ 12;
+      _month = index % 12 + 1;
+    });
+  }
+
+  void _shiftMinutes(int delta) {
+    setState(() => _value = _value.add(Duration(minutes: delta)));
+  }
+
+  void _selectDay(int day) {
+    setState(
+      () => _value = DateTime(_year, _month, day, _value.hour, _value.minute),
     );
-    if (time == null) {
-      return;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final PlayColors colors = PlayColors.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          'Choose a time',
+          style: PlayType.title.copyWith(color: colors.ink),
+        ),
+        const SizedBox(height: PlaySpace.md),
+        Row(
+          children: <Widget>[
+            PlayIconButton(
+              icon: PlayIcons.back,
+              variant: PlayIconButtonVariant.plain,
+              size: 36,
+              semanticLabel: 'Previous month',
+              onPressed: () => _shiftMonth(-1),
+            ),
+            Expanded(
+              child: Text(
+                '${_months[_month - 1]} $_year',
+                textAlign: TextAlign.center,
+                style: PlayType.bodyStrong.copyWith(color: colors.ink),
+              ),
+            ),
+            PlayIconButton(
+              icon: PlayIcons.next,
+              variant: PlayIconButtonVariant.plain,
+              size: 36,
+              semanticLabel: 'Next month',
+              onPressed: () => _shiftMonth(1),
+            ),
+          ],
+        ),
+        const SizedBox(height: PlaySpace.xs),
+        Row(
+          children: <Widget>[
+            for (final String weekday in _weekdays)
+              Expanded(
+                child: Text(
+                  weekday,
+                  textAlign: TextAlign.center,
+                  style: PlayType.caption.copyWith(color: colors.inkMuted),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: PlaySpace.xs),
+        ..._weeks(colors),
+        const SizedBox(height: PlaySpace.md),
+        _TimeRow(
+          label: formatClockLabel(
+            _value,
+            use24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
+          ),
+          onEarlier: () => _shiftMinutes(-15),
+          onLater: () => _shiftMinutes(15),
+        ),
+        const SizedBox(height: PlaySpace.lg),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: PlayButton(
+                label: 'Cancel',
+                variant: PlayButtonVariant.ghost,
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+            const SizedBox(width: PlaySpace.sm),
+            Expanded(
+              child: PlayButton(
+                label: 'Set',
+                onPressed: () => Navigator.of(context).pop(_value),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _weeks(PlayColors colors) {
+    final DateTime first = DateTime(_year, _month, 1);
+    final int daysInMonth = DateTime(_year, _month + 1, 0).day;
+    final int leading = first.weekday - 1;
+    final List<int> cells = <int>[
+      for (int i = 0; i < leading; i++) 0,
+      for (int day = 1; day <= daysInMonth; day++) day,
+    ];
+    while (cells.length % 7 != 0) {
+      cells.add(0);
     }
-    await controller.setTransitTimeOfDay(
-      mode,
-      DateTime(date.year, date.month, date.day, time.hour, time.minute),
+    final List<Widget> rows = <Widget>[];
+    for (int start = 0; start < cells.length; start += 7) {
+      rows.add(
+        Row(
+          children: <Widget>[
+            for (int i = start; i < start + 7; i++)
+              Expanded(child: _dayCell(cells[i], colors)),
+          ],
+        ),
+      );
+    }
+    return rows;
+  }
+
+  Widget _dayCell(int day, PlayColors colors) {
+    if (day == 0) {
+      return const SizedBox(height: 40);
+    }
+    final bool selected =
+        _value.year == _year && _value.month == _month && _value.day == day;
+    return PlayPressable(
+      onTap: () => _selectDay(day),
+      scale: 0.9,
+      child: SizedBox(
+        height: 40,
+        child: Center(
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: selected ? colors.primary : const Color(0x00000000),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                '$day',
+                style: PlayType.caption.copyWith(
+                  color: selected ? colors.onPrimary : colors.ink,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The hour/minute stepper row inside [_PlayDateTimePicker].
+class _TimeRow extends StatelessWidget {
+  const _TimeRow({
+    required this.label,
+    required this.onEarlier,
+    required this.onLater,
+  });
+
+  final String label;
+  final VoidCallback onEarlier;
+  final VoidCallback onLater;
+
+  @override
+  Widget build(BuildContext context) {
+    final PlayColors colors = PlayColors.of(context);
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Text('Time', style: PlayType.body.copyWith(color: colors.ink)),
+        ),
+        PlayIconButton(
+          icon: PhosphorIconsRegular.minus,
+          variant: PlayIconButtonVariant.surface,
+          tone: PlayTone.soft,
+          size: 36,
+          iconSize: 16,
+          semanticLabel: 'Earlier',
+          onPressed: onEarlier,
+        ),
+        SizedBox(
+          width: 84,
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: PlayType.bodyStrong.copyWith(color: colors.ink),
+          ),
+        ),
+        PlayIconButton(
+          icon: PlayIcons.add,
+          variant: PlayIconButtonVariant.surface,
+          tone: PlayTone.soft,
+          size: 36,
+          iconSize: 16,
+          semanticLabel: 'Later',
+          onPressed: onLater,
+        ),
+      ],
     );
   }
 }
@@ -156,11 +408,11 @@ class _PreferRow extends ConsumerWidget {
         ])
           Padding(
             padding: const EdgeInsets.only(right: AppSpacing.sm),
-            child: FilterChip(
-              avatar: Icon(transitModeIcon(group.modes.first), size: 18),
-              label: Text(group.label),
+            child: PlayChip(
+              icon: transitModeIcon(group.modes.first),
+              label: group.label,
               selected: group.modes.every(state.transitModes.contains),
-              onSelected: (bool _) => unawaited(
+              onTap: () => unawaited(
                 ref
                     .read(routeControllerProvider.notifier)
                     .toggleTransitGroup(group),
@@ -188,20 +440,20 @@ class _RoutePreferenceRow extends ConsumerWidget {
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.only(right: AppSpacing.sm),
-          child: FilterChip(
-            label: const Text('Fewer transfers'),
+          child: PlayChip(
+            label: 'Fewer transfers',
             selected: state.fewerTransfers,
-            onSelected: (bool value) =>
-                unawaited(controller.setFewerTransfers(value)),
+            onTap: () =>
+                unawaited(controller.setFewerTransfers(!state.fewerTransfers)),
           ),
         ),
         Padding(
           padding: const EdgeInsets.only(right: AppSpacing.sm),
-          child: FilterChip(
-            label: const Text('Less walking'),
+          child: PlayChip(
+            label: 'Less walking',
             selected: state.lessWalking,
-            onSelected: (bool value) =>
-                unawaited(controller.setLessWalking(value)),
+            onTap: () =>
+                unawaited(controller.setLessWalking(!state.lessWalking)),
           ),
         ),
       ],
@@ -217,12 +469,16 @@ class _LabelledChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final PlayColors colors = PlayColors.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: <Widget>[
         SizedBox(
           width: 56,
-          child: Text(label, style: Theme.of(context).textTheme.labelLarge),
+          child: Text(
+            label,
+            style: PlayType.bodyStrong.copyWith(color: colors.ink),
+          ),
         ),
         Expanded(
           child: SingleChildScrollView(
@@ -290,7 +546,7 @@ class _TransitError extends StatelessWidget {
   const _TransitError({
     required this.message,
     required this.onRetry,
-    this.icon = Icons.error_outline,
+    this.icon = PlayIcons.error,
   });
 
   final String message;
@@ -303,14 +559,15 @@ class _TransitError extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         children: <Widget>[
-          Icon(icon, color: Theme.of(context).colorScheme.outline),
+          Icon(icon, color: PlayColors.of(context).inkFaint),
           const SizedBox(height: AppSpacing.sm),
           Text(message, textAlign: TextAlign.center),
           const SizedBox(height: AppSpacing.sm),
-          OutlinedButton.icon(
+          PlayButton(
+            label: 'Retry',
+            icon: PlayIcons.refresh,
+            variant: PlayButtonVariant.ghost,
             onPressed: onRetry,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Retry'),
           ),
         ],
       ),

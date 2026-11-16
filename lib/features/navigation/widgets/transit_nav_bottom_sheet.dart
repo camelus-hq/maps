@@ -1,7 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format.dart';
@@ -10,6 +11,7 @@ import '../../../state/commands/commands_provider.dart';
 import '../../../state/navigation.dart';
 import '../../../state/route.dart';
 import '../../../state/settings.dart';
+import '../../design/play.dart';
 import '../../directions/widgets/transit/transit_line_badge.dart';
 import '../../directions/widgets/transit/transit_timeline.dart';
 import 'nav_sheet.dart';
@@ -71,6 +73,7 @@ class TransitNavBottomSheet extends ConsumerWidget {
   /// sheet showed before the journey timeline.
   Widget _fallback(BuildContext context, WidgetRef ref, NavState nav) {
     final bool imperial = ref.watch(imperialUnitsProvider);
+    final PlayColors colors = PlayColors.of(context);
     final double remaining = (nav.totalMeters - nav.traveledMeters).clamp(
       0,
       double.infinity,
@@ -93,11 +96,7 @@ class TransitNavBottomSheet extends ConsumerWidget {
           const SizedBox(height: AppSpacing.sm),
           Row(
             children: <Widget>[
-              Icon(
-                Icons.directions_transit,
-                size: 16,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+              Icon(PhosphorIconsRegular.bus, size: 16, color: colors.inkMuted),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -105,9 +104,7 @@ class TransitNavBottomSheet extends ConsumerWidget {
                   'to go',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                  style: PlayType.caption.copyWith(color: colors.inkMuted),
                 ),
               ),
             ],
@@ -127,6 +124,7 @@ class TransitNavBottomSheet extends ConsumerWidget {
     RouteState routeState,
   ) {
     final List<TransitLeg> rides = itinerary.rides;
+    final PlayColors colors = PlayColors.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       child: Column(
@@ -144,11 +142,7 @@ class TransitNavBottomSheet extends ConsumerWidget {
                 children: <Widget>[
                   for (int i = 0; i < rides.length; i++) ...<Widget>[
                     if (i > 0)
-                      Icon(
-                        Icons.chevron_right,
-                        size: 18,
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
+                      Icon(PlayIcons.next, size: 18, color: colors.inkFaint),
                     TransitLineBadge(leg: rides[i]),
                   ],
                 ],
@@ -169,7 +163,10 @@ class TransitNavBottomSheet extends ConsumerWidget {
             liveFraction: progress?.fractionInLeg,
             onStopTap: (TransitStop stop) => _openDepartures(ref, stop),
           ),
-          const Divider(height: AppSpacing.lg),
+          const SizedBox(
+            height: AppSpacing.lg,
+            child: Center(child: PlayDivider()),
+          ),
           _TotalRow(nav: nav),
         ],
       ),
@@ -199,19 +196,20 @@ class _TotalRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool arrived = nav.status == NavStatus.arrived;
+    final PlayColors colors = PlayColors.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Row(
         children: <Widget>[
           Text(
             arrived ? 'Trip complete' : formatDuration(nav.remaining),
-            style: Theme.of(context).textTheme.titleMedium,
+            style: PlayType.subtitle.copyWith(color: colors.ink),
           ),
           const Spacer(),
           if (!arrived)
             Text(
               'Arrives ${arrivalLabel(context, nav.remaining)}',
-              style: Theme.of(context).textTheme.bodySmall,
+              style: PlayType.caption.copyWith(color: colors.inkMuted),
             ),
         ],
       ),

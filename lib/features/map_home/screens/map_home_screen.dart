@@ -1,6 +1,6 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/app_spacing.dart';
 import '../../../domain/entities/place.dart';
@@ -14,6 +14,7 @@ import '../../../state/route.dart';
 import '../../../state/settings.dart';
 import '../../../state/social.dart';
 import '../../../state/transit_departures.dart';
+import '../../design/play.dart';
 import '../../directions/screens/directions_sheet.dart';
 import '../../directions/widgets/directions_endpoint_card.dart';
 import '../../directions/widgets/transit/transit_departures_sheet.dart';
@@ -63,101 +64,103 @@ class MapHomeScreen extends ConsumerWidget {
     // Routes map taps (result markers + native POIs) into the place flow.
     ref.watch(mapTapProvider);
 
-    return Scaffold(
-      // The map must stay put while the soft keyboard is open. With the default
-      // (true) the whole body — including the native Mapbox platform view —
-      // would shrink by the keyboard inset and the map would jump up whenever a
-      // text field appears anywhere above it (e.g. the search screen, which is
-      // pushed on top of this route while this one stays mounted). Sheets that
-      // own a text field lift themselves above the keyboard instead.
-      resizeToAvoidBottomInset: false,
-      body: Stack(
-        fit: StackFit.expand,
-        children: <Widget>[
-          const MapSurface(),
-          // Measures the map viewport (used to bound POI searches to what is
-          // on screen). Invisible.
-          const MapViewportLayer(),
-          // Measures the viewport and keeps the review badges in sync with the
-          // camera (queries only what is on screen). Invisible.
-          const ReviewMapLayer(),
+    final PlayColors colors = PlayColors.of(context);
+    // A full-bleed, Material-free host: the map (a platform view) fills the
+    // screen, so the map must not be inset by a safe area and must not shrink
+    // when the soft keyboard opens — a text field pushed on top of this route
+    // (e.g. search) lifts itself above the keyboard instead.
+    return ColoredBox(
+      color: colors.canvas,
+      child: DefaultTextStyle(
+        style: PlayType.body.copyWith(color: colors.ink),
+        child: Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            const MapSurface(),
+            // Measures the map viewport (used to bound POI searches to what is
+            // on screen). Invisible.
+            const MapViewportLayer(),
+            // Measures the viewport and keeps the review badges in sync with the
+            // camera (queries only what is on screen). Invisible.
+            const ReviewMapLayer(),
 
-          if (!navigating) ...<Widget>[
-            if (!composing)
-              SafeArea(
-                bottom: false,
-                child: routeState.status != RouteStatus.idle
-                    // Directions: the search bar is replaced by the
-                    // start/stop/destination card that overhangs the map. It is
-                    // top-aligned so the transparent Stack region below it still
-                    // passes map gestures through.
-                    ? Align(
-                        alignment: Alignment.topCenter,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.md,
-                            AppSpacing.sm,
-                            AppSpacing.md,
-                            0,
-                          ),
-                          child: const DirectionsEndpointCard(),
-                        ),
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: <Widget>[
-                          Padding(
+            if (!navigating) ...<Widget>[
+              if (!composing)
+                SafeArea(
+                  bottom: false,
+                  child: routeState.status != RouteStatus.idle
+                      // Directions: the search bar is replaced by the
+                      // start/stop/destination card that overhangs the map. It is
+                      // top-aligned so the transparent Stack region below it still
+                      // passes map gestures through.
+                      ? Align(
+                          alignment: Alignment.topCenter,
+                          child: Padding(
                             padding: const EdgeInsets.fromLTRB(
                               AppSpacing.md,
                               AppSpacing.sm,
                               AppSpacing.md,
                               0,
                             ),
-                            child: SearchBarPill(
-                              onTap: () => context.push('/search'),
-                            ),
+                            child: const DirectionsEndpointCard(),
                           ),
-                          const SizedBox(height: AppSpacing.sm),
-                          const CategoryChips(),
-                          const SizedBox(height: AppSpacing.xs),
-                          const FriendReviewChip(),
-                          const SearchAreaChip(),
-                        ],
-                      ),
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: <Widget>[
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                AppSpacing.md,
+                                AppSpacing.sm,
+                                AppSpacing.md,
+                                0,
+                              ),
+                              child: SearchBarPill(
+                                onTap: () => context.push('/search'),
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            const CategoryChips(),
+                            const SizedBox(height: AppSpacing.xs),
+                            const FriendReviewChip(),
+                            const SearchAreaChip(),
+                          ],
+                        ),
+                ),
+              // The sheet is measured by [MapSheet] (each sheet wraps its
+              // `DraggableScrollableSheet` in it) so the floating chrome below can
+              // attach to its top edge. Transition with a fade only — a slide
+              // would translate the sheet's measured region while it animates, and
+              // the chrome would briefly (and, after settling, incorrectly) anchor
+              // to the offset position.
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                transitionBuilder: (Widget child, Animation<double> animation) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+                child: categoryRouteOpen
+                    // The results route is showing the sheet; the map home holds
+                    // nothing so exactly one sheet reports the chrome anchor and
+                    // the chrome re-anchors when the route pops.
+                    ? const SizedBox.shrink()
+                    : _sheet(composing, selected, routeState, category, friend),
               ),
-            // The sheet is measured by [MapSheet] (each sheet wraps its
-            // `DraggableScrollableSheet` in it) so the floating chrome below can
-            // attach to its top edge. Transition with a fade only — a slide
-            // would translate the sheet's measured region while it animates, and
-            // the chrome would briefly (and, after settling, incorrectly) anchor
-            // to the offset position.
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              transitionBuilder: (Widget child, Animation<double> animation) {
-                return FadeTransition(opacity: animation, child: child);
-              },
-              child: categoryRouteOpen
-                  // The results route is showing the sheet; the map home holds
-                  // nothing so exactly one sheet reports the chrome anchor and
-                  // the chrome re-anchors when the route pops.
-                  ? const SizedBox.shrink()
-                  : _sheet(composing, selected, routeState, category, friend),
-            ),
-            if (!(routeState.isTransit && routeState.transitDetailOpen))
-              const MapControls(),
-            if (ref.watch(appConfigProvider).hasMapboxToken)
-              const MapAttribution(),
+              if (!(routeState.isTransit && routeState.transitDetailOpen))
+                const MapControls(),
+              if (ref.watch(appConfigProvider).hasMapboxToken)
+                const MapAttribution(),
+            ],
+            if (navigating) const NavigationOverlay(),
+            // The "Departures" board floats above whatever sheet is showing (the
+            // journey detail or the live navigation sheet) when a station on the
+            // timeline is tapped.
+            if (ref.watch(transitDeparturesProvider).isOpen)
+              const TransitDeparturesSheet(),
+            // Drives the ongoing OS notification of the running trip (and routes
+            // its "Exit navigation" action back into guidance). Invisible.
+            const NavigationNotificationLayer(),
           ],
-          if (navigating) const NavigationOverlay(),
-          // The "Departures" board floats above whatever sheet is showing (the
-          // journey detail or the live navigation sheet) when a station on the
-          // timeline is tapped.
-          if (ref.watch(transitDeparturesProvider).isOpen)
-            const TransitDeparturesSheet(),
-          // Drives the ongoing OS notification of the running trip (and routes
-          // its "Exit navigation" action back into guidance). Invisible.
-          const NavigationNotificationLayer(),
-        ],
+        ),
       ),
     );
   }
