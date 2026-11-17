@@ -43,9 +43,17 @@ class MapHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // First run: show the location rationale before the map.
-    if (ref.watch(onboardingSeenProvider).value == false) {
-      return const OnboardingScreen();
+    // First run: show the onboarding (terms, then the location rationale)
+    // before the map. Until the persisted flag has loaded we keep a neutral
+    // canvas rather than the map: building the map here would spin up the
+    // location controls and ask the OS for permission before the user has made
+    // any choice (the `false` default of the previous gate let the map — and so
+    // the prompt — flash on every launch).
+    final AsyncValue<bool> onboardingSeen = ref.watch(onboardingSeenProvider);
+    if (onboardingSeen.value != true) {
+      return onboardingSeen.hasValue
+          ? const OnboardingScreen()
+          : const _StartupCanvas();
     }
     final Place? selected = ref.watch(selectedPlaceProvider);
     final RouteState routeState = ref.watch(routeControllerProvider);
@@ -196,5 +204,25 @@ class MapHomeScreen extends ConsumerWidget {
       return CategoryResultsSheet(key: ValueKey<String>('category-$category'));
     }
     return const HomeShell(key: ValueKey<String>('home'));
+  }
+}
+
+/// A neutral first frame, shown while the persisted onboarding flag loads.
+///
+/// It deliberately builds nothing that touches the map or the device location,
+/// so the OS permission prompt can only appear after the user has chosen to
+/// allow location.
+class _StartupCanvas extends StatelessWidget {
+  const _StartupCanvas();
+
+  @override
+  Widget build(BuildContext context) {
+    final PlayColors colors = PlayColors.of(context);
+    return ColoredBox(
+      color: colors.canvas,
+      child: Center(
+        child: Icon(PlayIcons.brand, size: 56, color: colors.primary),
+      ),
+    );
   }
 }
