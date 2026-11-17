@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
-import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../features/directions/screens/endpoint_picker_screen.dart';
 import '../features/feedback/screens/feedback_screen.dart';
@@ -17,38 +17,18 @@ import '../features/social/screens/manage_friends_screen.dart';
 import '../features/social/screens/profile_screen.dart';
 import '../state/navigation_keys.dart';
 
-/// The default page transition: a small horizontal slide plus a fade, so every
-/// pushed screen animates in the same way instead of swapping instantly.
+/// The default page transition: a small horizontal slide, so every pushed screen
+/// animates in the same way instead of swapping instantly.
+///
+/// Deliberately **no fade**. A full-screen `OpacityLayer` makes the engine
+/// re-composite the whole pushed page on every animation frame; with Impeller
+/// (the Android default, and it has no raster cache) that costs a large multiple
+/// of a normal frame, so pushing the search page visibly stuttered — worse
+/// because its text field autofocuses, so the IME opens and re-lays-out the page
+/// across the same frames. A transform-only slide keeps the motion and draws the
+/// page once per frame.
 Page<void> _page(GoRouterState state, Widget child) {
-  return CustomTransitionPage<void>(
-    key: state.pageKey,
-    child: child,
-    transitionDuration: const Duration(milliseconds: 280),
-    reverseTransitionDuration: const Duration(milliseconds: 220),
-    transitionsBuilder:
-        (
-          BuildContext context,
-          Animation<double> animation,
-          Animation<double> secondaryAnimation,
-          Widget child,
-        ) {
-          final Animation<double> curved = CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-            reverseCurve: Curves.easeInCubic,
-          );
-          return FadeTransition(
-            opacity: curved,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.06, 0), // slide in from the trailing edge
-                end: Offset.zero,
-              ).animate(curved),
-              child: child,
-            ),
-          );
-        },
-  );
+  return MaterialPage<void>(key: state.pageKey, child: child);
 }
 
 /// The category-results page: a non-modal route that fades up over the map.
@@ -156,8 +136,12 @@ GoRouter buildAppRouter() {
       ),
       GoRoute(
         path: '/search',
-        pageBuilder: (BuildContext context, GoRouterState state) =>
-            _page(state, const SearchScreen()),
+        pageBuilder: (BuildContext context, GoRouterState state) {
+          return NoTransitionPage<void>(
+            key: state.pageKey,
+            child: const SearchScreen(),
+          );
+        },
       ),
       GoRoute(
         path: '/directions/endpoint',
