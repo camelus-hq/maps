@@ -19,6 +19,7 @@ import 'package:openmaps/features/place_details/widgets/place_details_sheet.dart
 import 'package:openmaps/state/place.dart';
 import 'package:openmaps/state/ports.dart';
 import 'package:openmaps/state/social.dart';
+import 'package:openmaps/state/transit_stop_board.dart';
 
 /// The station sheet: a public-transport stop gets a **Departures** tab before
 /// Overview, its line chips, and an earlier/later paged departures list.
@@ -133,6 +134,34 @@ void main() {
     expect(find.text('Back to departures'), findsNothing);
     expect(find.text('Later departures'), findsOneWidget);
   });
+
+  testWidgets(
+    'removing the station sheet clears its board without a build-time write',
+    (WidgetTester tester) async {
+      // Regression: `PlaceDetailsSheet.dispose` cleared the stop board
+      // synchronously, which throws Riverpod's "Tried to modify a provider
+      // while the widget tree was building" when the sheet is removed while its
+      // board is still open (e.g. opening Directions from the station sheet).
+      // The close is deferred past the frame now.
+      final ProviderContainer c = container();
+      addTearDown(c.dispose);
+      await pump(tester, c, station);
+      await expand(tester);
+      // The board is open for the station.
+      expect(c.read(transitStopBoardProvider).isOpen, isTrue);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: c,
+          child: const MaterialApp(home: Scaffold(body: SizedBox())),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(c.read(transitStopBoardProvider).isOpen, isFalse);
+    },
+  );
 
   testWidgets('a non-transit place has no Departures tab', (
     WidgetTester tester,

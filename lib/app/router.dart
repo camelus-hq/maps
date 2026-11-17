@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,6 +36,20 @@ Page<void> _page(GoRouterState state, Widget child) {
   return MaterialPage<void>(key: state.pageKey, child: child);
 }
 
+/// Runs a route's pop handler once the current frame is done building.
+///
+/// `Page.onPopInvoked` is not only called for a real pop (the back gesture):
+/// when the Navigator replaces its page list — e.g. the URL mirror's `go('/')`
+/// dropping the `/place` or `/category` overlay — go_router reports the removal
+/// from `NavigatorState.didUpdateWidget`. Clearing a provider there throws
+/// Riverpod's "Tried to modify a provider while the widget tree was building",
+/// so the pop work is scheduled as a microtask, which runs after the frame's
+/// synchronous build/finalize pass has finished (unlike a timer, it never leaves
+/// a pending timer behind for tests).
+void _runOnPop(void Function() work) {
+  scheduleMicrotask(work);
+}
+
 /// The category-results page: a non-modal route that fades up over the map.
 ///
 /// A normal [Page]/[ModalRoute] always lays down a full-screen [ModalBarrier],
@@ -59,7 +74,7 @@ Page<void> _categoryPage(GoRouterState state, BuildContext context) {
     builder: (BuildContext context) => const CategoryResultsScreen(),
     onPopInvoked: (bool didPop, void result) {
       if (didPop) {
-        onCategoryRoutePopped(container);
+        _runOnPop(() => onCategoryRoutePopped(container));
       }
     },
   );
@@ -86,7 +101,7 @@ Page<void> _sheetRoutePage(
         DeepLinkRouteHost(link: link, child: const SizedBox.shrink()),
     onPopInvoked: (bool didPop, void result) {
       if (didPop) {
-        onPopped(container);
+        _runOnPop(() => onPopped(container));
       }
     },
   );

@@ -11,8 +11,9 @@ import '../widgets/category_results_sheet.dart';
 /// Clears the browse when the `/category` route is popped (the back gesture, an
 /// AppBar pop, a chip deselect or the sheet's ✕).
 ///
-/// Called from the route's `onPopInvoked` (see `lib/app/router.dart`), which
-/// runs outside a widget life-cycle, so provider writes are safe here.
+/// Called from the route's `onPopInvoked` (see `lib/app/router.dart`), which the
+/// router defers past the frame before calling this — the Navigator can report
+/// the pop from `didUpdateWidget`, where a provider write would throw.
 ///
 /// Skipped when a place was just selected: tapping a result opens the place
 /// sheet on the map behind, and its pin must stay.

@@ -359,6 +359,11 @@ class TransitStopBoardController extends Notifier<TransitStopBoardState> {
   /// sheet is disposed, so a sheet replacing it (under the sheet switcher) does
   /// not close the board it just opened.
   void closeFor(String placeId) {
+    // A deferred close can run after the container was torn down (tests) or the
+    // notifier was disposed; touching `state` then would throw.
+    if (!ref.mounted) {
+      return;
+    }
     if (state.isOpen && state.placeId == placeId) {
       close();
     }

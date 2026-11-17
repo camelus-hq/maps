@@ -59,6 +59,53 @@ void main() {
     expect(router.state.uri.path, '/');
   });
 
+  testWidgets('closing a station sheet never writes a provider mid-build', (
+    WidgetTester tester,
+  ) async {
+    // Regression: closing a place whose overlay route is on the stack makes the
+    // URL mirror `go('/')`, which drops the page and used to run its
+    // `onPopInvoked` — clearing `selectedPlaceProvider` — from
+    // `NavigatorState.didUpdateWidget`, throwing Riverpod's "Tried to modify a
+    // provider while the widget tree was building" (reported from the device
+    // when closing a public-transport stop).
+    const Place station = Place(
+      id: 'way/123456',
+      name: 'Central Station',
+      position: LatLon(52.525, 13.415),
+      category: 'rail',
+    );
+    final FakeOsmPlaceSource osm = FakeOsmPlaceSource()
+      ..seed('way/123456', station);
+    final ProviderContainer container = ProviderContainer(
+      overrides: <Override>[osmPlaceSourceProvider.overrideWithValue(osm)],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const OpenMapsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final GoRouter router = GoRouter.of(
+      tester.element(find.byType(MapHomeScreen)),
+    );
+
+    container.read(selectedPlaceProvider.notifier).select(station);
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(router.state.uri.path, '/place/way/123456');
+
+    // Close the sheet like the ✕ button does.
+    container.read(selectedPlaceProvider.notifier).clear();
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(router.state.uri.path, '/');
+  });
+
   testWidgets('a cold-start deep link opens the place from the URL', (
     WidgetTester tester,
   ) async {

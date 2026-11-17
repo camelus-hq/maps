@@ -118,8 +118,17 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet> {
   void dispose() {
     // Closing the sheet clears the stop board and the lines it drew — but not
     // when another place sheet (with a different place) has already replaced it
-    // under the sheet switcher and opened its own board.
-    _board.closeFor(widget.place.id);
+    // under the sheet switcher and opened its own board. Deferred to just after
+    // the frame: setting the board's state synchronously from `dispose` mutates a
+    // provider while the tree is finalising, which Riverpod rejects ("Tried to
+    // modify a provider while the widget tree was building"). The place guard in
+    // `closeFor` still keeps it a no-op when the board now belongs to another
+    // sheet.
+    final TransitStopBoardController board = _board;
+    final String placeId = widget.place.id;
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => board.closeFor(placeId),
+    );
     super.dispose();
   }
 
