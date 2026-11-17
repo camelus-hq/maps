@@ -15,6 +15,7 @@ import '../../core/utils/osm_payments.dart';
 import '../../core/utils/osm_ref.dart';
 import '../../data/fakes/fake_review_service.dart';
 import '../../data/fakes/fake_social_service.dart';
+import '../../domain/deep_link.dart';
 import '../../domain/entities/app_settings.dart';
 import '../../domain/entities/app_update.dart';
 import '../../domain/entities/camera.dart';
@@ -45,6 +46,7 @@ import '../../domain/ports/app_database.dart';
 import '../../domain/ports/map_service.dart';
 import '../../domain/ports/settings_repository.dart';
 import '../config.dart';
+import '../deep_link.dart';
 import '../feedback.dart';
 import '../follow.dart';
 import '../home.dart';
@@ -305,6 +307,39 @@ List<Command> buildCommands(Ref ref) {
         }
         return repository.onboardingSeen();
       },
+    ),
+    Command(
+      id: 'app.deepLink',
+      description:
+          'Apply a deep link URL (params: {url}) — opens the place, search or '
+          'route plan it names, the same path a shared link takes. Returns the '
+          'canonical URL. E.g. /place/way/159230368, '
+          '/directions?mode=drive&destination=52.5,13.4, /search?q=coffee, '
+          'or any of them with ?at=52.48,13.36,13z.',
+      handler: (CommandRequest request) async {
+        final Object? raw = request.params['url'];
+        if (raw is! String || raw.trim().isEmpty) {
+          throw const CommandException('bad_params', '"url" is required');
+        }
+        final Uri? uri = Uri.tryParse(raw.trim());
+        final DeepLink? link = uri == null ? null : DeepLink.parse(uri);
+        if (link == null) {
+          throw const CommandException(
+            'bad_params',
+            '"url" is not a deep-linkable URL',
+          );
+        }
+        await ref.read(deepLinkControllerProvider.notifier).apply(link);
+        return link.toUri().toString();
+      },
+    ),
+    Command(
+      id: 'app.link',
+      description:
+          'Return the canonical deep link for the last applied URL, or null '
+          'when none has been applied yet.',
+      handler: (CommandRequest request) async =>
+          ref.read(deepLinkControllerProvider)?.toUri().toString(),
     ),
     Command(
       id: 'app.update.state',

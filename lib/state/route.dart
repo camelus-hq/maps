@@ -276,6 +276,49 @@ class RouteController extends Notifier<RouteState> {
     await _request();
   }
 
+  /// Plans a route between explicit endpoints — used by the control channel
+  /// (`route.request`) and by a deep link.
+  ///
+  /// A null [origin] falls back to the device's current location, so
+  /// `/directions?destination=…` plans "from here". [stops] are kept in order.
+  Future<void> planRoute({
+    required Place destination,
+    Place? origin,
+    List<Place> stops = const <Place>[],
+    TravelMode? mode,
+  }) async {
+    unawaited(
+      ref.read(recentSearchesProvider.notifier).recordPlace(destination),
+    );
+    state = state.copyWith(
+      mode: mode ?? state.mode,
+      stops: stops,
+      destination: destination,
+      status: RouteStatus.loading,
+      routes: const <Route>[],
+      itineraries: const <TransitItinerary>[],
+      selectedItineraryIndex: 0,
+      transitDetailOpen: false,
+      clearError: true,
+      clearPickTarget: true,
+      clearEditingEndpoint: true,
+    );
+    final Place? start = origin ?? await _currentLocationPlace();
+    if (start == null) {
+      state = state.copyWith(
+        status: RouteStatus.error,
+        error: const UnknownException('Location is unavailable'),
+      );
+      return;
+    }
+    state = state.copyWith(origin: start);
+    if (state.mode.isTransit) {
+      await _requestTransit();
+      return;
+    }
+    await _request();
+  }
+
   Future<void> setOrigin(Place origin) async {
     state = state.copyWith(origin: origin, clearError: true);
     await _replan();

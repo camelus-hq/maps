@@ -11,6 +11,7 @@ import '../features/feedback/widgets/alpha_banner.dart';
 import '../features/update/widgets/update_prompt.dart';
 import '../state/screenshot.dart';
 import '../state/settings.dart';
+import 'deep_link_bridge.dart';
 import 'router.dart';
 
 /// The root widget: themes plus the app-level router, wrapped in the repaint
@@ -67,7 +68,12 @@ class _OpenMapsAppState extends State<OpenMapsApp> {
                   style: PlayType.body.copyWith(color: colors.ink),
                   child: AlphaBannerHost(
                     child: UpdatePromptHost(
-                      child: child ?? const SizedBox.shrink(),
+                      // Keeps the browser/router URL in step with the app state
+                      // and applies deep links (see `deep_link_bridge.dart`).
+                      child: DeepLinkBridge(
+                        router: _router,
+                        child: child ?? const SizedBox.shrink(),
+                      ),
                     ),
                   ),
                 ),

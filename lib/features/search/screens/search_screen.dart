@@ -25,7 +25,11 @@ import '../../design/play.dart';
 /// where the details sheet takes over. When a Home/Work slot is being filled
 /// ([savedPlacePickProvider]) the selection is saved to that slot instead.
 class SearchScreen extends ConsumerStatefulWidget {
-  const SearchScreen({super.key});
+  const SearchScreen({this.initialQuery, super.key});
+
+  /// A query carried in the URL (`/search?q=…`), seeded into the field and run
+  /// once on open so a deep link lands on its results. `null` on a plain open.
+  final String? initialQuery;
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
@@ -37,10 +41,22 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   void initState() {
     super.initState();
-    // Always open on the recent list: drop any query/results left by an earlier
-    // search so "Recent" (and Home/Work) is what the user sees first.
+    final String? initial = widget.initialQuery;
+    if (initial != null) {
+      _text.text = initial;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+      if (!mounted) {
+        return;
+      }
+      if (initial != null) {
+        unawaited(
+          ref.read(searchControllerProvider.notifier).submitText(initial),
+        );
+      } else {
+        // Always open on the recent list: drop any query/results left by an
+        // earlier search so "Recent" (and Home/Work) is what the user sees
+        // first.
         ref.read(searchControllerProvider.notifier).reset();
       }
     });

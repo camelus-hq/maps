@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../domain/deep_link.dart';
+import '../features/common/deep_link_route_host.dart';
 import '../features/directions/screens/endpoint_picker_screen.dart';
 import '../features/feedback/screens/feedback_screen.dart';
 import '../features/map_home/screens/category_results_screen.dart';
@@ -16,6 +18,8 @@ import '../features/social/screens/friends_screen.dart';
 import '../features/social/screens/manage_friends_screen.dart';
 import '../features/social/screens/profile_screen.dart';
 import '../state/navigation_keys.dart';
+import '../state/place.dart';
+import '../state/route.dart';
 
 /// The default page transition: a small horizontal slide, so every pushed screen
 /// animates in the same way instead of swapping instantly.
@@ -56,6 +60,33 @@ Page<void> _categoryPage(GoRouterState state, BuildContext context) {
     onPopInvoked: (bool didPop, void result) {
       if (didPop) {
         onCategoryRoutePopped(container);
+      }
+    },
+  );
+}
+
+/// A transparent, barrier-free overlay route for a sheet that is *rendered by*
+/// the map home (the place details and the directions preview both live off
+/// provider state). It exists purely so the URL carries the sheet and the back
+/// gesture closes it: [onPopInvoked] clears the matching state, and the map
+/// still receives every gesture because the route paints nothing.
+Page<void> _sheetRoutePage(
+  GoRouterState state,
+  BuildContext context, {
+  required DeepLink? link,
+  required void Function(ProviderContainer container) onPopped,
+}) {
+  final ProviderContainer container = ProviderScope.containerOf(
+    context,
+    listen: false,
+  );
+  return _OverlayPage<void>(
+    key: state.pageKey,
+    builder: (BuildContext context) =>
+        DeepLinkRouteHost(link: link, child: const SizedBox.shrink()),
+    onPopInvoked: (bool didPop, void result) {
+      if (didPop) {
+        onPopped(container);
       }
     },
   );
@@ -122,8 +153,19 @@ GoRouter buildAppRouter() {
     routes: <RouteBase>[
       GoRoute(
         path: '/',
-        pageBuilder: (BuildContext context, GoRouterState state) =>
-            _page(state, const MapHomeScreen()),
+        pageBuilder: (BuildContext context, GoRouterState state) {
+          // The map home applies the `at=` view from any of its URLs; the
+          // nested sheet routes apply the rest of their own link. A URL that is
+          // not one of the map's routes (a picker, settings, …) leaves it be.
+          final DeepLink? link = DeepLink.parse(state.uri);
+          return _page(
+            state,
+            DeepLinkRouteHost(
+              link: link == null ? null : DeepLink.map(view: link.view),
+              child: const MapHomeScreen(),
+            ),
+          );
+        },
         routes: <RouteBase>[
           // Nested under the map home so the results route always has the map
           // (with the pins) painted beneath it.
@@ -132,14 +174,68 @@ GoRouter buildAppRouter() {
             pageBuilder: (BuildContext context, GoRouterState state) =>
                 _categoryPage(state, context),
           ),
+          // Deep-linkable sheets. These render nothing (the map home draws the
+          // sheet from state); they carry the URL and make the back gesture
+          // close the sheet, exactly like `/category`.
+          GoRoute(
+            path: 'place/:type/:id',
+            pageBuilder: (BuildContext context, GoRouterState state) =>
+                _sheetRoutePage(
+                  state,
+                  context,
+                  link: state.uri.path.startsWith('/place')
+                      ? DeepLink.parse(state.uri)
+                      : null,
+                  onPopped: (ProviderContainer container) =>
+                      container.read(selectedPlaceProvider.notifier).clear(),
+                ),
+          ),
+          GoRoute(
+            path: 'place/:id',
+            pageBuilder: (BuildContext context, GoRouterState state) =>
+                _sheetRoutePage(
+                  state,
+                  context,
+                  link: state.uri.path.startsWith('/place')
+                      ? DeepLink.parse(state.uri)
+                      : null,
+                  onPopped: (ProviderContainer container) =>
+                      container.read(selectedPlaceProvider.notifier).clear(),
+                ),
+          ),
+          GoRoute(
+            path: 'directions',
+            pageBuilder: (BuildContext context, GoRouterState state) =>
+                _sheetRoutePage(
+                  state,
+                  context,
+                  link: state.uri.path == '/directions'
+                      ? DeepLink.parse(state.uri)
+                      : null,
+                  onPopped: (ProviderContainer container) =>
+                      container.read(routeControllerProvider.notifier).clear(),
+                ),
+          ),
         ],
       ),
       GoRoute(
         path: '/search',
         pageBuilder: (BuildContext context, GoRouterState state) {
+          final String? query = state.uri.queryParameters['q'];
           return NoTransitionPage<void>(
             key: state.pageKey,
-            child: const SearchScreen(),
+            child: DeepLinkRouteHost(
+              // The search screen seeds its own query; the host only applies
+              // the `at=` view from the URL.
+              link: state.uri.path == '/search'
+                  ? DeepLink.parse(state.uri)
+                  : null,
+              child: SearchScreen(
+                initialQuery: (query != null && query.trim().isNotEmpty)
+                    ? query
+                    : null,
+              ),
+            ),
           );
         },
       ),
