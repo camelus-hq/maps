@@ -18,6 +18,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
+import 'package:go_router/go_router.dart';
 import 'package:ndk/ndk.dart';
 import 'package:ndk_flutter/ndk_flutter.dart';
 
@@ -59,6 +61,11 @@ Future<void> main(List<String> args) async {
       database: database,
     ),
   );
+
+  if (kIsWeb) {
+    usePathUrlStrategy();
+  }
+  GoRouter.optionURLReflectsImperativeAPIs = true;
 
   // Development key from `--dart-define=NOSTR_NSEC=…` (never committed): sign
   // in without the login screen. A restored account always wins, and the key is
