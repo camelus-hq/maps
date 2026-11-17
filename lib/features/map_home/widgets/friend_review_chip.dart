@@ -1,12 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../../domain/entities/review_marker.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/reviews.dart';
+import '../../design/play.dart';
 
 /// The "Friend's review" chip on the map, shown when at least one place on
 /// screen has been reviewed by a friend.
@@ -24,7 +24,7 @@ class FriendReviewChip extends ConsumerWidget {
       return const SizedBox.shrink();
     }
     final bool friendOnly = ref.watch(friendReviewsOnlyProvider);
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
 
     double sum = 0;
     int reviews = 0;
@@ -37,65 +37,30 @@ class FriendReviewChip extends ConsumerWidget {
         ? '${friends.length} places'
         : '★ ${(average * 5).toStringAsFixed(1)} · '
               '${friends.length} ${friends.length == 1 ? 'place' : 'places'}';
+    final PlayToneColors palette = colors.tone(
+      friendOnly ? PlayTone.strong : PlayTone.neutral,
+    );
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(horizontal: PlaySpace.lg),
       child: Align(
         alignment: Alignment.centerLeft,
-        child: Material(
-          color: friendOnly ? scheme.primary : scheme.surface,
-          elevation: 2,
-          shape: const StadiumBorder(),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => unawaited(
-              ref.read(commandRegistryProvider).dispatch(
-                'map.reviews.friendOnly',
-                <String, Object?>{'on': !friendOnly},
-              ),
+        child: PlayChip(
+          label: friendOnly ? "Friend's reviews" : "Friend's review",
+          icon: friendOnly ? PlayIcons.filter : PlayIcons.friends,
+          selected: friendOnly,
+          onTap: () => unawaited(
+            ref.read(commandRegistryProvider).dispatch(
+              'map.reviews.friendOnly',
+              <String, Object?>{'on': !friendOnly},
             ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md,
-                vertical: AppSpacing.sm,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Icon(
-                    friendOnly ? Icons.filter_alt : Icons.people_alt_outlined,
-                    size: 16,
-                    color: friendOnly ? scheme.onPrimary : scheme.primary,
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Flexible(
-                    child: Text(
-                      friendOnly ? "Friend's reviews" : "Friend's review",
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: friendOnly ? scheme.onPrimary : scheme.onSurface,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Flexible(
-                    child: Text(
-                      summary,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: friendOnly
-                            ? scheme.onPrimary
-                            : scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          ),
+          trailing: Text(
+            summary,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: PlayType.caption.copyWith(
+              color: palette.foreground.withValues(alpha: 0.72),
             ),
           ),
         ),

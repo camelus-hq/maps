@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:openmaps/app/app.dart';
 import 'package:openmaps/core/errors/app_exception.dart';
 import 'package:openmaps/data/fakes/fake_app_installer.dart';
 import 'package:openmaps/data/fakes/fake_app_version_source.dart';
@@ -9,6 +10,7 @@ import 'package:openmaps/data/fakes/fake_release_source.dart';
 import 'package:openmaps/data/fakes/fake_social_service.dart';
 import 'package:openmaps/domain/entities/app_settings.dart';
 import 'package:openmaps/domain/entities/app_update.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/settings/screens/settings_screen.dart';
 import 'package:openmaps/state/ports.dart';
 import 'package:openmaps/state/settings.dart';
@@ -17,6 +19,31 @@ import 'package:openmaps/state/update.dart';
 final Uri _apkUrl = Uri.parse('https://example.com/app/app.apk');
 
 void main() {
+  testWidgets('the theme setting switches the play palette too', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const OpenMapsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    PlayTheme playTheme = tester.widget<PlayTheme>(find.byType(PlayTheme));
+    expect(playTheme.colors.brightness, Brightness.light);
+
+    await container.read(settingsProvider.notifier).setTheme(AppThemeMode.dark);
+    await tester.pumpAndSettle();
+
+    playTheme = tester.widget<PlayTheme>(find.byType(PlayTheme));
+    expect(playTheme.colors.brightness, Brightness.dark);
+    expect(identical(playTheme.colors, PlayColors.dark), isTrue);
+  });
+
   testWidgets('settings screen changes units and theme', (
     WidgetTester tester,
   ) async {

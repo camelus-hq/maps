@@ -7,6 +7,7 @@ import 'package:openmaps/data/fakes/fake_review_service.dart';
 import 'package:openmaps/data/fakes/fake_social_service.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/place.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/reviews/widgets/star_rating.dart';
 import 'package:openmaps/features/reviews/widgets/write_review_sheet.dart';
 import 'package:openmaps/state/ports.dart';
@@ -73,7 +74,7 @@ void main() {
     await pumpComposer(tester);
     final Finder stars = find.descendant(
       of: find.byType(StarRatingInput),
-      matching: find.byType(InkResponse),
+      matching: find.byType(PlayPressable),
     );
     expect(stars, findsNWidgets(5));
     await tester.tap(stars.at(4));
@@ -91,18 +92,18 @@ void main() {
       find
           .descendant(
             of: find.byType(StarRatingInput),
-            matching: find.byType(InkResponse),
+            matching: find.byType(PlayPressable),
           )
           .at(3),
     );
     await tester.enterText(
-      find.byType(TextField),
+      find.byType(EditableText),
       'An unforgettable evening. The acoustics are incredible.',
     );
     await tester.pump();
 
-    final FilledButton button = tester.widget<FilledButton>(
-      find.byType(FilledButton),
+    final PlayButton button = tester.widget<PlayButton>(
+      find.widgetWithText(PlayButton, 'Publish review'),
     );
     expect(button.onPressed, isNotNull);
 
@@ -130,8 +131,8 @@ void main() {
       find.text('Friends-only reviews are not available yet.'),
       findsOneWidget,
     );
-    final FilledButton button = tester.widget<FilledButton>(
-      find.byType(FilledButton),
+    final PlayButton button = tester.widget<PlayButton>(
+      find.widgetWithText(PlayButton, 'Publish review'),
     );
     expect(button.onPressed, isNull);
   });
@@ -140,8 +141,8 @@ void main() {
     WidgetTester tester,
   ) async {
     await pumpComposer(tester);
-    final FilledButton button = tester.widget<FilledButton>(
-      find.byType(FilledButton),
+    final PlayButton button = tester.widget<PlayButton>(
+      find.widgetWithText(PlayButton, 'Publish review'),
     );
     expect(button.onPressed, isNull);
   });

@@ -1,6 +1,7 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 
-import '../../core/theme/app_spacing.dart';
+import '../../core/theme/play/play_colors.dart';
+import '../../core/theme/play/play_tokens.dart';
 
 /// A shimmering placeholder surface for content that is still loading.
 ///
@@ -8,9 +9,8 @@ import '../../core/theme/app_spacing.dart';
 /// masked across the whole subtree, so a skeleton built from several boxes
 /// shimmers as one piece and animates from one ticker instead of one per box.
 ///
-/// The colours come from the active [ColorScheme] (a `surfaceContainerHighest`
-/// block with an `onSurface` highlight blended through it), so the shimmer
-/// reads correctly in both light and dark themes.
+/// The colours come from the active play palette (a recessed block with the ink
+/// blended through it), so the shimmer reads correctly in both light and dark.
 class Shimmer extends StatefulWidget {
   const Shimmer({
     super.key,
@@ -42,10 +42,10 @@ class _ShimmerState extends State<Shimmer> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    final Color base = scheme.surfaceContainerHighest;
+    final PlayColors colors = PlayColors.of(context);
+    final Color base = colors.surfaceSunken;
     final Color highlight = Color.alphaBlend(
-      scheme.onSurface.withValues(alpha: 0.09),
+      colors.ink.withValues(alpha: 0.08),
       base,
     );
     return AnimatedBuilder(
@@ -87,7 +87,7 @@ class ShimmerBox extends StatelessWidget {
     super.key,
     this.width,
     this.height = 14,
-    this.radius = AppSpacing.xs + 2,
+    this.radius = PlayRadii.xs,
     this.circle = false,
   });
 
@@ -103,11 +103,12 @@ class ShimmerBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final PlayColors colors = PlayColors.of(context);
     return Container(
       width: circle ? height : width,
       height: height,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: colors.surfaceSunken,
         shape: circle ? BoxShape.circle : BoxShape.rectangle,
         borderRadius: circle ? null : BorderRadius.circular(radius),
       ),

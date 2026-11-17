@@ -1,10 +1,11 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format.dart';
 import '../../../domain/entities/route.dart';
+import '../../../domain/entities/travel_mode.dart';
 import '../../../state/navigation.dart';
+import '../../design/play.dart';
 import '../../directions/widgets/maneuver_glyph.dart';
 import '../nav_style.dart';
 import 'lane_glyph.dart';
@@ -50,7 +51,7 @@ class NavBanner extends StatelessWidget {
     final Color border = switch (urgency) {
       NavUrgency.now => style.bannerAccent,
       NavUrgency.soon => const Color(0xFFF2B23E),
-      NavUrgency.none => Colors.transparent,
+      NavUrgency.none => const Color(0x00000000),
     };
     final String primaryText = arrived
         ? 'You have arrived'
@@ -62,116 +63,104 @@ class NavBanner extends StatelessWidget {
         ? null
         : _instructionOf(maneuver);
 
-    return Material(
-      color: Colors.transparent,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOut,
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: border,
-              width: urgency == NavUrgency.none ? 0 : 2,
-            ),
-            boxShadow: const <BoxShadow>[
-              BoxShadow(
-                color: Color(0x33000000),
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
+    return PlayPressable(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(PlayRadii.md),
+          border: Border.all(
+            color: border,
+            width: urgency == NavUrgency.none ? 0 : 2,
           ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.md,
-                  AppSpacing.md,
-                  AppSpacing.md,
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: <Widget>[
-                    ManeuverGlyph(
-                      type: type,
-                      size: 54,
-                      color: style.bannerAccent,
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: Color(0x33000000),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.all(PlaySpace.lg),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: <Widget>[
+                  ManeuverGlyph(
+                    type: type,
+                    size: 54,
+                    color: style.bannerAccent,
+                  ),
+                  const SizedBox(width: PlaySpace.lg),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text(
+                          primaryText,
+                          style: TextStyle(
+                            color: style.bannerAccent,
+                            fontSize: urgency == NavUrgency.now ? 34 : 30,
+                            fontWeight: FontWeight.w600,
+                            height: 1.05,
+                          ),
+                        ),
+                        if (street != null) ...<Widget>[
                           Text(
-                            primaryText,
+                            'toward',
                             style: TextStyle(
-                              color: style.bannerAccent,
-                              fontSize: urgency == NavUrgency.now ? 34 : 30,
-                              fontWeight: FontWeight.w600,
-                              height: 1.05,
+                              color: style.bannerAccent.withValues(alpha: 0.75),
+                              fontSize: 13,
+                              height: 1.1,
                             ),
                           ),
-                          if (street != null) ...<Widget>[
-                            Text(
-                              'toward',
-                              style: TextStyle(
-                                color: style.bannerAccent.withValues(
-                                  alpha: 0.75,
-                                ),
-                                fontSize: 13,
-                                height: 1.1,
-                              ),
-                            ),
-                            Text(
-                              street,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: style.bannerAccent,
-                                fontSize: 22,
-                                fontWeight: FontWeight.w600,
-                                height: 1.15,
-                              ),
-                            ),
-                          ] else if (instruction != null)
-                            Text(
-                              instruction,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: style.bannerAccent.withValues(
-                                  alpha: 0.92,
-                                ),
-                                fontSize: 21,
-                                height: 1.15,
-                              ),
-                            ),
-                          if (urgency != NavUrgency.none) ...<Widget>[
-                            const SizedBox(height: AppSpacing.sm),
-                            _ApproachBar(
-                              progress: _approachProgress(distance),
+                          Text(
+                            street,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
                               color: style.bannerAccent,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w600,
+                              height: 1.15,
                             ),
-                          ],
+                          ),
+                        ] else if (instruction != null)
+                          Text(
+                            instruction,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: style.bannerAccent.withValues(alpha: 0.92),
+                              fontSize: 21,
+                              height: 1.15,
+                            ),
+                          ),
+                        if (urgency != NavUrgency.none) ...<Widget>[
+                          const SizedBox(height: PlaySpace.sm),
+                          _ApproachBar(
+                            progress: _approachProgress(distance),
+                            color: style.bannerAccent,
+                          ),
                         ],
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              if (style.showLanes &&
-                  maneuver != null &&
-                  maneuver.lanes.isNotEmpty)
-                NavLaneStrip(style: style, lanes: maneuver.lanes),
-            ],
-          ),
+            ),
+            if (style.showLanes &&
+                maneuver != null &&
+                maneuver.lanes.isNotEmpty)
+              NavLaneStrip(style: style, lanes: maneuver.lanes),
+          ],
         ),
       ),
     );
@@ -234,8 +223,8 @@ class NavLaneStrip extends StatelessWidget {
       color: style.laneStrip,
       width: double.infinity,
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
+        horizontal: PlaySpace.lg,
+        vertical: PlaySpace.sm,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -285,13 +274,13 @@ class NavSpeedChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final int? limit = limitKmh;
     final double? speed = currentKmh;
-    return Material(
-      color: scheme.surface,
-      elevation: 6,
-      borderRadius: BorderRadius.circular(18),
+    return PlaySurface(
+      backgroundColor: colors.surface,
+      radius: PlayRadii.md,
+      shadow: PlayShadow.soft,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Row(
@@ -299,7 +288,7 @@ class NavSpeedChip extends StatelessWidget {
           children: <Widget>[
             if (limit != null) ...<Widget>[
               _SpeedLimitSign(value: limit),
-              const SizedBox(width: AppSpacing.sm),
+              const SizedBox(width: PlaySpace.sm),
             ],
             Column(
               mainAxisSize: MainAxisSize.min,
@@ -311,12 +300,11 @@ class NavSpeedChip extends StatelessWidget {
                       : (imperial
                             ? '${(speed * 0.621371).round()}'
                             : '${speed.round()}'),
-                  style: Theme.of(context).textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w700),
+                  style: PlayType.title.copyWith(color: colors.ink),
                 ),
                 Text(
                   imperial ? 'mph' : 'km/h',
-                  style: Theme.of(context).textTheme.labelSmall,
+                  style: PlayType.caption.copyWith(color: colors.inkMuted),
                 ),
               ],
             ),
@@ -338,7 +326,7 @@ class _SpeedLimitSign extends StatelessWidget {
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFFFFFFFF),
         shape: BoxShape.circle,
         border: Border.all(color: AppColors.statusClosed, width: 4),
       ),
@@ -346,7 +334,7 @@ class _SpeedLimitSign extends StatelessWidget {
       child: Text(
         '$value',
         style: const TextStyle(
-          color: Colors.black,
+          color: Color(0xFF000000),
           fontWeight: FontWeight.w700,
           fontSize: 16,
         ),
@@ -365,33 +353,27 @@ class NavRecenterButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.surface,
-      elevation: 4,
-      borderRadius: BorderRadius.circular(AppSpacing.pillRadius),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onPressed,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm + 2,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(Icons.navigation, size: 20, color: scheme.primary),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                'Re-center',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: scheme.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
+    final PlayColors colors = PlayColors.of(context);
+    return PlaySurface(
+      backgroundColor: colors.surface,
+      radius: PlayRadii.pill,
+      shadow: PlayShadow.soft,
+      onTap: onPressed,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: PlaySpace.lg,
+          vertical: PlaySpace.sm + 2,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(PlayIcons.navigation, size: 20, color: colors.primary),
+            const SizedBox(width: PlaySpace.sm),
+            Text(
+              'Re-center',
+              style: PlayType.bodyStrong.copyWith(color: colors.primary),
+            ),
+          ],
         ),
       ),
     );
@@ -411,14 +393,12 @@ class NavSideControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         _SideButton(
-          icon: tracking ? Icons.map_outlined : Icons.navigation,
-          tooltip: tracking ? 'Route overview' : 'Re-center',
-          color: scheme.onSurfaceVariant,
+          icon: tracking ? PlayIcons.mapStandard : PlayIcons.navigation,
+          semanticLabel: tracking ? 'Route overview' : 'Re-center',
           onPressed: onToggleOverview,
         ),
       ],
@@ -429,27 +409,60 @@ class NavSideControls extends StatelessWidget {
 class _SideButton extends StatelessWidget {
   const _SideButton({
     required this.icon,
-    required this.tooltip,
-    required this.color,
+    required this.semanticLabel,
     required this.onPressed,
   });
 
   final IconData icon;
-  final String tooltip;
-  final Color color;
+  final String semanticLabel;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Theme.of(context).colorScheme.surface,
-      elevation: 3,
-      shape: const CircleBorder(),
-      child: IconButton(
-        icon: Icon(icon, color: color),
-        tooltip: tooltip,
-        onPressed: onPressed,
-      ),
+    return PlayIconButton(
+      icon: icon,
+      size: 48,
+      semanticLabel: semanticLabel,
+      onPressed: onPressed,
     );
   }
 }
+
+@PlayPreview(name: 'NavBanner', size: Size(420, 260))
+Widget navBannerPreview() => PlayPreviewFrame(
+  child: NavBanner(
+    nav: const NavState(
+      status: NavStatus.navigating,
+      mode: TravelMode.drive,
+      totalMeters: 1700,
+      traveledMeters: 1480,
+      distanceToNextManeuver: 220,
+      nextManeuver: Maneuver(
+        instruction: 'Turn left onto Messedamm',
+        type: ManeuverType.turnLeft,
+        streetName: 'Messedamm',
+        lanes: <LaneGuidance>[
+          LaneGuidance(indications: <LaneIndication>[LaneIndication.left]),
+          LaneGuidance(
+            active: true,
+            valid: true,
+            indications: <LaneIndication>[LaneIndication.left],
+          ),
+          LaneGuidance(indications: <LaneIndication>[LaneIndication.straight]),
+          LaneGuidance(indications: <LaneIndication>[LaneIndication.right]),
+        ],
+      ),
+    ),
+    style: NavStyle.forMode(TravelMode.drive),
+    imperial: false,
+  ),
+);
+
+@PlayPreview(name: 'NavSpeedChip', size: Size(300, 160))
+Widget navSpeedChipPreview() => const PlayPreviewFrame(
+  child: NavSpeedChip(limitKmh: 50, currentKmh: 42, imperial: false),
+);
+
+@PlayPreview(name: 'NavRecenterButton', size: Size(320, 140))
+Widget navRecenterButtonPreview() =>
+    PlayPreviewFrame(child: NavRecenterButton(onPressed: () {}));

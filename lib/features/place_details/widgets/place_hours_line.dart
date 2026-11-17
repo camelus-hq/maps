@@ -1,8 +1,8 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/opening_hours.dart';
+import '../../design/play.dart';
 
 /// The place sheet's opening-hours line.
 ///
@@ -20,9 +20,8 @@ class PlaceHoursLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme scheme = theme.colorScheme;
-    final TextStyle? base = theme.textTheme.bodyMedium;
+    final PlayColors colors = PlayColors.of(context);
+    final TextStyle base = PlayType.body.copyWith(color: colors.ink);
     final String? value = hours?.trim();
     final OpeningHoursStatus? status = evaluateOpeningHours(
       hours,
@@ -36,12 +35,12 @@ class PlaceHoursLine extends StatelessWidget {
         OpeningState.openingSoon => (AppColors.statusSoon, 'Opening soon'),
         OpeningState.closed => (AppColors.statusClosed, 'Closed now'),
       };
-      final String? change = status.nextChangeMinutes == null
+      final int? changeMinutes = status.nextChangeMinutes;
+      final String? change = changeMinutes == null
           ? null
-          : '${status.isOpen ? 'Closes' : 'Opens'} '
-                '${_clock(status.nextChangeMinutes!)}';
+          : '${status.isOpen ? 'Closes' : 'Opens'} ${_clock(changeMinutes)}';
       return Padding(
-        padding: const EdgeInsets.only(top: AppSpacing.xs),
+        padding: const EdgeInsets.only(top: PlaySpace.xs),
         child: Row(
           children: <Widget>[
             Container(
@@ -49,16 +48,13 @@ class PlaceHoursLine extends StatelessWidget {
               height: 8,
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
-            const SizedBox(width: AppSpacing.sm),
+            const SizedBox(width: PlaySpace.sm),
             Text(
               label,
-              style: base?.copyWith(color: color, fontWeight: FontWeight.w600),
+              style: base.copyWith(color: color, fontWeight: FontWeight.w700),
             ),
             if (change != null) ...<Widget>[
-              Text(
-                ' · ',
-                style: base?.copyWith(color: scheme.onSurfaceVariant),
-              ),
+              Text(' · ', style: base.copyWith(color: colors.inkMuted)),
               Flexible(
                 child: Text(
                   change,
@@ -75,16 +71,13 @@ class PlaceHoursLine extends StatelessWidget {
 
     if (value != null && value.isNotEmpty) {
       return Padding(
-        padding: const EdgeInsets.only(top: AppSpacing.xs),
+        padding: const EdgeInsets.only(top: PlaySpace.xs),
         child: Row(
           children: <Widget>[
-            Icon(Icons.schedule, size: 16, color: scheme.onSurfaceVariant),
-            const SizedBox(width: AppSpacing.xs),
+            Icon(PlayIcons.clock, size: 16, color: colors.inkMuted),
+            const SizedBox(width: PlaySpace.xs),
             Expanded(
-              child: Text(
-                value,
-                style: base?.copyWith(color: scheme.onSurfaceVariant),
-              ),
+              child: Text(value, style: base.copyWith(color: colors.inkMuted)),
             ),
           ],
         ),
@@ -92,10 +85,10 @@ class PlaceHoursLine extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.xs),
+      padding: const EdgeInsets.only(top: PlaySpace.xs),
       child: Text(
         'Hours not listed',
-        style: base?.copyWith(color: scheme.onSurfaceVariant),
+        style: base.copyWith(color: colors.inkMuted),
       ),
     );
   }

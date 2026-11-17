@@ -1,5 +1,6 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/errors/app_exception.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -8,6 +9,7 @@ import '../../../state/commands/commands_provider.dart';
 import '../../../state/transit_stop_board.dart';
 import '../../common/error_text.dart';
 import '../../common/shimmer.dart';
+import '../../design/play.dart';
 import '../../directions/widgets/transit/transit_common.dart';
 import '../../directions/widgets/transit/transit_departure_row.dart';
 import '../../directions/widgets/transit/transit_line_chip.dart';
@@ -35,6 +37,7 @@ class PlaceStopLines extends ConsumerWidget {
     if (routes.isEmpty) {
       return const SizedBox.shrink();
     }
+    final PlayColors colors = PlayColors.of(context);
     final List<TransitStopRoute> shown = routes.length <= _maxChips
         ? routes
         : routes.sublist(0, _maxChips);
@@ -55,9 +58,7 @@ class PlaceStopLines extends ConsumerWidget {
           if (hidden > 0)
             Text(
               '+$hidden',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+              style: PlayType.caption.copyWith(color: colors.inkMuted),
             ),
         ],
       ),
@@ -87,12 +88,13 @@ class PlaceDeparturesTab extends ConsumerWidget {
       return _ErrorState(error: state.error);
     }
     if (state.departures.isEmpty) {
+      final PlayColors colors = PlayColors.of(context);
       return Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Center(
           child: Text(
             'No departures found for this stop',
-            style: Theme.of(context).textTheme.bodyMedium,
+            style: PlayType.body.copyWith(color: colors.ink),
           ),
         ),
       );
@@ -103,7 +105,7 @@ class PlaceDeparturesTab extends ConsumerWidget {
       children: <Widget>[
         _LoadControl(
           label: 'Earlier departures',
-          icon: Icons.keyboard_arrow_up,
+          icon: PhosphorIconsRegular.caretUp,
           loading: state.loadingEarlier,
           visible: state.hasEarlier,
           command: 'transit.stop.earlier',
@@ -119,7 +121,7 @@ class PlaceDeparturesTab extends ConsumerWidget {
           ),
         _LoadControl(
           label: 'Later departures',
-          icon: Icons.keyboard_arrow_down,
+          icon: PhosphorIconsRegular.caretDown,
           loading: state.loadingLater,
           visible: state.hasLater,
           command: 'transit.stop.later',
@@ -151,22 +153,35 @@ class _LoadControl extends ConsumerWidget {
     if (!visible && !loading) {
       return const SizedBox.shrink();
     }
+    final PlayColors colors = PlayColors.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-      child: TextButton.icon(
-        onPressed: loading
+      child: PlayPressable(
+        enabled: !loading,
+        onTap: loading
             ? null
             : () => ref
                   .read(commandRegistryProvider)
                   .dispatch(command, const <String, Object?>{}),
-        icon: loading
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Icon(icon, size: 18),
-        label: Text(label),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                if (loading)
+                  const PlaySpinner(size: 16, strokeWidth: 2)
+                else
+                  Icon(icon, size: 18, color: colors.primary),
+                const SizedBox(width: AppSpacing.xs),
+                Text(
+                  label,
+                  style: PlayType.bodyStrong.copyWith(color: colors.primary),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -179,7 +194,7 @@ class _TripDetail extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     final TransitStopBoardState state = ref.watch(transitStopBoardProvider);
     final TransitStopDeparture? departure = state.selectedDeparture;
     final TransitStopLine? line = state.tripDetail;
@@ -189,11 +204,13 @@ class _TripDetail extends ConsumerWidget {
       children: <Widget>[
         Align(
           alignment: Alignment.centerLeft,
-          child: TextButton.icon(
+          child: PlayButton(
+            label: 'Back to departures',
+            icon: PlayIcons.back,
+            variant: PlayButtonVariant.ghost,
+            size: PlayButtonSize.sm,
             onPressed: () =>
                 ref.read(transitStopBoardProvider.notifier).closeTrip(),
-            icon: const Icon(Icons.arrow_back, size: 18),
-            label: const Text('Back to departures'),
           ),
         ),
         if (line == null && state.tripLoading)
@@ -202,14 +219,15 @@ class _TripDetail extends ConsumerWidget {
           _TripError(state: state, departure: departure)
         else ...<Widget>[
           _TripHeader(departure: departure, line: line),
-          const Divider(height: AppSpacing.lg),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            child: PlayDivider(),
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: Text(
               '${line.stops.length} stops',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              style: PlayType.caption.copyWith(color: colors.inkMuted),
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -235,8 +253,7 @@ class _TripHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme scheme = theme.colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final TransitStopDeparture? dep = departure;
     final String destination =
         dep?.headsign ?? line.route.routeLongName ?? line.stops.last.name;
@@ -259,7 +276,7 @@ class _TripHeader extends StatelessWidget {
               Expanded(
                 child: Text(
                   'to $destination',
-                  style: theme.textTheme.titleMedium,
+                  style: PlayType.title.copyWith(color: colors.ink),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -272,9 +289,7 @@ class _TripHeader extends StatelessWidget {
               line.route.mode.label,
               if (line.route.agencyName != null) line.route.agencyName!,
             ].join(' · '),
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
+            style: PlayType.caption.copyWith(color: colors.inkMuted),
           ),
           if (dep != null) ...<Widget>[
             const SizedBox(height: AppSpacing.xs),
@@ -289,7 +304,7 @@ class _TripHeader extends StatelessWidget {
                     Icon(
                       transitModeIcon(dep.mode),
                       size: 18,
-                      color: scheme.primary,
+                      color: colors.primary,
                     ),
                     const SizedBox(width: AppSpacing.xs),
                     Text(
@@ -302,14 +317,14 @@ class _TripHeader extends StatelessWidget {
                                 now: DateTime.now(),
                               ),
                             ].join(' · '),
-                      style: theme.textTheme.bodyMedium,
+                      style: PlayType.body.copyWith(color: colors.ink),
                     ),
                   ],
                 ),
                 Text(
                   transitDepartureStatus(dep),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: dep.cancelled ? scheme.error : scheme.outline,
+                  style: PlayType.caption.copyWith(
+                    color: dep.cancelled ? colors.coral : colors.inkFaint,
                   ),
                 ),
                 if (dep.realTime && !dep.cancelled) const TransitLiveBadge(),
@@ -340,8 +355,7 @@ class _TripStopRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme scheme = theme.colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final DateTime? time = stop.displayTime?.toLocal();
     final String? track = stop.displayTrack;
     return Padding(
@@ -356,8 +370,8 @@ class _TripStopRow extends StatelessWidget {
             width: 58,
             child: Text(
               time == null ? '—' : transitClock(context, time),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
+              style: PlayType.caption.copyWith(
+                color: colors.inkMuted,
                 fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
               ),
             ),
@@ -370,7 +384,7 @@ class _TripStopRow extends StatelessWidget {
                 margin: const EdgeInsets.only(top: 4),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: first || last ? Color(color) : scheme.surface,
+                  color: first || last ? Color(color) : colors.surface,
                   border: Border.all(color: Color(color), width: 2),
                 ),
               ),
@@ -383,16 +397,15 @@ class _TripStopRow extends StatelessWidget {
               children: <Widget>[
                 Text(
                   stop.name,
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  style: PlayType.body.copyWith(
+                    color: colors.ink,
                     fontWeight: first || last ? FontWeight.w600 : null,
                   ),
                 ),
                 if (track != null)
                   Text(
                     'Platform $track',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.outline,
-                    ),
+                    style: PlayType.caption.copyWith(color: colors.inkFaint),
                   ),
               ],
             ),
@@ -411,6 +424,7 @@ class _TripError extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final PlayColors colors = PlayColors.of(context);
     final ({IconData icon, String text}) presentation = errorPresentation(
       state.tripError,
       fallback: 'Could not load the train',
@@ -419,19 +433,25 @@ class _TripError extends ConsumerWidget {
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         children: <Widget>[
-          Icon(presentation.icon, color: Theme.of(context).colorScheme.outline),
+          Icon(presentation.icon, color: colors.inkFaint),
           const SizedBox(height: AppSpacing.sm),
-          Text(presentation.text, textAlign: TextAlign.center),
+          Text(
+            presentation.text,
+            textAlign: TextAlign.center,
+            style: PlayType.body.copyWith(color: colors.ink),
+          ),
           const SizedBox(height: AppSpacing.sm),
-          OutlinedButton.icon(
+          PlayButton(
+            label: 'Retry',
+            icon: PlayIcons.refresh,
+            variant: PlayButtonVariant.ghost,
+            size: PlayButtonSize.sm,
             onPressed: () {
               final TransitStopDeparture? dep = departure;
               if (dep != null) {
                 ref.read(transitStopBoardProvider.notifier).openTrip(dep);
               }
             },
-            icon: const Icon(Icons.refresh),
-            label: const Text('Retry'),
           ),
         ],
       ),
@@ -446,6 +466,7 @@ class _ErrorState extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final PlayColors colors = PlayColors.of(context);
     final ({IconData icon, String text}) presentation = errorPresentation(
       error,
       fallback: 'Could not load departures',
@@ -454,15 +475,21 @@ class _ErrorState extends ConsumerWidget {
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         children: <Widget>[
-          Icon(presentation.icon, color: Theme.of(context).colorScheme.outline),
+          Icon(presentation.icon, color: colors.inkFaint),
           const SizedBox(height: AppSpacing.sm),
-          Text(presentation.text, textAlign: TextAlign.center),
+          Text(
+            presentation.text,
+            textAlign: TextAlign.center,
+            style: PlayType.body.copyWith(color: colors.ink),
+          ),
           const SizedBox(height: AppSpacing.sm),
-          OutlinedButton.icon(
+          PlayButton(
+            label: 'Retry',
+            icon: PlayIcons.refresh,
+            variant: PlayButtonVariant.ghost,
+            size: PlayButtonSize.sm,
             onPressed: () =>
                 ref.read(transitStopBoardProvider.notifier).retry(),
-            icon: const Icon(Icons.refresh),
-            label: const Text('Retry'),
           ),
         ],
       ),

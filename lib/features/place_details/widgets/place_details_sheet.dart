@@ -1,9 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format.dart';
 import '../../../core/utils/opening_hours.dart';
 import '../../../core/utils/osm_payments.dart';
@@ -22,6 +21,7 @@ import '../../../state/transit_stop_board.dart';
 import '../../../state/usecases.dart';
 import '../../common/map_sheet.dart';
 import '../../common/shimmer.dart';
+import '../../design/play.dart';
 import '../../reviews/widgets/place_reviews_section.dart';
 import '../../reviews/widgets/star_rating.dart';
 import 'place_departures_tab.dart';
@@ -51,7 +51,7 @@ const List<_PlaceTab> _transitTabs = <_PlaceTab>[
   _PlaceTab.photos,
 ];
 
-/// Draggable bottom sheet for the selected place.
+/// Draggable bottom sheet for the selected place, in the play style.
 ///
 /// The place summary — the name, the rating / review entry, the promoted-payment
 /// badges, the distance/hours line and the primary actions — is the same at
@@ -68,8 +68,7 @@ class PlaceDetailsSheet extends ConsumerStatefulWidget {
   ConsumerState<PlaceDetailsSheet> createState() => _PlaceDetailsSheetState();
 }
 
-class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
-    with TickerProviderStateMixin {
+class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet> {
   /// The default half height and the full height.
   static const double _half = 0.5;
   static const double _full = 0.9;
@@ -86,12 +85,11 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
   /// The measured peek, as a fraction of the sheet viewport.
   double? _peekFraction;
 
-  /// Drives the real Material [TabBar] (animated indicator) and the animated
-  /// body switch below it.
-  late TabController _tabs;
-
   /// The panes currently shown (3, or 4 with Departures for a transit stop).
   List<_PlaceTab> _visibleTabs = _baseTabs;
+
+  /// The selected pane index into [_visibleTabs].
+  int _selected = 0;
 
   /// Whether [_visibleTabs] currently includes the Departures pane.
   bool _showingTransitTabs = false;
@@ -113,27 +111,16 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     final bool transit = isTransitStopPlace(widget.place);
     _showingTransitTabs = transit;
     _visibleTabs = transit ? _transitTabs : _baseTabs;
-    _tabs = TabController(length: _visibleTabs.length, vsync: this)
-      ..addListener(_onTabChanged);
+    _selected = transit ? _tabIndex(_PlaceTab.departures) : 0;
   }
 
   @override
   void dispose() {
-    _tabs
-      ..removeListener(_onTabChanged)
-      ..dispose();
     // Closing the sheet clears the stop board and the lines it drew — but not
     // when another place sheet (with a different place) has already replaced it
     // under the sheet switcher and opened its own board.
     _board.closeFor(widget.place.id);
     super.dispose();
-  }
-
-  void _onTabChanged() {
-    if (mounted && !_tabs.indexIsChanging) {
-      // Rebuild once the indicator has settled on the new tab.
-      setState(() {});
-    }
   }
 
   /// The sheet index of [tab] within the currently visible panes.
@@ -144,7 +131,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
 
   /// Switches the pane set when the place turns out to be a transit stop (the
   /// OSM element lookup can land after the sheet opens). Done after the frame so
-  /// the ticker is never rebuilt during build.
+  /// we never mutate state during build.
   void _syncTransitTabs(bool transit) {
     if (transit == _showingTransitTabs) {
       return;
@@ -155,20 +142,13 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
       }
       setState(() {
         final _PlaceTab current =
-            _visibleTabs[_tabs.index.clamp(0, _visibleTabs.length - 1)];
+            _visibleTabs[_selected.clamp(0, _visibleTabs.length - 1)];
         _visibleTabs = transit ? _transitTabs : _baseTabs;
         _showingTransitTabs = transit;
-        _tabs
-          ..removeListener(_onTabChanged)
-          ..dispose();
-        _tabs = TabController(
-          length: _visibleTabs.length,
-          // A station opens straight on its departures.
-          initialIndex: transit
-              ? _tabIndex(_PlaceTab.departures)
-              : _tabIndex(current),
-          vsync: this,
-        )..addListener(_onTabChanged);
+        // A station opens straight on its departures.
+        _selected = transit
+            ? _tabIndex(_PlaceTab.departures)
+            : _tabIndex(current);
       });
     });
   }
@@ -197,7 +177,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     }
     // The ListView's top padding, the summary and the gap before the tabs.
     final double next =
-        ((AppSpacing.sm + box.size.height + AppSpacing.md) / viewport).clamp(
+        ((PlaySpace.sm + box.size.height + PlaySpace.md) / viewport).clamp(
           0.1,
           0.45,
         );
@@ -209,8 +189,6 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme scheme = theme.colorScheme;
     // The OSM lookup fills in phone/e-mail/website, wheelchair access and the
     // opening hours. It starts when the sheet opens and the sheet re-renders
     // when it lands; until then it simply shows less.
@@ -246,20 +224,14 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
       snap: true,
       snapSizes: <double>[peek, _half, _full],
       builder: (BuildContext context, ScrollController scrollController) {
-        return Material(
-          color: scheme.surface,
-          elevation: 12,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(AppSpacing.sheetRadius),
-          ),
-          clipBehavior: Clip.antiAlias,
+        return PlaySheet(
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.sm,
-              AppSpacing.md,
-              AppSpacing.lg,
+              PlaySpace.lg,
+              PlaySpace.sm,
+              PlaySpace.lg,
+              PlaySpace.xl,
             ),
             children: <Widget>[
               // The summary is the same at every sheet size; the peek is sized
@@ -268,27 +240,27 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
                 key: _summaryKey,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  _Handle(color: scheme.outlineVariant),
-                  const SizedBox(height: AppSpacing.sm),
+                  const PlaySheetHandle(),
+                  const SizedBox(height: PlaySpace.xs),
                   _header(context, place),
-                  const SizedBox(height: AppSpacing.sm),
+                  const SizedBox(height: PlaySpace.sm),
                   _ratingRow(context, summary, loading: reviewsLoading),
                   // A place that takes Bitcoin Lightning / Chaumian ecash
                   // advertises it right below the review (the rest of its
                   // payments live in the Overview).
                   if (place.promotedPayments.isNotEmpty)
                     OsmCryptoBadges(methods: place.promotedPayments),
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: PlaySpace.xs),
                   _subtitle(context, place),
                   // The lines serving a tapped transit stop, in their own
                   // colours, like the other transit screens.
                   if (transit) const PlaceStopLines(),
                   PlaceHoursLine(hours: place.openingHours),
-                  const SizedBox(height: AppSpacing.md),
+                  const SizedBox(height: PlaySpace.lg),
                   _actions(context, place),
                 ],
               ),
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: PlaySpace.lg),
               _tabBar(context),
               _tabBody(context, place, summary, overviewLoading: osmLoading),
             ],
@@ -299,39 +271,43 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
   }
 
   Widget _header(BuildContext context, Place place) {
-    final ThemeData theme = Theme.of(context);
     final bool bookmarked = _isBookmarked();
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.xs),
+            padding: const EdgeInsets.only(top: PlaySpace.xs),
             child: Text(
               place.name,
-              style: theme.textTheme.headlineSmall,
+              style: PlayType.headline.copyWith(
+                color: PlayColors.of(context).ink,
+              ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ),
         ),
-        const SizedBox(width: AppSpacing.sm),
-        _CircleButton(
-          icon: bookmarked ? Icons.bookmark : Icons.bookmark_border,
-          tooltip: bookmarked ? 'Saved' : 'Save',
-          onTap: () => unawaited(_toggleSave(bookmarked)),
+        const SizedBox(width: PlaySpace.sm),
+        PlayIconButton(
+          icon: bookmarked ? PlayIcons.savedFilled : PlayIcons.saved,
+          size: 40,
+          semanticLabel: bookmarked ? 'Saved' : 'Save',
+          onPressed: () => unawaited(_toggleSave(bookmarked)),
         ),
-        const SizedBox(width: AppSpacing.xs),
-        _CircleButton(
-          icon: Icons.share_outlined,
-          tooltip: 'Share',
-          onTap: () => unawaited(_share()),
+        const SizedBox(width: PlaySpace.xs),
+        PlayIconButton(
+          icon: PlayIcons.share,
+          size: 40,
+          semanticLabel: 'Share',
+          onPressed: () => unawaited(_share()),
         ),
-        const SizedBox(width: AppSpacing.xs),
-        _CircleButton(
-          icon: Icons.close,
-          tooltip: 'Close',
-          onTap: () => ref.read(selectedPlaceProvider.notifier).clear(),
+        const SizedBox(width: PlaySpace.xs),
+        PlayIconButton(
+          icon: PlayIcons.close,
+          size: 40,
+          semanticLabel: 'Close',
+          onPressed: () => ref.read(selectedPlaceProvider.notifier).clear(),
         ),
       ],
     );
@@ -344,8 +320,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     ReviewSummary summary, {
     required bool loading,
   }) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme scheme = theme.colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     if (summary.isEmpty) {
       if (loading) {
         // Avoid flashing "Write a review" while the reviews are still loading.
@@ -353,36 +328,37 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
       }
       return Align(
         alignment: Alignment.centerLeft,
-        child: OutlinedButton.icon(
+        child: PlayButton(
+          label: 'Write a review',
+          icon: PlayIcons.review,
+          variant: PlayButtonVariant.soft,
+          size: PlayButtonSize.sm,
           onPressed: _openComposer,
-          icon: const Icon(Icons.rate_review_outlined, size: 18),
-          label: const Text('Write a review'),
         ),
       );
     }
-    return InkWell(
-      onTap: () => _tabs.animateTo(_tabIndex(_PlaceTab.reviews)),
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-        child: Row(
-          children: <Widget>[
-            Text(
-              summary.stars.toStringAsFixed(1),
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: PlayPressable(
+        onTap: () => setState(() => _selected = _tabIndex(_PlaceTab.reviews)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: PlaySpace.xs),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                summary.stars.toStringAsFixed(1),
+                style: PlayType.subtitle.copyWith(color: colors.ink),
               ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            StarRating(value: summary.stars, size: 18),
-            const SizedBox(width: AppSpacing.sm),
-            Text(
-              '(${summary.reviewCount})',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
+              const SizedBox(width: PlaySpace.sm),
+              StarRating(value: summary.stars, size: 18),
+              const SizedBox(width: PlaySpace.sm),
+              Text(
+                '(${summary.reviewCount})',
+                style: PlayType.caption.copyWith(color: colors.inkMuted),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -390,23 +366,21 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
 
   /// "170 m · Cafe", the distance and category line.
   Widget _subtitle(BuildContext context, Place place) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     final LatLon? from = ref.watch(userLocationProvider).value;
     final bool imperial = ref.watch(imperialUnitsProvider);
+    final String? category = place.category?.trim();
     final List<String> parts = <String>[
       if (from != null)
         formatDistance(place.position.distanceTo(from), imperial: imperial),
-      if (place.category != null && place.category!.trim().isNotEmpty)
-        place.category!.trim(),
+      if (category != null && category.isNotEmpty) category,
     ];
     if (parts.isEmpty) {
       return const SizedBox.shrink();
     }
     return Text(
       parts.join(' · '),
-      style: theme.textTheme.bodyMedium?.copyWith(
-        color: theme.colorScheme.onSurfaceVariant,
-      ),
+      style: PlayType.body.copyWith(color: colors.inkMuted),
     );
   }
 
@@ -416,50 +390,45 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
       scrollDirection: Axis.horizontal,
       child: Row(
         children: <Widget>[
-          _ActionPill(
-            icon: Icons.directions,
+          PlayButton(
+            icon: PlayIcons.directions,
             label: 'Directions',
-            primary: true,
-            onTap: () => unawaited(
+            size: PlayButtonSize.sm,
+            onPressed: () => unawaited(
               ref
                   .read(routeControllerProvider.notifier)
                   .plan(place, suggestMode: true),
             ),
           ),
-          const SizedBox(width: AppSpacing.sm),
-          _ActionPill(
-            icon: Icons.call,
+          const SizedBox(width: PlaySpace.sm),
+          PlayButton(
+            icon: PlayIcons.phone,
             label: 'Call',
-            enabled: place.hasPhone,
-            onTap: () => unawaited(_call()),
+            size: PlayButtonSize.sm,
+            variant: PlayButtonVariant.soft,
+            onPressed: place.hasPhone ? () => unawaited(_call()) : null,
           ),
-          const SizedBox(width: AppSpacing.sm),
-          _ActionPill(
-            icon: Icons.language,
+          const SizedBox(width: PlaySpace.sm),
+          PlayButton(
+            icon: PlayIcons.globe,
             label: 'Website',
-            enabled: place.website?.trim().isNotEmpty ?? false,
-            onTap: () => unawaited(_openWebsite()),
+            size: PlayButtonSize.sm,
+            variant: PlayButtonVariant.soft,
+            onPressed: (place.website?.trim().isNotEmpty ?? false)
+                ? () => unawaited(_openWebsite())
+                : null,
           ),
         ],
       ),
     );
   }
 
-  /// The real Material tab bar (animated indicator) for the visible panes.
+  /// The play tab bar for the visible panes.
   Widget _tabBar(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    return TabBar(
-      controller: _tabs,
-      indicatorColor: scheme.primary,
-      indicatorSize: TabBarIndicatorSize.label,
-      labelColor: scheme.primary,
-      unselectedLabelColor: scheme.onSurfaceVariant,
-      labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-      unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500),
-      dividerColor: scheme.outlineVariant,
-      tabs: <Widget>[
-        for (final _PlaceTab tab in _visibleTabs) Tab(text: _tabLabel(tab)),
-      ],
+    return PlayTabs(
+      tabs: <String>[for (final _PlaceTab tab in _visibleTabs) _tabLabel(tab)],
+      selectedIndex: _selected,
+      onSelected: (int index) => setState(() => _selected = index),
     );
   }
 
@@ -477,7 +446,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     required bool overviewLoading,
   }) {
     final _PlaceTab tab =
-        _visibleTabs[_tabs.index.clamp(0, _visibleTabs.length - 1)];
+        _visibleTabs[_selected.clamp(0, _visibleTabs.length - 1)];
     final Widget body = switch (tab) {
       _PlaceTab.departures => const PlaceDeparturesTab(),
       _PlaceTab.overview => _overview(context, place, loading: overviewLoading),
@@ -502,17 +471,20 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
 
   /// The Overview facts, each row only when we actually know the value.
   Widget _overview(BuildContext context, Place place, {required bool loading}) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     final List<Widget> rows = <Widget>[];
     final String? address = place.address;
     if (address != null && address.trim().isNotEmpty) {
       rows.add(
         _InfoRow(
-          icon: Icons.place_outlined,
+          icon: PlayIcons.place,
           text: address.trim(),
-          trailing: IconButton(
-            icon: const Icon(Icons.copy_all_outlined, size: 20),
-            tooltip: 'Copy address',
+          trailing: PlayIconButton(
+            icon: PlayIcons.copy,
+            variant: PlayIconButtonVariant.plain,
+            size: 36,
+            iconSize: 18,
+            semanticLabel: 'Copy address',
             onPressed: () => unawaited(_copyAddress()),
           ),
         ),
@@ -526,7 +498,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           ...rows,
-          if (rows.isNotEmpty) const SizedBox(height: AppSpacing.xs),
+          if (rows.isNotEmpty) const SizedBox(height: PlaySpace.xs),
           const _OverviewSkeleton(),
         ],
       );
@@ -536,7 +508,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
         weeklyOpeningHours(place.openingHours, DateTime.now()) != null) {
       rows.add(
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          padding: const EdgeInsets.symmetric(vertical: PlaySpace.sm),
           child: PlaceWeeklyHours(hours: place.openingHours),
         ),
       );
@@ -545,7 +517,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     if (phone != null && phone.trim().isNotEmpty) {
       rows.add(
         _InfoRow(
-          icon: Icons.call_outlined,
+          icon: PlayIcons.phone,
           text: phone.trim(),
           onTap: () => unawaited(_call()),
         ),
@@ -555,7 +527,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     if (website != null && website.trim().isNotEmpty) {
       rows.add(
         _InfoRow(
-          icon: Icons.language,
+          icon: PlayIcons.globe,
           text: website.trim(),
           link: true,
           onTap: () => unawaited(_openWebsite()),
@@ -566,7 +538,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     if (email != null && email.trim().isNotEmpty) {
       rows.add(
         _InfoRow(
-          icon: Icons.mail_outline,
+          icon: PlayIcons.mail,
           text: email.trim(),
           link: true,
           onTap: () => unawaited(_email()),
@@ -575,12 +547,15 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     }
     if (place.wheelchairAccessible == true) {
       rows.add(
-        const _InfoRow(icon: Icons.accessible, text: 'Wheelchair accessible'),
+        const _InfoRow(
+          icon: PlayIcons.wheelchair,
+          text: 'Wheelchair accessible',
+        ),
       );
     } else if (place.wheelchairAccessible == false) {
       rows.add(
         const _InfoRow(
-          icon: Icons.not_accessible,
+          icon: PlayIcons.wheelchairOff,
           text: 'Not wheelchair accessible',
         ),
       );
@@ -588,13 +563,13 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     final String? wheelchairDescription = place.wheelchairDescription;
     if (wheelchairDescription != null) {
       rows.add(
-        _InfoRow(icon: Icons.accessible_forward, text: wheelchairDescription),
+        _InfoRow(icon: PlayIcons.wheelchair, text: wheelchairDescription),
       );
     }
     final String? takeaway = place.takeaway;
     if (takeaway != null) {
       rows.add(
-        _InfoRow(icon: Icons.takeout_dining, text: _takeawayLabel(takeaway)),
+        _InfoRow(icon: PlayIcons.takeaway, text: _takeawayLabel(takeaway)),
       );
     }
     final List<OsmPaymentMethod> payments = place.paymentMethods;
@@ -607,7 +582,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     }
     final String? paymentDescription = place.paymentDescription;
     if (paymentDescription != null) {
-      rows.add(_InfoRow(icon: Icons.notes_outlined, text: paymentDescription));
+      rows.add(_InfoRow(icon: PlayIcons.note, text: paymentDescription));
     }
     // Developer option: every raw OSM tag, alphabetically.
     if (ref.watch(showOsmTagsProvider) && place.osmTags.isNotEmpty) {
@@ -618,9 +593,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
       rows.add(
         Text(
           'No more details yet',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+          style: PlayType.body.copyWith(color: colors.inkMuted),
         ),
       );
     }
@@ -628,7 +601,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         ...rows,
-        if (hasFacts) const SizedBox(height: AppSpacing.xs),
+        if (hasFacts) const SizedBox(height: PlaySpace.xs),
       ],
     );
   }
@@ -652,9 +625,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(bookmarked ? 'Removed' : 'Saved')));
+    showPlayToast(context, bookmarked ? 'Removed' : 'Saved');
   }
 
   void _openComposer() => unawaited(
@@ -670,8 +641,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
       <String, Object?>{'id': widget.place.id},
     );
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Address copied')));
+      showPlayToast(context, 'Address copied');
     }
   }
 
@@ -694,8 +664,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
     }
     final bool launched = result is Map && result['launched'] == true;
     if (!launched) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(unavailable)));
+      showPlayToast(context, unavailable);
     }
   }
 
@@ -705,120 +674,8 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet>
       <String, Object?>{'id': widget.place.id},
     );
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Share text copied')));
+      showPlayToast(context, 'Share text copied');
     }
-  }
-}
-
-class _Handle extends StatelessWidget {
-  const _Handle({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 40,
-        height: 4,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(2),
-        ),
-      ),
-    );
-  }
-}
-
-/// A round, tonal icon button — the Save / Share / Close row in the header.
-class _CircleButton extends StatelessWidget {
-  const _CircleButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.surfaceContainerHighest,
-      shape: const CircleBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: Tooltip(
-        message: tooltip,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.sm + 2),
-            child: Icon(icon, size: 20, color: scheme.onSurfaceVariant),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A primary (filled) or tonal action pill.
-class _ActionPill extends StatelessWidget {
-  const _ActionPill({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.primary = false,
-    this.enabled = true,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool primary;
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    final Color background = primary
-        ? scheme.primary
-        : scheme.surfaceContainerHighest;
-    final Color foreground = !enabled
-        ? scheme.outline
-        : primary
-        ? scheme.onPrimary
-        : scheme.onSurfaceVariant;
-    return Material(
-      color: background,
-      shape: const StadiumBorder(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: enabled ? onTap : null,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm + 2,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(icon, size: 18, color: foreground),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                label,
-                style: TextStyle(
-                  color: foreground,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -842,27 +699,28 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme scheme = theme.colorScheme;
+    final PlayColors colors = PlayColors.of(context);
+    final Widget? trailingWidget = trailing;
     final Widget content = Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(vertical: PlaySpace.sm),
       child: Row(
         children: <Widget>[
-          Icon(icon, size: 20, color: scheme.onSurfaceVariant),
-          const SizedBox(width: AppSpacing.md),
+          Icon(icon, size: 20, color: colors.inkMuted),
+          const SizedBox(width: PlaySpace.md),
           Expanded(
             child: Text(
               text,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: link ? scheme.primary : null,
+              style: PlayType.body.copyWith(
+                color: link ? colors.primary : colors.ink,
               ),
             ),
           ),
-          ?trailing,
+          ?trailingWidget,
         ],
       ),
     );
-    return onTap == null ? content : InkWell(onTap: onTap, child: content);
+    final VoidCallback? tap = onTap;
+    return tap == null ? content : PlayPressable(onTap: tap, child: content);
   }
 }
 
@@ -879,11 +737,11 @@ class _OverviewSkeleton extends StatelessWidget {
         children: <Widget>[
           for (final double width in const <double>[1.0, 0.75, 0.55, 0.85])
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              padding: const EdgeInsets.symmetric(vertical: PlaySpace.sm),
               child: Row(
                 children: <Widget>[
                   const ShimmerBox(height: 20, circle: true),
-                  const SizedBox(width: AppSpacing.md),
+                  const SizedBox(width: PlaySpace.md),
                   Expanded(
                     child: FractionallySizedBox(
                       alignment: Alignment.centerLeft,

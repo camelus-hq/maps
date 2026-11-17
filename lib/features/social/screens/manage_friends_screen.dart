@@ -1,62 +1,71 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/errors/app_exception.dart';
-import '../../../core/theme/app_spacing.dart';
 import '../../../domain/entities/friend.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/ports.dart';
 import '../../../state/social.dart';
+import '../../design/play.dart';
 import '../widgets/friend_avatar.dart';
 
 /// Manage the "friends" set (`/friends/manage`): who is in it, and who can be
 /// added from the people the user already follows.
-class ManageFriendsScreen extends ConsumerWidget {
+class ManageFriendsScreen extends ConsumerStatefulWidget {
   const ManageFriendsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ManageFriendsScreen> createState() =>
+      _ManageFriendsScreenState();
+}
+
+class _ManageFriendsScreenState extends ConsumerState<ManageFriendsScreen> {
+  int _tab = 0;
+
+  @override
+  Widget build(BuildContext context) {
     final bool signedIn = ref.watch(socialServiceProvider).isLoggedIn;
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Manage friends'),
-          bottom: signedIn
-              ? const TabBar(
-                  tabs: <Widget>[
-                    Tab(text: 'Friends'),
-                    Tab(text: 'Following'),
-                  ],
-                )
-              : null,
-        ),
-        floatingActionButton: signedIn
-            ? FloatingActionButton.extended(
-                onPressed: () => context.push('/friends/add'),
-                icon: const Icon(Icons.qr_code_scanner),
-                label: const Text('Add friend'),
-              )
-            : null,
-        body: SafeArea(
-          child: !signedIn
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(AppSpacing.lg),
-                    child: Text(
-                      'Sign in with Nostr to manage your friends.',
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                )
-              : const TabBarView(
-                  children: <Widget>[_FriendsTab(), _FollowingTab()],
-                ),
-        ),
+    return PlayScaffold(
+      appBar: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const PlayAppBar(title: 'Manage friends'),
+          if (signedIn)
+            PlayTabs(
+              tabs: const <String>['Friends', 'Following'],
+              selectedIndex: _tab,
+              onSelected: (int index) => setState(() => _tab = index),
+            ),
+        ],
       ),
+      child: !signedIn
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(PlaySpace.xl),
+                child: Text(
+                  'Sign in with Nostr to manage your friends.',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            )
+          : Stack(
+              children: <Widget>[
+                _tab == 0 ? const _FriendsTab() : const _FollowingTab(),
+                Positioned(
+                  right: PlaySpace.lg,
+                  bottom: PlaySpace.lg,
+                  child: PlayButton(
+                    label: 'Add friend',
+                    icon: PhosphorIconsRegular.qrCode,
+                    onPressed: () => context.push('/friends/add'),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
@@ -68,7 +77,7 @@ class _FriendsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final AsyncValue<List<Friend>> friends = ref.watch(friendsProvider);
     return friends.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const Center(child: PlaySpinner()),
       error: (Object error, StackTrace stack) => _ErrorState(
         message: 'Could not load your friends',
         onRetry: () => ref.invalidate(friendsProvider),
@@ -81,7 +90,7 @@ class _FriendsTab extends ConsumerWidget {
             Expanded(
               child: list.isEmpty
                   ? const _EmptyState(
-                      icon: Icons.people_outline,
+                      icon: PlayIcons.friends,
                       title: 'No friends yet',
                       body:
                           'Add people from the people you follow, or scan their '
@@ -93,16 +102,19 @@ class _FriendsTab extends ConsumerWidget {
                       itemCount: list.length,
                       itemBuilder: (BuildContext context, int index) {
                         final Friend friend = list[index];
-                        return ListTile(
+                        return PlayRow(
                           leading: FriendAvatar(
                             label: friend.label,
                             pictureUrl: friend.pictureUrl,
                           ),
-                          title: Text(friend.label),
-                          subtitle: Text(_short(friend.pubkey)),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.person_remove_outlined),
-                            tooltip: 'Remove',
+                          label: friend.label,
+                          subtitle: _short(friend.pubkey),
+                          showChevron: false,
+                          trailing: PlayIconButton(
+                            icon: PhosphorIconsRegular.userMinus,
+                            variant: PlayIconButtonVariant.plain,
+                            size: 40,
+                            semanticLabel: 'Remove',
                             onPressed: () =>
                                 unawaited(_remove(context, ref, friend)),
                           ),
@@ -122,24 +134,10 @@ class _FriendsTab extends ConsumerWidget {
     Friend friend,
   ) async {
     final bool confirmed =
-        await showDialog<bool>(
-          context: context,
-          builder: (BuildContext context) => AlertDialog(
-            title: Text('Remove ${friend.label}?'),
-            content: const Text(
-              'They will no longer be able to see your live location.',
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Remove'),
-              ),
-            ],
-          ),
+        await showPlaySheet<bool>(
+          context,
+          builder: (BuildContext context) =>
+              _RemoveConfirm(label: friend.label),
         ) ??
         false;
     if (!confirmed) {
@@ -151,15 +149,69 @@ class _FriendsTab extends ConsumerWidget {
         <String, Object?>{'pubkey': friend.pubkey},
       );
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Removed ${friend.label}')));
+        showPlayToast(context, 'Removed ${friend.label}');
       }
     } on AppException catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
+        showPlayToast(context, error.message);
       }
     }
+  }
+}
+
+/// Confirmation sheet for removing a friend; pops `true` on confirm.
+class _RemoveConfirm extends StatelessWidget {
+  const _RemoveConfirm({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final PlayColors colors = PlayColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        PlaySpace.lg,
+        0,
+        PlaySpace.lg,
+        PlaySpace.lg,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            'Remove $label?',
+            style: PlayType.title.copyWith(color: colors.ink),
+          ),
+          const SizedBox(height: PlaySpace.sm),
+          Text(
+            'They will no longer be able to see your live location.',
+            style: PlayType.body.copyWith(color: colors.inkMuted),
+          ),
+          const SizedBox(height: PlaySpace.lg),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: PlayButton(
+                  label: 'Cancel',
+                  variant: PlayButtonVariant.ghost,
+                  expand: true,
+                  onPressed: () => Navigator.of(context).pop(false),
+                ),
+              ),
+              const SizedBox(width: PlaySpace.sm),
+              Expanded(
+                child: PlayButton(
+                  label: 'Remove',
+                  expand: true,
+                  onPressed: () => Navigator.of(context).pop(true),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -194,25 +246,21 @@ class _FollowingTabState extends ConsumerState<_FollowingTab> {
       children: <Widget>[
         Padding(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.md,
-            AppSpacing.sm,
-            AppSpacing.md,
-            AppSpacing.xs,
+            PlaySpace.lg,
+            PlaySpace.sm,
+            PlaySpace.lg,
+            PlaySpace.xs,
           ),
-          child: TextField(
+          child: PlayTextField(
             controller: _filter,
+            hint: 'Filter people you follow',
+            leading: const Icon(PlayIcons.search),
             onChanged: (String _) => setState(() {}),
-            decoration: const InputDecoration(
-              hintText: 'Filter people you follow',
-              prefixIcon: Icon(Icons.search),
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
           ),
         ),
         Expanded(
           child: followings.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const Center(child: PlaySpinner()),
             error: (Object error, StackTrace stack) => _ErrorState(
               message: 'Could not load who you follow',
               onRetry: () => ref.invalidate(followingsProvider),
@@ -227,7 +275,7 @@ class _FollowingTabState extends ConsumerState<_FollowingTab> {
               ];
               if (visible.isEmpty) {
                 return _EmptyState(
-                  icon: Icons.group_outlined,
+                  icon: PhosphorIconsRegular.users,
                   title: list.isEmpty
                       ? 'You do not follow anyone yet'
                       : 'No matches',
@@ -242,24 +290,28 @@ class _FollowingTabState extends ConsumerState<_FollowingTab> {
                 itemBuilder: (BuildContext context, int index) {
                   final Friend friend = visible[index];
                   final bool added = friends.contains(friend.pubkey);
-                  return ListTile(
+                  return PlayRow(
                     leading: FriendAvatar(
                       label: friend.label,
                       pictureUrl: friend.pictureUrl,
                     ),
-                    title: Text(friend.label),
-                    subtitle: Text(_short(friend.pubkey)),
+                    label: friend.label,
+                    subtitle: _short(friend.pubkey),
+                    showChevron: false,
                     trailing: added
-                        ? const Text('Added')
-                        : _busy.contains(friend.pubkey)
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                        ? Text(
+                            'Added',
+                            style: PlayType.caption.copyWith(
+                              color: PlayColors.of(context).inkMuted,
+                            ),
                           )
-                        : FilledButton.tonal(
+                        : _busy.contains(friend.pubkey)
+                        ? const PlaySpinner(size: 20, strokeWidth: 2)
+                        : PlayButton(
+                            label: 'Add',
+                            variant: PlayButtonVariant.soft,
+                            size: PlayButtonSize.sm,
                             onPressed: () => unawaited(_add(context, friend)),
-                            child: const Text('Add'),
                           ),
                   );
                 },
@@ -279,13 +331,11 @@ class _FollowingTabState extends ConsumerState<_FollowingTab> {
         <String, Object?>{'pubkey': friend.pubkey},
       );
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Added ${friend.label}')));
+        showPlayToast(context, 'Added ${friend.label}');
       }
     } on AppException catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
+        showPlayToast(context, error.message);
       }
     } finally {
       if (mounted) {
@@ -300,24 +350,24 @@ class _PrivacyNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.sm,
-        AppSpacing.md,
-        AppSpacing.xs,
+        PlaySpace.lg,
+        PlaySpace.sm,
+        PlaySpace.lg,
+        PlaySpace.xs,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Icon(Icons.lock_outline, size: 18, color: theme.colorScheme.primary),
-          const SizedBox(width: AppSpacing.sm),
+          Icon(PlayIcons.lock, size: 18, color: colors.primary),
+          const SizedBox(width: PlaySpace.sm),
           Expanded(
             child: Text(
               'Only you can see this list. It is stored encrypted in your own '
               'Nostr set, so relays never learn who your friends are.',
-              style: theme.textTheme.bodySmall,
+              style: PlayType.caption.copyWith(color: colors.inkMuted),
             ),
           ),
         ],
@@ -339,21 +389,21 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.all(PlaySpace.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(icon, size: 48, color: theme.colorScheme.primary),
-            const SizedBox(height: AppSpacing.md),
-            Text(title, style: theme.textTheme.titleMedium),
-            const SizedBox(height: AppSpacing.xs),
+            Icon(icon, size: 48, color: colors.primary),
+            const SizedBox(height: PlaySpace.md),
+            Text(title, style: PlayType.subtitle.copyWith(color: colors.ink)),
+            const SizedBox(height: PlaySpace.xs),
             Text(
               body,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall,
+              style: PlayType.caption.copyWith(color: colors.inkMuted),
             ),
           ],
         ),
@@ -370,17 +420,22 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final PlayColors colors = PlayColors.of(context);
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.all(PlaySpace.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            const Icon(Icons.error_outline),
-            const SizedBox(height: AppSpacing.sm),
-            Text(message),
-            const SizedBox(height: AppSpacing.md),
-            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+            Icon(PlayIcons.error, color: colors.ink),
+            const SizedBox(height: PlaySpace.sm),
+            Text(message, style: PlayType.body.copyWith(color: colors.ink)),
+            const SizedBox(height: PlaySpace.md),
+            PlayButton(
+              label: 'Retry',
+              variant: PlayButtonVariant.ghost,
+              onPressed: onRetry,
+            ),
           ],
         ),
       ),

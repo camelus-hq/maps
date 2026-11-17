@@ -12,6 +12,7 @@ import 'package:openmaps/data/fakes/fake_app_version_source.dart';
 import 'package:openmaps/data/fakes/fake_feedback_service.dart';
 import 'package:openmaps/data/fakes/fake_social_service.dart';
 import 'package:openmaps/domain/entities/app_update.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/feedback/screens/feedback_screen.dart';
 import 'package:openmaps/state/config.dart';
 import 'package:openmaps/state/ports.dart';
@@ -91,7 +92,7 @@ void main() {
 
     expect(find.byType(Image), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField), 'The map froze');
+    await tester.enterText(find.byType(PlayTextField), 'The map froze');
     await tester.pumpAndSettle();
     await tester.tap(find.text('Send'));
     await tester.pumpAndSettle();
@@ -107,16 +108,16 @@ void main() {
   ) async {
     await pumpFeedback(tester);
 
-    final FilledButton before = tester.widget<FilledButton>(
-      find.byType(FilledButton),
+    final PlayButton before = tester.widget<PlayButton>(
+      find.widgetWithText(PlayButton, 'Send'),
     );
     expect(before.onPressed, isNull);
 
-    await tester.enterText(find.byType(TextField), 'hello');
+    await tester.enterText(find.byType(PlayTextField), 'hello');
     await tester.pumpAndSettle();
 
-    final FilledButton after = tester.widget<FilledButton>(
-      find.byType(FilledButton),
+    final PlayButton after = tester.widget<PlayButton>(
+      find.widgetWithText(PlayButton, 'Send'),
     );
     expect(after.onPressed, isNotNull);
   });
@@ -127,10 +128,10 @@ void main() {
     await pumpFeedback(tester, config: const AppConfig());
 
     expect(find.textContaining("isn't set up"), findsOneWidget);
-    await tester.enterText(find.byType(TextField), 'hello');
+    await tester.enterText(find.byType(PlayTextField), 'hello');
     await tester.pumpAndSettle();
-    final FilledButton button = tester.widget<FilledButton>(
-      find.byType(FilledButton),
+    final PlayButton button = tester.widget<PlayButton>(
+      find.widgetWithText(PlayButton, 'Send'),
     );
     expect(button.onPressed, isNull);
   });
@@ -145,10 +146,10 @@ void main() {
       find.textContaining('sent from an anonymous identity'),
       findsOneWidget,
     );
-    await tester.enterText(find.byType(TextField), 'hello');
+    await tester.enterText(find.byType(PlayTextField), 'hello');
     await tester.pumpAndSettle();
-    final FilledButton button = tester.widget<FilledButton>(
-      find.byType(FilledButton),
+    final PlayButton button = tester.widget<PlayButton>(
+      find.widgetWithText(PlayButton, 'Send'),
     );
     expect(button.onPressed, isNotNull);
 
@@ -165,7 +166,7 @@ void main() {
 
     // A send failure (no relay reached).
     service.error = const NetworkException('no relay accepted it');
-    await tester.enterText(find.byType(TextField), 'hello');
+    await tester.enterText(find.byType(PlayTextField), 'hello');
     await tester.pumpAndSettle();
     await tester.tap(find.text('Send'));
     await tester.pumpAndSettle();

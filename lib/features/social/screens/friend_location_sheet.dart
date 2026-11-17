@@ -1,10 +1,10 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/errors/app_exception.dart';
-import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format.dart';
 import '../../../domain/entities/friend.dart';
 import '../../../domain/entities/friend_location.dart';
@@ -16,6 +16,7 @@ import '../../../state/search.dart';
 import '../../../state/settings.dart';
 import '../../../state/social.dart';
 import '../../common/map_sheet.dart';
+import '../../design/play.dart';
 import '../widgets/friend_avatar.dart';
 
 /// Bottom sheet for a friend's live location.
@@ -29,7 +30,6 @@ class FriendLocationSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ThemeData theme = Theme.of(context);
     final FriendLocation? location = _locationFor(ref);
     final Friend? friend = ref.watch(friendsByPubkeyProvider)[pubkey];
     final String label = friend?.label ?? location?.label ?? _short(pubkey);
@@ -41,44 +41,28 @@ class FriendLocationSheet extends ConsumerWidget {
       snap: true,
       snapSizes: const <double>[0.42, 0.9],
       builder: (BuildContext context, ScrollController scrollController) {
-        return Material(
-          color: theme.colorScheme.surface,
-          elevation: 12,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(AppSpacing.sheetRadius),
-          ),
-          clipBehavior: Clip.antiAlias,
+        return PlaySheet(
           child: ListView(
             controller: scrollController,
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.sm,
-              AppSpacing.md,
-              AppSpacing.lg,
+              PlaySpace.lg,
+              0,
+              PlaySpace.lg,
+              PlaySpace.xl,
             ),
             children: <Widget>[
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
+              const PlaySheetHandle(),
               _header(context, ref, label, friend, location),
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: PlaySpace.sm),
               if (location == null || !location.isLiveAt(DateTime.now()))
                 _staleNotice(context)
               else ...<Widget>[
                 _distanceRow(context, ref, location),
-                const SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: PlaySpace.sm),
                 _shareWindow(context, location),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: PlaySpace.md),
                 _actions(context, ref, label, location),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: PlaySpace.md),
                 _messageHint(context),
               ],
             ],
@@ -104,7 +88,7 @@ class FriendLocationSheet extends ConsumerWidget {
     Friend? friend,
     FriendLocation? location,
   ) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     final bool live = location?.isLiveAt(DateTime.now()) ?? false;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,23 +99,25 @@ class FriendLocationSheet extends ConsumerWidget {
           size: 48,
           borderColor: live ? const Color(0xFF1B9C6B) : null,
         ),
-        const SizedBox(width: AppSpacing.sm),
+        const SizedBox(width: PlaySpace.sm),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(label, style: theme.textTheme.titleLarge),
+              Text(label, style: PlayType.title.copyWith(color: colors.ink)),
               Text(
                 live ? 'Updated just now' : 'Not sharing right now',
-                style: theme.textTheme.bodySmall,
+                style: PlayType.caption.copyWith(color: colors.inkMuted),
               ),
             ],
           ),
         ),
         if (live) const _LivePill(),
-        IconButton(
-          icon: const Icon(Icons.close),
-          tooltip: 'Close',
+        PlayIconButton(
+          icon: PlayIcons.close,
+          variant: PlayIconButtonVariant.plain,
+          size: 40,
+          semanticLabel: 'Close',
           onPressed: () => ref.read(selectedFriendProvider.notifier).clear(),
         ),
       ],
@@ -143,7 +129,7 @@ class FriendLocationSheet extends ConsumerWidget {
     WidgetRef ref,
     FriendLocation location,
   ) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     final LatLon? me = ref.watch(userLocationProvider).value;
     final LatLon? position = location.position;
     if (me == null || position == null) {
@@ -154,17 +140,13 @@ class FriendLocationSheet extends ConsumerWidget {
     final int walkMinutes = (meters / 80).ceil();
     return Row(
       children: <Widget>[
-        Icon(
-          Icons.near_me_outlined,
-          size: 18,
-          color: theme.colorScheme.primary,
-        ),
-        const SizedBox(width: AppSpacing.xs),
+        Icon(PlayIcons.nearby, size: 18, color: colors.primary),
+        const SizedBox(width: PlaySpace.xs),
         Expanded(
           child: Text(
             '${formatDistance(meters, imperial: imperial)} away'
             '${walkMinutes > 0 ? ' · About $walkMinutes min walk' : ''}',
-            style: theme.textTheme.bodyMedium,
+            style: PlayType.body.copyWith(color: colors.ink),
           ),
         ),
       ],
@@ -172,30 +154,25 @@ class FriendLocationSheet extends ConsumerWidget {
   }
 
   Widget _shareWindow(BuildContext context, FriendLocation location) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     final int minutes = location.remainingMinutesAt(DateTime.now());
-    return Container(
+    return PlaySurface(
+      tone: PlayTone.sunken,
+      radius: PlayRadii.md,
+      shadow: PlayShadow.none,
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
+        horizontal: PlaySpace.sm,
+        vertical: PlaySpace.sm,
       ),
       child: Row(
         children: <Widget>[
-          Icon(
-            Icons.schedule,
-            size: 18,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(width: AppSpacing.sm),
+          Icon(PlayIcons.clock, size: 18, color: colors.inkMuted),
+          const SizedBox(width: PlaySpace.sm),
           Expanded(
             child: Text(
               'Sharing until ${formatClockTime(location.expiresAt)}'
               ' · ${minutes == 1 ? '1 min left' : '$minutes min left'}',
-              style: theme.textTheme.bodyMedium,
+              style: PlayType.body.copyWith(color: colors.ink),
             ),
           ),
         ],
@@ -212,18 +189,22 @@ class FriendLocationSheet extends ConsumerWidget {
     return Row(
       children: <Widget>[
         Expanded(
-          child: FilledButton.tonalIcon(
+          child: PlayButton(
+            label: 'Directions',
+            icon: PlayIcons.directions,
+            variant: PlayButtonVariant.soft,
+            expand: true,
             onPressed: () => unawaited(_directions(ref, label, location)),
-            icon: const Icon(Icons.directions),
-            label: const Text('Directions'),
           ),
         ),
-        const SizedBox(width: AppSpacing.sm),
+        const SizedBox(width: PlaySpace.sm),
         Expanded(
-          child: OutlinedButton.icon(
+          child: PlayButton(
+            label: 'Message $label',
+            icon: PhosphorIconsRegular.chatCircle,
+            variant: PlayButtonVariant.ghost,
+            expand: true,
             onPressed: () => unawaited(_message(context, ref, label)),
-            icon: const Icon(Icons.message_outlined),
-            label: Text('Message $label'),
           ),
         ),
       ],
@@ -232,14 +213,14 @@ class FriendLocationSheet extends ConsumerWidget {
 
   Widget _messageHint(BuildContext context) => Text(
     'Messages are sent as private (gift-wrapped) Nostr direct messages.',
-    style: Theme.of(context).textTheme.bodySmall,
+    style: PlayType.caption.copyWith(color: PlayColors.of(context).inkMuted),
   );
 
-  Widget _staleNotice(BuildContext context) => ListTile(
-    contentPadding: EdgeInsets.zero,
-    leading: const Icon(Icons.location_off_outlined),
-    title: const Text('This friend has stopped sharing'),
-    subtitle: const Text('Their location is no longer visible.'),
+  Widget _staleNotice(BuildContext context) => const PlayRow(
+    icon: PlayIcons.locationLost,
+    label: 'This friend has stopped sharing',
+    subtitle: 'Their location is no longer visible.',
+    showChevron: false,
   );
 
   Future<void> _directions(
@@ -270,9 +251,9 @@ class FriendLocationSheet extends ConsumerWidget {
     WidgetRef ref,
     String label,
   ) async {
-    final String? text = await showDialog<String>(
-      context: context,
-      builder: (BuildContext context) => _MessageDialog(label: label),
+    final String? text = await showPlaySheet<String>(
+      context,
+      builder: (BuildContext context) => _MessageSheet(label: label),
     );
     if (text == null || text.trim().isEmpty || !context.mounted) {
       return;
@@ -282,13 +263,11 @@ class FriendLocationSheet extends ConsumerWidget {
           .read(socialServiceProvider)
           .sendDirectMessage(recipientPubkey: pubkey, text: text);
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Message sent to $label')));
+        showPlayToast(context, 'Message sent to $label');
       }
     } on AppException catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
+        showPlayToast(context, error.message);
       }
     }
   }
@@ -302,15 +281,14 @@ class _LivePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    return Container(
+    final PlayColors colors = PlayColors.of(context);
+    return PlaySurface(
+      tone: PlayTone.soft,
+      radius: PlayRadii.pill,
+      shadow: PlayShadow.none,
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: scheme.primaryContainer,
-        borderRadius: BorderRadius.circular(AppSpacing.pillRadius),
+        horizontal: PlaySpace.sm,
+        vertical: PlaySpace.xs,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -323,13 +301,12 @@ class _LivePill extends StatelessWidget {
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: AppSpacing.xs),
+          const SizedBox(width: PlaySpace.xs),
           Text(
             'Live',
-            style: TextStyle(
-              fontSize: 12,
+            style: PlayType.caption.copyWith(
+              color: colors.onPrimarySoft,
               fontWeight: FontWeight.w600,
-              color: scheme.onPrimaryContainer,
             ),
           ),
         ],
@@ -338,16 +315,17 @@ class _LivePill extends StatelessWidget {
   }
 }
 
-class _MessageDialog extends StatefulWidget {
-  const _MessageDialog({required this.label});
+/// The "Message …" composer, shown from the friend sheet.
+class _MessageSheet extends StatefulWidget {
+  const _MessageSheet({required this.label});
 
   final String label;
 
   @override
-  State<_MessageDialog> createState() => _MessageDialogState();
+  State<_MessageSheet> createState() => _MessageSheetState();
 }
 
-class _MessageDialogState extends State<_MessageDialog> {
+class _MessageSheetState extends State<_MessageSheet> {
   final TextEditingController _controller = TextEditingController();
 
   @override
@@ -358,28 +336,51 @@ class _MessageDialogState extends State<_MessageDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('Message ${widget.label}'),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        maxLines: 3,
-        maxLength: 4000,
-        decoration: const InputDecoration(
-          hintText: 'Write a message',
-          border: OutlineInputBorder(),
-        ),
+    final PlayColors colors = PlayColors.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        PlaySpace.lg,
+        0,
+        PlaySpace.lg,
+        PlaySpace.lg,
       ),
-      actions: <Widget>[
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_controller.text),
-          child: const Text('Send'),
-        ),
-      ],
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            'Message ${widget.label}',
+            style: PlayType.title.copyWith(color: colors.ink),
+          ),
+          const SizedBox(height: PlaySpace.md),
+          PlayTextField(
+            controller: _controller,
+            hint: 'Write a message',
+            autofocus: true,
+          ),
+          const SizedBox(height: PlaySpace.md),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: PlayButton(
+                  label: 'Cancel',
+                  variant: PlayButtonVariant.ghost,
+                  expand: true,
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+              const SizedBox(width: PlaySpace.sm),
+              Expanded(
+                child: PlayButton(
+                  label: 'Send',
+                  expand: true,
+                  onPressed: () => Navigator.of(context).pop(_controller.text),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

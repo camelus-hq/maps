@@ -1,13 +1,15 @@
 name: openmaps
 description: "A new Flutter project."
 publish_to: 'none'
-version: 0.4.2+26
+version: 0.5.0+29
 
 environment:
   sdk: ^3.13.5
 
 dependencies:
   flutter:
+    sdk: flutter
+  flutter_web_plugins:
     sdk: flutter
   flutter_device_compass: ^2.2.0
   flutter_riverpod: ^3.4.3

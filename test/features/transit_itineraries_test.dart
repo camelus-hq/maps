@@ -5,7 +5,9 @@ import 'package:openmaps/core/theme/app_theme.dart';
 import 'package:openmaps/data/fakes/fake_transit_routing_service.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/transit.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/directions/screens/directions_sheet.dart';
+import 'package:openmaps/features/directions/widgets/transit/transit_common.dart';
 import 'package:openmaps/features/directions/widgets/transit_itineraries.dart';
 import 'package:openmaps/state/commands/commands_provider.dart';
 import 'package:openmaps/state/navigation.dart';
@@ -70,7 +72,7 @@ void main() {
     expect(find.text('Platform 3'), findsOneWidget);
     expect(find.text('Platform 7'), findsOneWidget);
     expect(find.text('Walk 4 min (260 m)'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Start'), findsOneWidget);
+    expect(find.widgetWithText(PlayButton, 'Start'), findsOneWidget);
   });
 
   testWidgets('the detail Start button begins guidance', (
@@ -98,8 +100,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(FilledButton, 'Start'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, 'Start'));
+    expect(find.widgetWithText(PlayButton, 'Start'), findsOneWidget);
+    await tester.tap(find.widgetWithText(PlayButton, 'Start'));
     await tester.pump();
 
     expect(
@@ -173,11 +175,11 @@ void main() {
     await tester.tap(find.byType(TransitItineraryCard).first);
     await tester.pumpAndSettle();
     expect(container.read(routeControllerProvider).transitDetailOpen, isTrue);
-    expect(find.widgetWithText(FilledButton, 'Start'), findsOneWidget);
+    expect(find.widgetWithText(PlayButton, 'Start'), findsOneWidget);
     expect(find.text('Leave now'), findsNothing);
 
-    // Closing returns to the list.
-    await tester.tap(find.byTooltip('Close'));
+    // Closing returns to the list (the detail header's only icon control).
+    await tester.tap(find.byType(PlayIconButton));
     await tester.pumpAndSettle();
     expect(container.read(routeControllerProvider).transitDetailOpen, isFalse);
     expect(find.text('Leave now'), findsOneWidget);
@@ -202,8 +204,8 @@ void main() {
       );
 
       // A node for the tram ride; the walk legs' own icons too.
-      expect(find.byIcon(Icons.tram), findsOneWidget);
-      expect(find.byIcon(Icons.directions_walk), findsNWidgets(2));
+      expect(find.byIcon(transitModeIcon(TransitMode.tram)), findsOneWidget);
+      expect(find.byIcon(transitModeIcon(TransitMode.walk)), findsNWidgets(2));
       // The 1 min gap between arriving and the tram's departure.
       expect(find.text('Wait 1 min'), findsOneWidget);
     },
@@ -229,7 +231,7 @@ void main() {
 
     // The whole-journey duration sits with the Start action, not in the list.
     expect(find.text('19 min'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Start'), findsOneWidget);
+    expect(find.widgetWithText(PlayButton, 'Start'), findsOneWidget);
   });
 
   test('waitBefore is the gap between legs and zero elsewhere', () async {
@@ -286,6 +288,6 @@ void main() {
       const Offset(0, 600),
     );
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(FilledButton, 'Start'), findsOneWidget);
+    expect(find.widgetWithText(PlayButton, 'Start'), findsOneWidget);
   });
 }

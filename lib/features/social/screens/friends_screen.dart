@@ -1,10 +1,10 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format.dart';
 import '../../../domain/entities/friend.dart';
 import '../../../domain/entities/friend_location.dart';
@@ -15,6 +15,7 @@ import '../../../state/search.dart';
 import '../../../state/settings.dart';
 import '../../../state/social.dart';
 import '../../common/navigation.dart';
+import '../../design/play.dart';
 import '../widgets/friend_avatar.dart';
 import 'share_live_location_sheet.dart';
 
@@ -25,7 +26,6 @@ class FriendsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ThemeData theme = Theme.of(context);
     final bool signedIn = ref.watch(socialServiceProvider).isLoggedIn;
     final AsyncValue<List<Friend>> friends = ref.watch(friendsProvider);
     final List<FriendLocation> live = ref.watch(friendLocationsProvider);
@@ -33,88 +33,83 @@ class FriendsScreen extends ConsumerWidget {
       for (final FriendLocation location in live) location.pubkey: location,
     };
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Friends'),
+    return PlayScaffold(
+      appBar: PlayAppBar(
+        title: 'Friends',
         actions: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.manage_accounts_outlined),
-            tooltip: 'Manage friends',
+          PlayIconButton(
+            icon: PhosphorIconsRegular.userGear,
+            variant: PlayIconButtonVariant.plain,
+            size: 44,
+            semanticLabel: 'Manage friends',
             onPressed: () => context.push('/friends/manage'),
           ),
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            tooltip: 'You',
+          PlayIconButton(
+            icon: PlayIcons.person,
+            variant: PlayIconButtonVariant.plain,
+            size: 44,
+            semanticLabel: 'You',
             onPressed: () => context.push('/profile'),
           ),
         ],
       ),
-      body: SafeArea(
-        child: !signedIn
-            ? _signedOut(context, theme)
-            : Column(
-                children: <Widget>[
-                  Expanded(
-                    child: friends.when(
-                      loading: () =>
-                          const Center(child: CircularProgressIndicator()),
-                      error: (Object error, StackTrace stack) => _error(
-                        context,
-                        theme,
-                        onRetry: () => unawaited(
-                          ref.read(friendsProvider.notifier).refresh(),
-                        ),
-                      ),
-                      data: (List<Friend> list) =>
-                          _list(context, ref, list, liveByPubkey),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () =>
-                            unawaited(showShareLiveLocationSheet(context)),
-                        icon: const Icon(Icons.share_location_outlined),
-                        label: const Text('Share live location'),
+      child: !signedIn
+          ? _signedOut(context)
+          : Column(
+              children: <Widget>[
+                Expanded(
+                  child: friends.when(
+                    loading: () => const Center(child: PlaySpinner()),
+                    error: (Object error, StackTrace stack) => _error(
+                      context,
+                      onRetry: () => unawaited(
+                        ref.read(friendsProvider.notifier).refresh(),
                       ),
                     ),
+                    data: (List<Friend> list) =>
+                        _list(context, ref, list, liveByPubkey),
                   ),
-                ],
-              ),
-      ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(PlaySpace.lg),
+                  child: PlayButton(
+                    label: 'Share live location',
+                    icon: PhosphorIconsRegular.broadcast,
+                    expand: true,
+                    onPressed: () =>
+                        unawaited(showShareLiveLocationSheet(context)),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 
-  Widget _signedOut(BuildContext context, ThemeData theme) {
+  Widget _signedOut(BuildContext context) {
+    final PlayColors colors = PlayColors.of(context);
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.all(PlaySpace.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(
-              Icons.people_outline,
-              size: 56,
-              color: theme.colorScheme.primary,
-            ),
-            const SizedBox(height: AppSpacing.md),
+            Icon(PlayIcons.friends, size: 56, color: colors.primary),
+            const SizedBox(height: PlaySpace.md),
             Text(
               'See where your friends are',
-              style: theme.textTheme.titleLarge,
+              style: PlayType.title.copyWith(color: colors.ink),
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: PlaySpace.sm),
             Text(
               'Sign in with Nostr to follow your friends and share your live '
               'location with them.',
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium,
+              style: PlayType.body.copyWith(color: colors.inkMuted),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            FilledButton(
+            const SizedBox(height: PlaySpace.lg),
+            PlayButton(
+              label: 'Sign in with Nostr',
               onPressed: () => context.push('/profile'),
-              child: const Text('Sign in with Nostr'),
             ),
           ],
         ),
@@ -122,22 +117,26 @@ class FriendsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _error(
-    BuildContext context,
-    ThemeData theme, {
-    required VoidCallback onRetry,
-  }) {
+  Widget _error(BuildContext context, {required VoidCallback onRetry}) {
+    final PlayColors colors = PlayColors.of(context);
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.all(PlaySpace.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            const Icon(Icons.error_outline),
-            const SizedBox(height: AppSpacing.sm),
-            const Text('Could not load your friends'),
-            const SizedBox(height: AppSpacing.md),
-            OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+            Icon(PlayIcons.error, color: colors.ink),
+            const SizedBox(height: PlaySpace.sm),
+            Text(
+              'Could not load your friends',
+              style: PlayType.body.copyWith(color: colors.ink),
+            ),
+            const SizedBox(height: PlaySpace.md),
+            PlayButton(
+              label: 'Retry',
+              variant: PlayButtonVariant.ghost,
+              onPressed: onRetry,
+            ),
           ],
         ),
       ),
@@ -165,7 +164,7 @@ class FriendsScreen extends ConsumerWidget {
       return _empty(context, ref);
     }
     return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      padding: const EdgeInsets.symmetric(horizontal: PlaySpace.lg),
       children: <Widget>[
         if (live.isNotEmpty) ...<Widget>[
           _sectionLabel(context, 'LIVE NOW'),
@@ -178,7 +177,7 @@ class FriendsScreen extends ConsumerWidget {
               me,
               imperial,
             ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: PlaySpace.md),
         ],
         _sectionLabel(context, 'ALL FRIENDS'),
         for (final Friend friend in offline)
@@ -191,32 +190,32 @@ class FriendsScreen extends ConsumerWidget {
   /// user fills deliberately (from the people they follow, or by scanning an
   /// npub) — nothing is copied in automatically.
   Widget _empty(BuildContext context, WidgetRef ref) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.all(PlaySpace.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(
-              Icons.people_outline,
-              size: 48,
-              color: theme.colorScheme.primary,
+            Icon(PlayIcons.friends, size: 48, color: colors.primary),
+            const SizedBox(height: PlaySpace.md),
+            Text(
+              'No friends yet',
+              style: PlayType.subtitle.copyWith(color: colors.ink),
             ),
-            const SizedBox(height: AppSpacing.md),
-            Text('No friends yet', style: theme.textTheme.titleMedium),
-            const SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: PlaySpace.xs),
             Text(
               'Add people to your "friends" list to share your live location '
               'with them.',
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall,
+              style: PlayType.caption.copyWith(color: colors.inkMuted),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            FilledButton.tonalIcon(
+            const SizedBox(height: PlaySpace.lg),
+            PlayButton(
+              label: 'Add friends',
+              icon: PhosphorIconsRegular.userPlus,
+              variant: PlayButtonVariant.soft,
               onPressed: () => context.push('/friends/manage'),
-              icon: const Icon(Icons.group_add_outlined),
-              label: const Text('Add friends'),
             ),
           ],
         ),
@@ -225,11 +224,10 @@ class FriendsScreen extends ConsumerWidget {
   }
 
   Widget _sectionLabel(BuildContext context, String text) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+    padding: const EdgeInsets.symmetric(vertical: PlaySpace.sm),
     child: Text(
       text,
-      style: Theme.of(context).textTheme.labelSmall
-          ?.copyWith(letterSpacing: 0.8, fontWeight: FontWeight.w600),
+      style: PlayType.overline.copyWith(color: PlayColors.of(context).inkMuted),
     ),
   );
 
@@ -241,7 +239,7 @@ class FriendsScreen extends ConsumerWidget {
     LatLon? me,
     bool imperial,
   ) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     final LatLon? position = location?.position;
     String subtitle = 'Friend';
     if (position != null) {
@@ -250,23 +248,21 @@ class FriendsScreen extends ConsumerWidget {
           : 'Live · ${formatDistance(me.distanceTo(position), imperial: imperial)} away';
       subtitle = where;
     }
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
+    return PlayRow(
       leading: FriendAvatar(
         label: friend.label,
         pictureUrl: friend.pictureUrl,
         borderColor: location == null ? null : const Color(0xFF1B9C6B),
       ),
-      title: Text(friend.label),
-      subtitle: Text(subtitle),
+      label: friend.label,
+      subtitle: subtitle,
+      showChevron: false,
       trailing: location == null
           ? null
-          : Icon(Icons.near_me, size: 18, color: theme.colorScheme.primary),
+          : Icon(PlayIcons.nearby, size: 18, color: colors.primary),
       onTap: () {
         if (location == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${friend.label} is not sharing right now')),
-          );
+          showPlayToast(context, '${friend.label} is not sharing right now');
           return;
         }
         // Opens their card *and* moves the camera to where they are, then hands

@@ -1,12 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format.dart';
 import '../../../domain/entities/live_share.dart';
 import '../../../state/social.dart';
+import '../../design/play.dart';
 import '../screens/share_live_location_sheet.dart';
 
 /// The live-location status card above the bottom navigation.
@@ -20,7 +21,7 @@ class LiveShareCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     final LiveShareState share = ref.watch(liveShareProvider);
     final bool active = share.isActive;
     final DateTime? expiresAt = share.expiresAt;
@@ -40,77 +41,69 @@ class LiveShareCard extends ConsumerWidget {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.sm,
-        AppSpacing.md,
-        AppSpacing.sm,
+        PlaySpace.md,
+        PlaySpace.sm,
+        PlaySpace.md,
+        PlaySpace.sm,
       ),
-      child: Material(
-        color: theme.colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(AppSpacing.sheetRadius),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm,
-          ),
-          child: Row(
-            children: <Widget>[
-              Icon(
-                active ? Icons.near_me : Icons.shield_outlined,
-                color: active
-                    ? const Color(0xFF1B9C6B)
-                    : theme.colorScheme.primary,
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
+      child: PlaySurface(
+        radius: PlayRadii.lg,
+        borderWidth: 1,
+        padding: const EdgeInsets.symmetric(
+          horizontal: PlaySpace.md,
+          vertical: PlaySpace.sm,
+        ),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              active ? PlayIcons.nearby : PhosphorIconsRegular.shield,
+              color: active ? const Color(0xFF1B9C6B) : colors.primary,
+            ),
+            const SizedBox(width: PlaySpace.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    active
+                        ? 'Sharing your live location'
+                        : 'Your live location is off',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: PlayType.bodyStrong.copyWith(color: colors.ink),
+                  ),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: PlayType.caption.copyWith(color: colors.inkMuted),
+                  ),
+                  if (error != null)
                     Text(
-                      active
-                          ? 'Sharing your live location'
-                          : 'Your live location is off',
-                      style: theme.textTheme.titleSmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      error,
+                      style: PlayType.caption.copyWith(color: colors.coral),
                     ),
-                    Text(
-                      subtitle,
-                      style: theme.textTheme.bodySmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (error != null)
-                      Text(
-                        error,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.error,
-                        ),
-                      ),
-                  ],
-                ),
+                ],
               ),
-              const SizedBox(width: AppSpacing.sm),
-              if (share.isBusy)
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              else if (active)
-                TextButton(
-                  onPressed: () =>
-                      unawaited(ref.read(liveShareProvider.notifier).stop()),
-                  child: const Text('Stop'),
-                )
-              else
-                FilledButton(
-                  onPressed: () =>
-                      unawaited(showShareLiveLocationSheet(context)),
-                  child: const Text('Share live'),
-                ),
-            ],
-          ),
+            ),
+            const SizedBox(width: PlaySpace.sm),
+            if (share.isBusy)
+              const PlaySpinner(size: 20, strokeWidth: 2)
+            else if (active)
+              PlayButton(
+                label: 'Stop',
+                variant: PlayButtonVariant.ghost,
+                size: PlayButtonSize.sm,
+                onPressed: () =>
+                    unawaited(ref.read(liveShareProvider.notifier).stop()),
+              )
+            else
+              PlayButton(
+                label: 'Share live',
+                size: PlayButtonSize.sm,
+                onPressed: () => unawaited(showShareLiveLocationSheet(context)),
+              ),
+          ],
         ),
       ),
     );

@@ -1,7 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/errors/app_exception.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -14,6 +15,7 @@ import '../../../state/ports.dart';
 import '../../../state/reviews.dart';
 import '../../common/error_text.dart';
 import '../../common/shimmer.dart';
+import '../../design/play.dart';
 import 'review_tile.dart';
 
 /// The reviews block inside the place sheet: the friend recommendation banner,
@@ -54,10 +56,10 @@ class _PlaceReviewsSectionState extends ConsumerState<PlaceReviewsSection> {
     final AsyncValue<List<Review>> async = ref.watch(
       placeReviewsProvider(placeKey),
     );
-    final ThemeData theme = Theme.of(context);
     return async.when(
       loading: () => const _ReviewsLoadingSkeleton(),
       error: (Object error, StackTrace _) {
+        final PlayColors colors = PlayColors.of(context);
         final ({IconData icon, String text}) presentation = errorPresentation(
           error is AppException ? error : null,
           fallback: 'Could not load reviews',
@@ -66,16 +68,19 @@ class _PlaceReviewsSectionState extends ConsumerState<PlaceReviewsSection> {
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
           child: Row(
             children: <Widget>[
-              Icon(
-                presentation.icon,
-                size: 20,
-                color: theme.colorScheme.outline,
-              ),
+              Icon(presentation.icon, size: 20, color: colors.inkFaint),
               const SizedBox(width: AppSpacing.sm),
-              Expanded(child: Text(presentation.text)),
-              TextButton(
+              Expanded(
+                child: Text(
+                  presentation.text,
+                  style: PlayType.body.copyWith(color: colors.ink),
+                ),
+              ),
+              PlayButton(
+                label: 'Retry',
+                variant: PlayButtonVariant.ghost,
+                size: PlayButtonSize.sm,
                 onPressed: () => ref.invalidate(placeReviewsProvider(placeKey)),
-                child: const Text('Retry'),
               ),
             ],
           ),
@@ -87,20 +92,25 @@ class _PlaceReviewsSectionState extends ConsumerState<PlaceReviewsSection> {
   }
 
   Widget _body(ReviewSummary summary) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     if (summary.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text('No reviews yet', style: theme.textTheme.bodyMedium),
+            Text(
+              'No reviews yet',
+              style: PlayType.body.copyWith(color: colors.ink),
+            ),
             if (widget.writeButtonWhenEmpty) ...<Widget>[
               const SizedBox(height: AppSpacing.sm),
-              OutlinedButton.icon(
+              PlayButton(
+                label: 'Be the first to review',
+                icon: PlayIcons.review,
+                variant: PlayButtonVariant.ghost,
+                size: PlayButtonSize.sm,
                 onPressed: _openComposer,
-                icon: const Icon(Icons.edit_outlined, size: 18),
-                label: const Text('Be the first to review'),
               ),
             ],
           ],
@@ -123,14 +133,19 @@ class _PlaceReviewsSectionState extends ConsumerState<PlaceReviewsSection> {
           children: <Widget>[
             if (widget.showTitle)
               Expanded(
-                child: Text('Reviews', style: theme.textTheme.titleMedium),
+                child: Text(
+                  'Reviews',
+                  style: PlayType.title.copyWith(color: colors.ink),
+                ),
               )
             else
               const Spacer(),
-            TextButton.icon(
+            PlayButton(
+              label: 'Write a review',
+              icon: PlayIcons.review,
+              variant: PlayButtonVariant.ghost,
+              size: PlayButtonSize.sm,
               onPressed: _openComposer,
-              icon: const Icon(Icons.rate_review_outlined, size: 18),
-              label: const Text('Write a review'),
             ),
           ],
         ),
@@ -150,15 +165,18 @@ class _PlaceReviewsSectionState extends ConsumerState<PlaceReviewsSection> {
         for (final Review review in rest)
           ReviewTile(review: review, onEdit: _isOwn(review) ? _edit : null),
         if (_friendsOnly && reviews.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
-            child: Text('No reviews from friends yet'),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+            child: Text(
+              'No reviews from friends yet',
+              style: PlayType.body.copyWith(color: colors.ink),
+            ),
           ),
         const SizedBox(height: AppSpacing.xs),
         Text(
           'Review average ${summary.stars.toStringAsFixed(1)} · '
           '${summary.reviewCount} ${summary.reviewCount == 1 ? 'review' : 'reviews'}',
-          style: theme.textTheme.bodySmall,
+          style: PlayType.caption.copyWith(color: colors.inkMuted),
         ),
       ],
     );
@@ -242,59 +260,50 @@ class _FriendBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme scheme = theme.colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final int friends = summary.friendCount;
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Material(
-        color: scheme.primaryContainer,
-        borderRadius: BorderRadius.circular(16),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            child: Row(
-              children: <Widget>[
-                Text(
-                  summary.stars.toStringAsFixed(1),
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: scheme.onPrimaryContainer,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        friendsOnly
-                            ? 'Showing your friends’ reviews'
-                            : 'Recommended by your friends',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: scheme.onPrimaryContainer,
-                        ),
-                      ),
-                      Text(
-                        friends == 1
-                            ? '1 friend has reviewed this place'
-                            : '$friends friends have reviewed this place',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onPrimaryContainer,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  friendsOnly ? Icons.expand_less : Icons.chevron_right,
-                  color: scheme.onPrimaryContainer,
-                ),
-              ],
+      child: PlaySurface(
+        tone: PlayTone.soft,
+        radius: PlayRadii.md,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        onTap: onTap,
+        child: Row(
+          children: <Widget>[
+            Text(
+              summary.stars.toStringAsFixed(1),
+              style: PlayType.headline.copyWith(color: colors.onPrimarySoft),
             ),
-          ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    friendsOnly
+                        ? 'Showing your friends’ reviews'
+                        : 'Recommended by your friends',
+                    style: PlayType.bodyStrong.copyWith(
+                      color: colors.onPrimarySoft,
+                    ),
+                  ),
+                  Text(
+                    friends == 1
+                        ? '1 friend has reviewed this place'
+                        : '$friends friends have reviewed this place',
+                    style: PlayType.caption.copyWith(
+                      color: colors.onPrimarySoft,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              friendsOnly ? PhosphorIconsRegular.caretUp : PlayIcons.next,
+              color: colors.onPrimarySoft,
+            ),
+          ],
         ),
       ),
     );

@@ -1,8 +1,9 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format.dart';
 import '../../../../domain/entities/transit.dart';
+import '../../../design/play.dart';
 import 'transit_common.dart';
 import 'transit_line_badge.dart';
 
@@ -22,71 +23,58 @@ class TransitItineraryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final List<TransitLeg> rides = itinerary.rides;
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      color: selected
-          ? scheme.surfaceContainerHighest
-          : scheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: selected ? scheme.primary : scheme.outlineVariant,
-          width: selected ? 2 : 1,
-        ),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return PlaySurface(
+      radius: AppSpacing.sheetRadius,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      shadow: PlayShadow.none,
+      borderWidth: selected ? 2 : 1,
+      borderColor: selected ? colors.primary : colors.line,
+      backgroundColor: selected ? colors.surfaceSunken : colors.surface,
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _status(context, itinerary),
+          const SizedBox(height: AppSpacing.xs),
+          Row(
             children: <Widget>[
-              _status(context, itinerary),
-              const SizedBox(height: AppSpacing.xs),
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Text(
-                      '${transitClock(context, itinerary.startTime.toLocal())} – '
-                      '${transitClock(context, itinerary.endTime.toLocal())}',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  Text(
-                    formatDuration(itinerary.duration),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  Icon(Icons.chevron_right, color: scheme.outline),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.xs,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: _lineSummary(context, itinerary, rides),
-              ),
-              if (itinerary.agencies.isNotEmpty) ...<Widget>[
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  itinerary.agencies.join(' · '),
-                  style: Theme.of(context).textTheme.bodySmall
-                      ?.copyWith(color: scheme.outline),
+              Expanded(
+                child: Text(
+                  '${transitClock(context, itinerary.startTime.toLocal())} – '
+                  '${transitClock(context, itinerary.endTime.toLocal())}',
+                  style: PlayType.subtitle.copyWith(color: colors.ink),
                 ),
-              ],
+              ),
+              Text(
+                formatDuration(itinerary.duration),
+                style: PlayType.subtitle.copyWith(color: colors.ink),
+              ),
+              Icon(PlayIcons.next, color: colors.inkFaint),
             ],
           ),
-        ),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: _lineSummary(context, itinerary, rides),
+          ),
+          if (itinerary.agencies.isNotEmpty) ...<Widget>[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              itinerary.agencies.join(' · '),
+              style: PlayType.caption.copyWith(color: colors.inkFaint),
+            ),
+          ],
+        ],
       ),
     );
   }
 
   Widget _status(BuildContext context, TransitItinerary itinerary) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final DateTime start = itinerary.startTime.toLocal();
     final DateTime now = DateTime.now();
     final String label;
@@ -100,29 +88,28 @@ class TransitItineraryCard extends StatelessWidget {
           ? 'in $minutes min'
           : 'Departs ${transitClock(context, start)}';
     }
-    final Color color = itinerary.isCancelled ? scheme.error : scheme.primary;
+    final Color color = itinerary.isCancelled ? colors.coral : colors.primary;
     final Duration? delay = itinerary.departureDelay;
     return Row(
       children: <Widget>[
-        Text(
-          label,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(color: color),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: PlayType.bodyStrong.copyWith(color: color),
+          ),
         ),
         if (itinerary.hasRealtime && !itinerary.isCancelled) ...<Widget>[
           const SizedBox(width: AppSpacing.sm),
-          Icon(Icons.circle, size: 8, color: scheme.primary),
+          Icon(PlayIcons.dot, size: 8, color: colors.primary),
           const SizedBox(width: 4),
-          Text(
-            'Live',
-            style: Theme.of(context).textTheme.bodySmall
-                ?.copyWith(color: scheme.primary),
-          ),
+          Text('Live', style: PlayType.caption.copyWith(color: colors.primary)),
           if (delay != null && delay.inMinutes.abs() >= 1) ...<Widget>[
             const SizedBox(width: AppSpacing.xs),
             Text(
               transitDelayLabel(delay),
-              style: Theme.of(context).textTheme.bodySmall
-                  ?.copyWith(color: scheme.error),
+              style: PlayType.caption.copyWith(color: colors.coral),
             ),
           ],
         ],
@@ -141,7 +128,7 @@ class TransitItineraryCard extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            const Icon(Icons.directions_walk, size: 18),
+            Icon(transitModeIcon(TransitMode.walk), size: 18),
             const SizedBox(width: 4),
             Text(formatDuration(itinerary.duration)),
           ],
@@ -152,9 +139,9 @@ class TransitItineraryCard extends StatelessWidget {
       for (int i = 0; i < rides.length; i++) ...<Widget>[
         if (i > 0)
           Icon(
-            Icons.chevron_right,
+            PlayIcons.next,
             size: 18,
-            color: Theme.of(context).colorScheme.outline,
+            color: PlayColors.of(context).inkFaint,
           ),
         TransitLineBadge(leg: rides[i]),
       ],

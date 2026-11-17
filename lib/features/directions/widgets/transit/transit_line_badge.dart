@@ -1,6 +1,7 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../../../domain/entities/transit.dart';
+import '../../../design/play.dart';
 
 /// A coloured line badge ("U7", "Bus 100", …) using the operator's own colour
 /// when the provider reported one, and our own mode palette otherwise.
@@ -25,8 +26,10 @@ class TransitLineBadge extends StatelessWidget {
       ),
       child: Text(
         leg.lineLabel,
-        style: Theme.of(context).textTheme.labelMedium
-            ?.copyWith(color: Color(foreground), fontWeight: FontWeight.w600),
+        style: PlayType.caption.copyWith(
+          color: Color(foreground),
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

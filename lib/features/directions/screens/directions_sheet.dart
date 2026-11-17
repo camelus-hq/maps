@@ -1,7 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart' hide Route;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart' hide Route;
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format.dart';
@@ -14,6 +15,7 @@ import '../../../state/settings.dart';
 import '../../common/error_text.dart';
 import '../../common/map_sheet.dart';
 import '../../common/shimmer.dart';
+import '../../design/play.dart';
 import '../widgets/cycle_options.dart';
 import '../widgets/maneuver_glyph.dart';
 import '../widgets/transit_itineraries.dart';
@@ -28,7 +30,6 @@ class DirectionsSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
     final RouteState state = ref.watch(routeControllerProvider);
     // Step 2 of the transit flow: the journey detail replaces the list.
     final TransitItinerary? detail = state.isTransit && state.transitDetailOpen
@@ -49,13 +50,8 @@ class DirectionsSheet extends ConsumerWidget {
         snap: true,
         snapSizes: <double>[peek, 0.5, 0.92],
         builder: (BuildContext context, ScrollController scrollController) {
-          return Material(
-            color: scheme.surface,
-            elevation: 12,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(AppSpacing.sheetRadius),
-            ),
-            clipBehavior: Clip.antiAlias,
+          return PlaySheet(
+            radius: PlayRadii.lg,
             child: TransitJourneyDetail(
               itinerary: detail,
               scrollController: scrollController,
@@ -71,32 +67,17 @@ class DirectionsSheet extends ConsumerWidget {
       snap: true,
       snapSizes: const <double>[0.45, 0.92],
       builder: (BuildContext context, ScrollController scrollController) {
-        return Material(
-          color: scheme.surface,
-          elevation: 12,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(AppSpacing.sheetRadius),
-          ),
-          clipBehavior: Clip.antiAlias,
+        return PlaySheet(
+          radius: PlayRadii.lg,
           child: Column(
             children: <Widget>[
-              const SizedBox(height: AppSpacing.sm),
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: scheme.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+              const PlaySheetHandle(),
               Expanded(
                 child: ListView(
                   controller: scrollController,
                   padding: const EdgeInsets.fromLTRB(
                     AppSpacing.md,
-                    AppSpacing.sm,
+                    0,
                     AppSpacing.md,
                     AppSpacing.md,
                   ),
@@ -110,30 +91,25 @@ class DirectionsSheet extends ConsumerWidget {
                           '${_pickTargetLabel(state.pickTarget!)}.',
                         ),
                       ),
-                    SegmentedButton<TravelMode>(
-                      segments: const <ButtonSegment<TravelMode>>[
-                        ButtonSegment<TravelMode>(
-                          value: TravelMode.cycle,
-                          label: Text('Cycle'),
-                        ),
-                        ButtonSegment<TravelMode>(
-                          value: TravelMode.transit,
-                          label: Text('Transit'),
-                        ),
-                        ButtonSegment<TravelMode>(
-                          value: TravelMode.walk,
-                          label: Text('Walk'),
-                        ),
-                        ButtonSegment<TravelMode>(
-                          value: TravelMode.drive,
-                          label: Text('Drive'),
-                        ),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
+                      children: <Widget>[
+                        for (final (TravelMode mode, String label)
+                            in const <(TravelMode, String)>[
+                              (TravelMode.cycle, 'Cycle'),
+                              (TravelMode.transit, 'Transit'),
+                              (TravelMode.walk, 'Walk'),
+                              (TravelMode.drive, 'Drive'),
+                            ])
+                          PlayChip(
+                            label: label,
+                            selected: state.mode == mode,
+                            onTap: () => ref
+                                .read(routeControllerProvider.notifier)
+                                .setMode(mode),
+                          ),
                       ],
-                      selected: <TravelMode>{state.mode},
-                      showSelectedIcon: false,
-                      onSelectionChanged: (Set<TravelMode> selection) => ref
-                          .read(routeControllerProvider.notifier)
-                          .setMode(selection.first),
                     ),
                     const SizedBox(height: AppSpacing.md),
                     if (state.isTransit)
@@ -161,17 +137,20 @@ class DirectionsSheet extends ConsumerWidget {
   }
 
   Widget _title(BuildContext context, WidgetRef ref, RouteState state) {
+    final PlayColors colors = PlayColors.of(context);
     return Row(
       children: <Widget>[
         Expanded(
           child: Text(
             _modeLabel(state.mode),
-            style: Theme.of(context).textTheme.titleLarge,
+            style: PlayType.title.copyWith(color: colors.ink),
           ),
         ),
-        IconButton(
-          icon: const Icon(Icons.close),
-          tooltip: 'Close',
+        PlayIconButton(
+          icon: PlayIcons.close,
+          variant: PlayIconButtonVariant.plain,
+          size: 44,
+          semanticLabel: 'Close',
           onPressed: () => ref.read(routeControllerProvider.notifier).clear(),
         ),
       ],
@@ -185,37 +164,39 @@ class DirectionsSheet extends ConsumerWidget {
     return Row(
       children: <Widget>[
         Expanded(
-          child: FilledButton.icon(
+          child: PlayButton(
+            label: 'Start',
+            icon: PlayIcons.navigation,
             onPressed: () => unawaited(
               registry.dispatch('nav.start', const <String, Object?>{
                 'live': true,
               }),
             ),
-            icon: const Icon(Icons.navigation),
-            label: const Text('Start'),
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
-        IconButton.filledTonal(
+        PlayIconButton(
+          icon: PhosphorIconsRegular.play,
+          tone: PlayTone.soft,
+          semanticLabel: 'Simulate guidance',
           onPressed: () => unawaited(
             registry.dispatch('nav.start', const <String, Object?>{
               'auto': true,
             }),
           ),
-          icon: const Icon(Icons.play_arrow),
-          tooltip: 'Simulate guidance',
         ),
         const SizedBox(width: AppSpacing.sm),
-        IconButton.filledTonal(
-          onPressed: null,
-          icon: const Icon(Icons.share_outlined),
-          tooltip: 'Share',
+        const PlayIconButton(
+          icon: PlayIcons.share,
+          tone: PlayTone.soft,
+          semanticLabel: 'Share',
         ),
       ],
     );
   }
 
   Widget _body(BuildContext context, WidgetRef ref, RouteState state) {
+    final PlayColors colors = PlayColors.of(context);
     final bool imperial = ref.watch(imperialUnitsProvider);
     switch (state.status) {
       case RouteStatus.loading:
@@ -244,25 +225,25 @@ class DirectionsSheet extends ConsumerWidget {
             Text(
               '${formatDuration(selected.duration)} · '
               '${formatDistance(selected.distanceMeters, imperial: imperial)}',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: PlayType.subtitle.copyWith(color: colors.ink),
             ),
             Text(
               'Arrives ${_arrivalLabel(context, selected.duration)}',
-              style: Theme.of(context).textTheme.bodySmall,
+              style: PlayType.caption.copyWith(color: colors.inkMuted),
             ),
             if (state.routes.length > 1) ...<Widget>[
               const SizedBox(height: AppSpacing.sm),
               Wrap(
                 spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
                 children: <Widget>[
                   for (int i = 0; i < state.routes.length; i++)
-                    ChoiceChip(
-                      label: Text(
-                        'Route ${i + 1} · '
-                        '${formatDuration(state.routes[i].duration)}',
-                      ),
+                    PlayChip(
+                      label:
+                          'Route ${i + 1} · '
+                          '${formatDuration(state.routes[i].duration)}',
                       selected: state.selectedIndex == i,
-                      onSelected: (bool _) => ref
+                      onTap: () => ref
                           .read(routeControllerProvider.notifier)
                           .selectRoute(i),
                     ),
@@ -275,18 +256,24 @@ class DirectionsSheet extends ConsumerWidget {
               const SizedBox(height: AppSpacing.sm),
               const CycleOptionsPanel(),
             ],
-            const Divider(height: AppSpacing.lg),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+              child: PlayDivider(),
+            ),
             for (final Leg leg in selected.legs)
               for (final Maneuver maneuver in leg.maneuvers)
-                ListTile(
-                  dense: true,
+                PlayRow(
+                  label: maneuver.instruction,
                   leading: ManeuverGlyph(type: maneuver.type),
-                  title: Text(maneuver.instruction),
+                  showChevron: false,
                   trailing: maneuver.distanceMeters > 0
                       ? Text(
                           formatDistance(
                             maneuver.distanceMeters,
                             imperial: imperial,
+                          ),
+                          style: PlayType.caption.copyWith(
+                            color: colors.inkMuted,
                           ),
                         )
                       : null,
@@ -313,13 +300,21 @@ class DirectionsSheet extends ConsumerWidget {
 
   /// The projected arrival clock time, localised (respects 12/24-hour setting).
   static String _arrivalLabel(BuildContext context, Duration duration) {
-    final TimeOfDay arrival = TimeOfDay.fromDateTime(
+    return _clockLabel(
       DateTime.now().add(duration),
+      use24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
     );
-    return MaterialLocalizations.of(context).formatTimeOfDay(
-      arrival,
-      alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
-    );
+  }
+
+  /// Formatted as `HH:mm` (24-hour) or `h:mm AM/PM` — the play kit carries no
+  /// Material localisation, so the clock is formatted directly.
+  static String _clockLabel(DateTime time, {required bool use24HourFormat}) {
+    final String minute = time.minute.toString().padLeft(2, '0');
+    if (use24HourFormat) {
+      return '${time.hour.toString().padLeft(2, '0')}:$minute';
+    }
+    final int hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
+    return '$hour:$minute ${time.hour < 12 ? 'AM' : 'PM'}';
   }
 }
 
@@ -327,7 +322,7 @@ class _ErrorState extends StatelessWidget {
   const _ErrorState({
     required this.message,
     required this.onRetry,
-    this.icon = Icons.error_outline,
+    this.icon = PlayIcons.error,
   });
 
   final String message;
@@ -336,18 +331,20 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final PlayColors colors = PlayColors.of(context);
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         children: <Widget>[
-          Icon(icon, color: Theme.of(context).colorScheme.outline),
+          Icon(icon, color: colors.inkFaint),
           const SizedBox(height: AppSpacing.sm),
           Text(message, textAlign: TextAlign.center),
           const SizedBox(height: AppSpacing.sm),
-          OutlinedButton.icon(
+          PlayButton(
+            label: 'Retry',
+            icon: PlayIcons.refresh,
+            variant: PlayButtonVariant.ghost,
             onPressed: onRetry,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Retry'),
           ),
         ],
       ),
@@ -371,7 +368,10 @@ class _RouteLoadingSkeleton extends StatelessWidget {
           const ShimmerBox(width: 120, height: 12),
           const SizedBox(height: AppSpacing.sm),
           const ShimmerBox(width: 90, height: 32),
-          const Divider(height: AppSpacing.lg),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+            child: PlayDivider(),
+          ),
           for (int i = 0; i < 5; i++) ...<Widget>[
             Row(
               children: <Widget>[

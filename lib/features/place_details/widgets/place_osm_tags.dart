@@ -1,6 +1,8 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_spacing.dart';
+import '../../design/play.dart';
 
 /// Developer view of every raw OpenStreetMap tag on a place, shown only when the
 /// "Show all OpenStreetMap tags" setting is on.
@@ -14,8 +16,7 @@ class PlaceOsmTags extends StatelessWidget {
     if (tags.isEmpty) {
       return const SizedBox.shrink();
     }
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme scheme = theme.colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final List<String> keys = tags.keys.toList()..sort();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
@@ -24,12 +25,16 @@ class PlaceOsmTags extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Icon(Icons.data_object, size: 20, color: scheme.onSurfaceVariant),
+              Icon(
+                PhosphorIconsRegular.bracketsCurly,
+                size: 20,
+                color: colors.inkMuted,
+              ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Text(
                   'OpenStreetMap tags (${keys.length})',
-                  style: theme.textTheme.bodyLarge,
+                  style: PlayType.body.copyWith(color: colors.ink),
                 ),
               ),
             ],
@@ -46,12 +51,15 @@ class PlaceOsmTags extends StatelessWidget {
                 children: <Widget>[
                   Text(
                     key,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.primary,
-                      fontWeight: FontWeight.w600,
+                    style: PlayType.caption.copyWith(
+                      color: colors.primary,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  Text(tags[key]!, style: theme.textTheme.bodyMedium),
+                  Text(
+                    tags[key]!,
+                    style: PlayType.body.copyWith(color: colors.ink),
+                  ),
                 ],
               ),
             ),

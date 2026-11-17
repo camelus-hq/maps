@@ -1,19 +1,16 @@
-import 'package:flutter/widget_previews.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:material_ui/material_ui.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../../domain/entities/friend.dart';
 import '../../../state/social.dart';
-import '../../social/widgets/friend_avatar.dart';
+import '../../design/play.dart';
 
-/// The floating search bar at the top of the map-home shell.
+/// The floating search bar at the top of the map-home shell, in the play style.
 ///
-/// Has our own leading logo slot plus microphone and account slots, mirroring
-/// the Google Maps layout (our own iconography, never Google's). The account
-/// slot shows the signed-in Nostr user's profile picture (monogram fallback),
-/// or a generic person icon when signed out.
+/// Our own compass mark, a voice-search slot and the signed-in account avatar
+/// (with a monogram fallback). Tapping the bar opens the search screen; the
+/// avatar opens settings. Built entirely from the play kit — no Material chrome.
 class SearchBarPill extends ConsumerWidget {
   const SearchBarPill({super.key, required this.onTap});
 
@@ -21,115 +18,86 @@ class SearchBarPill extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    final BorderRadius radius = BorderRadius.circular(AppSpacing.pillRadius);
-    return Material(
-      color: scheme.surface,
-      elevation: 2,
-      borderRadius: radius,
-      child: InkWell(
-        borderRadius: radius,
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.md,
-            10,
-            AppSpacing.sm,
-            10,
+    final PlayColors colors = PlayColors.of(context);
+    return PlaySurface(
+      radius: PlayRadii.pill,
+      borderWidth: 1,
+      shadow: PlayShadow.soft,
+      padding: const EdgeInsets.all(PlaySpace.sm),
+      onTap: onTap,
+      child: Row(
+        children: <Widget>[
+          // Our own brand mark (a compass tile), never Google's logo.
+          PlaySurface(
+            radius: PlayRadii.pill,
+            tone: PlayTone.primary,
+            shadow: PlayShadow.none,
+            padding: const EdgeInsets.all(7),
+            child: Icon(PlayIcons.brand, size: 20, color: colors.onTeal),
           ),
-          child: Row(
-            children: <Widget>[
-              // Our own brand mark (not Google's multicolour logo).
-              Icon(Icons.place, color: scheme.primary),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(
-                  'Search here',
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-              ),
-              Tooltip(
-                message: 'Voice search (coming soon)',
-                child: Icon(Icons.mic_none, color: scheme.onSurfaceVariant),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              InkWell(
-                onTap: () => context.push('/settings'),
-                customBorder: const CircleBorder(),
-                child: _AccountAvatar(scheme: scheme),
-              ),
-            ],
+          const SizedBox(width: PlaySpace.md),
+          Expanded(
+            child: Text(
+              'Search here',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: PlayType.body.copyWith(color: colors.inkMuted),
+            ),
           ),
-        ),
+          const SizedBox(width: PlaySpace.xs),
+          Semantics(
+            label: 'Voice search (coming soon)',
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: PlaySpace.sm),
+              child: Icon(
+                PlayIcons.microphone,
+                size: 22,
+                color: colors.inkMuted,
+              ),
+            ),
+          ),
+          const SizedBox(width: PlaySpace.xs),
+          PlayPressable(
+            onTap: () => context.push('/settings'),
+            child: const _AccountAvatar(),
+          ),
+        ],
       ),
     );
   }
 }
 
 /// The account slot: the signed-in user's Nostr picture/monogram, else a
-/// generic person icon. Watches the profile so a picture that resolves later
+/// generic person glyph. Watches the profile so a picture that resolves later
 /// replaces the monogram.
 class _AccountAvatar extends ConsumerWidget {
-  const _AccountAvatar({required this.scheme});
-
-  final ColorScheme scheme;
+  const _AccountAvatar();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final String? pubkey = ref.watch(nostrPubkeyProvider).value;
     if (pubkey == null) {
-      return CircleAvatar(
-        radius: 16,
-        backgroundColor: scheme.primaryContainer,
-        child: Icon(Icons.person, size: 18, color: scheme.onPrimaryContainer),
+      return const PlayAvatar(
+        label: 'You',
+        icon: PlayIcons.user,
+        size: 36,
+        tone: PlayTone.soft,
       );
     }
     final Friend? profile = ref.watch(myProfileProvider).value;
-    return FriendAvatar(
+    return PlayAvatar(
       label: profile?.label ?? 'You',
-      pictureUrl: profile?.pictureUrl,
-      size: 32,
+      imageUrl: profile?.pictureUrl,
+      size: 36,
+      tone: PlayTone.soft,
     );
   }
 }
 
-@Preview(name: 'Search bar pill', size: Size(400, 80))
-Widget preview() {
-  return ProviderScope(
-    child: Padding(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: SearchBarPill(onTap: () {}),
-    ),
-  );
-}
-
-@Preview(name: 'Search bar pill', size: Size(400, 80))
+@PlayPreview(name: 'SearchBarPill', size: Size(460, 140))
 Widget searchBarPillPreview() {
-  return ProviderScope(
-    child: MaterialApp.router(
-      routerConfig: GoRouter(
-        routes: <RouteBase>[
-          GoRoute(
-            path: '/',
-            builder: (BuildContext context, GoRouterState state) {
-              return Scaffold(
-                body: SafeArea(
-                  child: Padding(
-                    padding: EdgeInsets.all(AppSpacing.md),
-                    child: Center(child: SearchBarPill(onTap: () {})),
-                  ),
-                ),
-              );
-            },
-          ),
-          GoRoute(
-            path: '/settings',
-            builder: (BuildContext context, GoRouterState state) {
-              return const Scaffold(body: Center(child: Text('Settings')));
-            },
-          ),
-        ],
-      ),
-    ),
+  return PlayPreviewFrame(
+    alignment: Alignment.topCenter,
+    child: ProviderScope(child: SearchBarPill(onTap: () {})),
   );
 }

@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_spacing.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/route.dart';
+import '../../design/play.dart';
 
 /// The floating directions header that overhangs the top of the map.
 ///
@@ -23,7 +25,7 @@ class DirectionsEndpointCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final RouteState state = ref.watch(routeControllerProvider);
     final registry = ref.read(commandRegistryProvider);
 
@@ -34,106 +36,92 @@ class DirectionsEndpointCard extends ConsumerWidget {
       }),
     );
 
-    return Material(
-      color: scheme.surface,
-      elevation: 3,
-      borderRadius: BorderRadius.circular(AppSpacing.sheetRadius),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            IconButton(
-              icon: const Icon(Icons.arrow_back),
-              tooltip: 'Exit directions',
-              onPressed:
-                  onClose ??
-                  () => unawaited(
-                    registry.dispatch('route.clear', const <String, Object?>{}),
-                  ),
-            ),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  _EndpointRow(
-                    icon: Icons.trip_origin,
-                    color: scheme.primary,
-                    text: state.origin?.name ?? 'Choose a start',
-                    placeholder: state.origin == null,
-                    onTap: () => edit('origin'),
-                  ),
-                  for (int i = 0; i < state.stops.length; i++)
-                    _EndpointRow(
-                      icon: Icons.circle,
-                      iconSize: 10,
-                      color: scheme.outline,
-                      text: state.stops[i].name,
-                      onTap: () => edit('stop', index: i),
-                      onRemove: () => unawaited(
-                        registry.dispatch('route.removeStop', <String, Object?>{
-                          'index': i,
-                        }),
-                      ),
-                    ),
-                  _EndpointRow(
-                    icon: Icons.place,
-                    color: scheme.primary,
-                    text: state.destination?.name ?? 'Choose a destination',
-                    placeholder: state.destination == null,
-                    onTap: () => edit('destination'),
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                PopupMenuButton<RouteMenu>(
-                  tooltip: 'Route options',
-                  icon: const Icon(Icons.more_vert),
-                  onSelected: (RouteMenu value) =>
-                      unawaited(_onMenu(ref, value)),
-                  itemBuilder: (BuildContext context) =>
-                      <PopupMenuEntry<RouteMenu>>[
-                        PopupMenuItem<RouteMenu>(
-                          value: RouteMenu.addStop,
-                          enabled: state.destination != null,
-                          child: const _MenuRow(
-                            icon: Icons.add_location_alt_outlined,
-                            label: 'Add stop',
-                          ),
-                        ),
-                        const PopupMenuItem<RouteMenu>(
-                          value: RouteMenu.swap,
-                          child: _MenuRow(
-                            icon: Icons.swap_vert,
-                            label: 'Swap start and destination',
-                          ),
-                        ),
-                        const PopupMenuDivider(),
-                        const PopupMenuItem<RouteMenu>(
-                          value: RouteMenu.clear,
-                          child: _MenuRow(
-                            icon: Icons.close,
-                            label: 'Clear route',
-                          ),
-                        ),
-                      ],
+    return PlaySurface(
+      radius: AppSpacing.sheetRadius,
+      padding: const EdgeInsets.all(4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          PlayIconButton(
+            icon: PlayIcons.back,
+            variant: PlayIconButtonVariant.plain,
+            semanticLabel: 'Exit directions',
+            onPressed:
+                onClose ??
+                () => unawaited(
+                  registry.dispatch('route.clear', const <String, Object?>{}),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.swap_vert),
-                  tooltip: 'Swap start and destination',
-                  onPressed: () => unawaited(
-                    registry.dispatch('route.swap', const <String, Object?>{}),
+          ),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                _EndpointRow(
+                  icon: PhosphorIconsRegular.record,
+                  color: colors.primary,
+                  text: state.origin?.name ?? 'Choose a start',
+                  placeholder: state.origin == null,
+                  onTap: () => edit('origin'),
+                ),
+                for (int i = 0; i < state.stops.length; i++)
+                  _EndpointRow(
+                    icon: PhosphorIconsRegular.circle,
+                    iconSize: 10,
+                    color: colors.inkFaint,
+                    text: state.stops[i].name,
+                    onTap: () => edit('stop', index: i),
+                    onRemove: () => unawaited(
+                      registry.dispatch('route.removeStop', <String, Object?>{
+                        'index': i,
+                      }),
+                    ),
                   ),
+                _EndpointRow(
+                  icon: PlayIcons.place,
+                  color: colors.primary,
+                  text: state.destination?.name ?? 'Choose a destination',
+                  placeholder: state.destination == null,
+                  onTap: () => edit('destination'),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              PlayMenuButton<RouteMenu>(
+                semanticLabel: 'Route options',
+                onSelected: (RouteMenu value) => unawaited(_onMenu(ref, value)),
+                items: <PlayMenuItem<RouteMenu>>[
+                  PlayMenuItem<RouteMenu>(
+                    value: RouteMenu.addStop,
+                    label: 'Add stop',
+                    icon: PlayIcons.contributePlace,
+                  ),
+                  const PlayMenuItem<RouteMenu>(
+                    value: RouteMenu.swap,
+                    label: 'Swap start and destination',
+                    icon: PhosphorIconsRegular.arrowsDownUp,
+                  ),
+                  const PlayMenuItem<RouteMenu>(
+                    value: RouteMenu.clear,
+                    label: 'Clear route',
+                    icon: PlayIcons.close,
+                  ),
+                ],
+              ),
+              PlayIconButton(
+                icon: PhosphorIconsRegular.arrowsDownUp,
+                variant: PlayIconButtonVariant.plain,
+                semanticLabel: 'Swap start and destination',
+                onPressed: () => unawaited(
+                  registry.dispatch('route.swap', const <String, Object?>{}),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -142,6 +130,11 @@ class DirectionsEndpointCard extends ConsumerWidget {
     final registry = ref.read(commandRegistryProvider);
     switch (value) {
       case RouteMenu.addStop:
+        // A stop needs a destination to attach to (the old menu greyed this out
+        // when there was none; PlayMenuButton has no disabled state).
+        if (ref.read(routeControllerProvider).destination == null) {
+          return;
+        }
         await registry.dispatch('route.editEndpoint', const <String, Object?>{
           'field': 'stop',
         });
@@ -154,28 +147,6 @@ class DirectionsEndpointCard extends ConsumerWidget {
 }
 
 enum RouteMenu { addStop, swap, clear }
-
-class _MenuRow extends StatelessWidget {
-  const _MenuRow({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: <Widget>[
-        Icon(
-          icon,
-          size: 18,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
-      ],
-    );
-  }
-}
 
 class _EndpointRow extends StatelessWidget {
   const _EndpointRow({
@@ -200,17 +171,15 @@ class _EndpointRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme scheme = theme.colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     // The remove button is a sibling of the tappable row, not a child: a nested
-    // InkWell loses the tap to the row, so a tap on ✕ used to open the stop
+    // pressable loses the tap to the row, so a tap on ✕ used to open the stop
     // editor instead of removing the stop.
     return Row(
       children: <Widget>[
         Expanded(
-          child: InkWell(
+          child: PlayPressable(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(AppSpacing.sm),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               child: Row(
@@ -227,8 +196,8 @@ class _EndpointRow extends StatelessWidget {
                       text,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: placeholder ? scheme.onSurfaceVariant : null,
+                      style: PlayType.body.copyWith(
+                        color: placeholder ? colors.inkMuted : colors.ink,
                       ),
                     ),
                   ),
@@ -238,17 +207,18 @@ class _EndpointRow extends StatelessWidget {
           ),
         ),
         if (onRemove != null)
-          IconButton(
-            icon: const Icon(Icons.close, size: 16),
-            tooltip: 'Remove stop',
-            visualDensity: VisualDensity.compact,
-            color: scheme.outline,
+          PlayIconButton(
+            icon: PlayIcons.close,
+            variant: PlayIconButtonVariant.plain,
+            size: 32,
+            iconSize: 16,
+            semanticLabel: 'Remove stop',
             onPressed: onRemove,
           )
         else
           Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: Icon(Icons.chevron_right, size: 18, color: scheme.outline),
+            child: Icon(PlayIcons.next, size: 18, color: colors.inkFaint),
           ),
       ],
     );

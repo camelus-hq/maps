@@ -1,8 +1,9 @@
 import 'dart:math' as math;
 
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../../domain/entities/route.dart';
+import '../../design/play.dart';
 
 /// Our own lane-arrow glyph (drawn in code, 24×24 canvas scaled to [size]).
 ///
@@ -28,7 +29,7 @@ class LaneGlyph extends StatelessWidget {
       child: CustomPaint(
         painter: _LaneGlyphPainter(
           indication: indication,
-          color: color ?? Theme.of(context).colorScheme.onSurface,
+          color: color ?? PlayColors.of(context).ink,
         ),
       ),
     );
@@ -185,3 +186,21 @@ class _LaneGlyphPainter extends CustomPainter {
   bool shouldRepaint(_LaneGlyphPainter oldDelegate) =>
       oldDelegate.indication != indication || oldDelegate.color != color;
 }
+
+@PlayPreview(name: 'LaneGlyph', size: Size(380, 160))
+Widget laneGlyphPreview() => const PlayPreviewFrame(
+  child: Wrap(
+    spacing: PlaySpace.lg,
+    runSpacing: PlaySpace.md,
+    children: <Widget>[
+      LaneGlyph(indication: LaneIndication.straight),
+      LaneGlyph(indication: LaneIndication.left),
+      LaneGlyph(indication: LaneIndication.slightLeft),
+      LaneGlyph(indication: LaneIndication.right),
+      LaneGlyph(indication: LaneIndication.uTurn),
+      LaneGlyph(indication: LaneIndication.merge),
+      LaneGlyph(indication: LaneIndication.forkLeft),
+      LaneGlyph(indication: LaneIndication.forkRight),
+    ],
+  ),
+);

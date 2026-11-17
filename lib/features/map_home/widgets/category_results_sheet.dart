@@ -1,9 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format.dart';
 import '../../../domain/entities/lat_lon.dart';
 import '../../../domain/entities/place.dart';
@@ -15,15 +14,16 @@ import '../../common/error_text.dart';
 import '../../common/map_sheet.dart';
 import '../../common/navigation.dart';
 import '../../common/place_result_icon.dart';
+import '../../design/play.dart';
 
 /// The draggable results sheet shown while browsing a category: the map stays
-/// visible behind it with the nearby places highlighted.
+/// visible behind it with the nearby places highlighted, in the play style.
 class CategoryResultsSheet extends ConsumerWidget {
   const CategoryResultsSheet({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final String? category = ref.watch(selectedCategoryProvider);
     final SearchState search = ref.watch(searchControllerProvider);
     return MapSheet(
@@ -33,46 +33,32 @@ class CategoryResultsSheet extends ConsumerWidget {
       snap: true,
       snapSizes: const <double>[0.45, 0.9],
       builder: (BuildContext context, ScrollController scrollController) {
-        return Material(
-          color: scheme.surface,
-          elevation: 12,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(AppSpacing.sheetRadius),
-          ),
-          clipBehavior: Clip.antiAlias,
+        return PlaySheet(
           child: Column(
             children: <Widget>[
-              const SizedBox(height: AppSpacing.sm),
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: scheme.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+              const PlaySheetHandle(),
               Padding(
                 padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.sm,
-                  AppSpacing.sm,
+                  PlaySpace.lg,
                   0,
+                  PlaySpace.sm,
+                  PlaySpace.xs,
                 ),
                 child: Row(
                   children: <Widget>[
                     Expanded(
                       child: Text(
                         category ?? 'Nearby',
-                        style: Theme.of(context).textTheme.titleLarge,
+                        style: PlayType.title.copyWith(color: colors.ink),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      tooltip: 'Close',
+                    PlayIconButton(
+                      icon: PlayIcons.close,
+                      variant: PlayIconButtonVariant.plain,
+                      size: 44,
+                      semanticLabel: 'Close',
                       onPressed: () => unawaited(_close(ref, context)),
                     ),
                   ],
@@ -102,9 +88,10 @@ class CategoryResultsSheet extends ConsumerWidget {
     SearchState search,
     ScrollController scrollController,
   ) {
+    final PlayColors colors = PlayColors.of(context);
     switch (search.status) {
       case SearchStatus.loading:
-        return _message(scrollController, const CircularProgressIndicator());
+        return _message(scrollController, const PlaySpinner());
       case SearchStatus.error:
         final ({IconData icon, String text}) presentation = errorPresentation(
           search.error,
@@ -113,17 +100,17 @@ class CategoryResultsSheet extends ConsumerWidget {
         return _message(
           scrollController,
           Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.all(PlaySpace.lg),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                Icon(
-                  presentation.icon,
-                  size: 32,
-                  color: Theme.of(context).colorScheme.outline,
+                Icon(presentation.icon, size: 34, color: colors.inkFaint),
+                const SizedBox(height: PlaySpace.md),
+                Text(
+                  presentation.text,
+                  textAlign: TextAlign.center,
+                  style: PlayType.body.copyWith(color: colors.inkMuted),
                 ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(presentation.text, textAlign: TextAlign.center),
               ],
             ),
           ),
@@ -134,9 +121,12 @@ class CategoryResultsSheet extends ConsumerWidget {
         if (search.results.isEmpty) {
           return _message(
             scrollController,
-            const Padding(
-              padding: EdgeInsets.all(AppSpacing.md),
-              child: Text('No places found nearby'),
+            Padding(
+              padding: const EdgeInsets.all(PlaySpace.lg),
+              child: Text(
+                'No places found nearby',
+                style: PlayType.body.copyWith(color: colors.inkMuted),
+              ),
             ),
           );
         }
@@ -170,9 +160,10 @@ class CategoryResultsSheet extends ConsumerWidget {
     final bool imperial = ref.watch(imperialUnitsProvider);
     return ListView.separated(
       controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: PlaySpace.lg),
       itemCount: places.length,
       separatorBuilder: (BuildContext context, int index) =>
-          const Divider(height: 1),
+          const PlayDivider(),
       itemBuilder: (BuildContext context, int index) {
         final Place place = places[index];
         final List<String> detail = <String>[?place.category, ?place.address];
@@ -181,17 +172,10 @@ class CategoryResultsSheet extends ConsumerWidget {
             formatDistance(place.position.distanceTo(from), imperial: imperial),
           );
         }
-        return ListTile(
-          leading: Icon(placeResultIcon(place.category)),
-          title: Text(place.name),
-          subtitle: detail.isEmpty
-              ? null
-              : Text(
-                  detail.join(' · '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-          trailing: const Icon(Icons.chevron_right),
+        return PlayRow(
+          icon: placeResultIcon(place.category),
+          label: place.name,
+          subtitle: detail.isEmpty ? null : detail.join(' · '),
           onTap: () async {
             await ref.read(commandRegistryProvider).dispatch(
               'place.select',

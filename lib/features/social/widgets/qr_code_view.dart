@@ -1,5 +1,7 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 import 'package:qr/qr.dart';
+
+import '../../design/play.dart';
 
 /// Draws a QR code for [data] with the `qr` encoder and our own painter.
 ///
@@ -26,7 +28,7 @@ class QrCodeView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final PlayColors colors = PlayColors.of(context);
     final QrImage? image = _buildImage();
     if (image == null) {
       return Container(
@@ -34,8 +36,8 @@ class QrCodeView extends StatelessWidget {
         height: size,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
+          color: colors.surfaceSunken,
+          borderRadius: BorderRadius.circular(PlayRadii.md),
         ),
         child: const Text('No code to show yet'),
       );
@@ -48,8 +50,8 @@ class QrCodeView extends StatelessWidget {
           data: data,
           image: image,
           quietZoneModules: quietZoneModules,
-          dark: theme.colorScheme.onSurface,
-          light: theme.colorScheme.surface,
+          dark: colors.ink,
+          light: colors.surface,
         ),
       ),
     );
@@ -130,4 +132,11 @@ class _QrCodePainter extends CustomPainter {
       oldDelegate.light != light ||
       oldDelegate.quietZoneModules != quietZoneModules ||
       oldDelegate.image.moduleCount != image.moduleCount;
+}
+
+@PlayPreview(name: 'QrCodeView', size: Size(360, 320))
+Widget qrCodeViewPreview() {
+  return PlayPreviewFrame(
+    child: const QrCodeView(data: 'npub1openmapspreviewkey'),
+  );
 }

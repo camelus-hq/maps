@@ -1,39 +1,52 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../domain/entities/transit.dart';
+import '../../../design/play.dart';
 
-/// The transit mode's glyph (our own icon choice, no external assets).
+/// The transit mode's glyph (our own icon choice — Phosphor, no external
+/// assets).
 IconData transitModeIcon(TransitMode mode) => switch (mode) {
   TransitMode.bus ||
   TransitMode.regionalBus ||
   TransitMode.coach ||
-  TransitMode.trolleybus => Icons.directions_bus,
-  TransitMode.tram => Icons.tram,
-  TransitMode.subway || TransitMode.metro => Icons.subway,
+  TransitMode.trolleybus => PhosphorIconsRegular.bus,
+  TransitMode.tram => PhosphorIconsRegular.tram,
+  TransitMode.subway || TransitMode.metro => PhosphorIconsRegular.subway,
   TransitMode.rail ||
   TransitMode.regionalRail ||
   TransitMode.highSpeedRail ||
   TransitMode.longDistanceRail ||
   TransitMode.nightRail ||
-  TransitMode.suburbanRail => Icons.train,
-  TransitMode.ferry => Icons.directions_boat,
+  TransitMode.suburbanRail => PhosphorIconsRegular.train,
+  TransitMode.ferry => PhosphorIconsRegular.boat,
   TransitMode.cableCar ||
   TransitMode.aerialLift ||
-  TransitMode.funicular => Icons.directions_transit,
-  TransitMode.monorail => Icons.tram,
-  TransitMode.walk => Icons.directions_walk,
-  TransitMode.bike => Icons.directions_bike,
-  TransitMode.car => Icons.directions_car,
-  TransitMode.other => Icons.directions_transit,
+  TransitMode.funicular => PhosphorIconsRegular.cableCar,
+  TransitMode.monorail => PhosphorIconsRegular.tram,
+  TransitMode.walk => PhosphorIconsRegular.personSimpleWalk,
+  TransitMode.bike => PhosphorIconsRegular.bicycle,
+  TransitMode.car => PhosphorIconsRegular.car,
+  TransitMode.other => PhosphorIconsRegular.train,
 };
 
 /// A localised clock label, e.g. "11:28 AM" (respects the 12/24-hour setting).
+///
+/// Play carries no Material localisation, so the clock is formatted directly:
+/// `HH:mm` in 24-hour mode and `h:mm AM/PM` otherwise.
 String transitClock(BuildContext context, DateTime time) {
-  final TimeOfDay tod = TimeOfDay.fromDateTime(time);
-  return MaterialLocalizations.of(context).formatTimeOfDay(
-    tod,
-    alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
-  );
+  final bool use24HourFormat = MediaQuery.alwaysUse24HourFormatOf(context);
+  return formatClockLabel(time, use24HourFormat: use24HourFormat);
+}
+
+/// Formats [time] as a wall-clock label, in 24-hour or 12-hour form.
+String formatClockLabel(DateTime time, {required bool use24HourFormat}) {
+  final String minute = time.minute.toString().padLeft(2, '0');
+  if (use24HourFormat) {
+    return '${time.hour.toString().padLeft(2, '0')}:$minute';
+  }
+  final int hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
+  return '$hour:$minute ${time.hour < 12 ? 'AM' : 'PM'}';
 }
 
 /// "2 min late" / "1 min early".
@@ -97,8 +110,8 @@ class TransitLiveBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Color color = onDark
-        ? Colors.white
-        : Theme.of(context).colorScheme.primary;
+        ? const Color(0xFFFFFFFF)
+        : PlayColors.of(context).primary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
       decoration: BoxDecoration(
@@ -117,8 +130,10 @@ class TransitLiveBadge extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             'Live',
-            style: Theme.of(context).textTheme.labelSmall
-                ?.copyWith(color: color, fontWeight: FontWeight.w600),
+            style: PlayType.caption.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -143,7 +158,7 @@ class TransitPlatformChip extends StatelessWidget {
       ),
       child: Text(
         'Platform $track',
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+        style: PlayType.caption.copyWith(
           color: const Color(0xFF3C4043),
           fontWeight: FontWeight.w500,
         ),

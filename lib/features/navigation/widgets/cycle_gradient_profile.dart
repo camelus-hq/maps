@@ -1,6 +1,7 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../../domain/entities/elevation.dart';
+import '../../design/play.dart';
 
 /// The route's elevation profile: a distance axis on top, a grade-coloured
 /// band (green flat / amber climbing / teal descending) and a marker for the
@@ -19,7 +20,7 @@ class CycleGradientProfile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final List<ElevationPoint> points = _smooth(profile.points);
     return CustomPaint(
       size: Size.infinite,
@@ -28,13 +29,13 @@ class CycleGradientProfile extends StatelessWidget {
         totalDistance: points.isEmpty ? 0 : points.last.distanceMeters,
         currentDistanceMeters: currentDistanceMeters,
         imperial: imperial,
-        gridColor: scheme.outlineVariant,
-        labelColor: scheme.onSurfaceVariant,
+        gridColor: colors.line,
+        labelColor: colors.inkMuted,
         flatColor: const Color(0xFF4C7A2E),
         climbColor: const Color(0xFFB07A2A),
         descentColor: const Color(0xFF2F7D6E),
-        markerColor: scheme.primary,
-        markerBorder: scheme.surface,
+        markerColor: colors.primary,
+        markerBorder: colors.surface,
       ),
     );
   }
@@ -319,3 +320,17 @@ class _GradientPainter extends CustomPainter {
       old.currentDistanceMeters != currentDistanceMeters ||
       old.gridColor != gridColor;
 }
+
+@PlayPreview(name: 'CycleGradientProfile', size: Size(460, 220))
+Widget cycleGradientProfilePreview() => const PlayPreviewFrame(
+  child: CycleGradientProfile(
+    profile: ElevationProfile(<ElevationPoint>[
+      ElevationPoint(distanceMeters: 0, elevationMeters: 40),
+      ElevationPoint(distanceMeters: 200, elevationMeters: 90),
+      ElevationPoint(distanceMeters: 600, elevationMeters: 58),
+      ElevationPoint(distanceMeters: 1000, elevationMeters: 95),
+    ]),
+    currentDistanceMeters: 200,
+    imperial: false,
+  ),
+);

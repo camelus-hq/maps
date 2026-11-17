@@ -1,11 +1,11 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../../state/ports.dart';
 import '../../../state/sheet_anchor.dart';
+import '../../design/play.dart';
 
-/// The map's data attribution, drawn by us.
+/// The map's data attribution, drawn by us in the play style.
 ///
 /// Mapbox's native attribution ornament is disabled in [MapboxMapService]
 /// because it sits glued to the bottom-left of the platform view, underneath
@@ -26,8 +26,8 @@ class MapAttribution extends ConsumerWidget {
     final bool hidden = anchor == null || anchor.hidesChrome;
 
     return Positioned(
-      left: AppSpacing.md,
-      bottom: (anchor ?? SheetAnchor.none).topInset + AppSpacing.xs,
+      left: PlaySpace.lg,
+      bottom: (anchor ?? SheetAnchor.none).topInset + PlaySpace.xs,
       child: IgnorePointer(
         ignoring: hidden,
         child: AnimatedOpacity(
@@ -48,23 +48,25 @@ class _AttributionCredit extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    final TextStyle? linkStyle = Theme.of(context).textTheme.labelSmall
-        ?.copyWith(color: scheme.onSurfaceVariant, fontSize: 9);
+    final PlayColors colors = PlayColors.of(context);
+    final TextStyle linkStyle = PlayType.caption.copyWith(
+      fontSize: 9,
+      color: colors.inkMuted,
+    );
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: scheme.surface.withValues(alpha: 0.82),
-        borderRadius: BorderRadius.circular(AppSpacing.xs),
+        color: colors.surface.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(PlayRadii.xs),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.xs + 2,
+          horizontal: PlaySpace.sm,
           vertical: 2,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Text('© '),
+            Text('© ', style: linkStyle),
             _AttributionLink(
               label: 'Mapbox',
               style: linkStyle,
@@ -72,7 +74,7 @@ class _AttributionCredit extends ConsumerWidget {
                   .read(externalActionsProvider)
                   .openWebsite('https://www.mapbox.com/about/maps'),
             ),
-            Text(' © '),
+            Text(' © ', style: linkStyle),
             _AttributionLink(
               label: 'OpenStreetMap',
               style: linkStyle,

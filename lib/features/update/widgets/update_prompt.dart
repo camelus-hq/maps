@@ -1,13 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../../domain/entities/app_update.dart';
 import '../../../state/update.dart';
+import '../../design/play.dart';
 
-/// Shows the "new version available" prompt as a bottom sheet over the app on
+/// Shows the "new version available" prompt as a play sheet over the app on
 /// startup.
 ///
 /// Rendered above the router (in `MaterialApp.router`'s `builder`) so it covers
@@ -61,14 +61,14 @@ class _UpdatePromptHostState extends ConsumerState<UpdatePromptHost> {
                                 .read(updateControllerProvider.notifier)
                                 .dismissPrompt(),
                           ),
-                    child: const ColoredBox(color: Colors.black54),
+                    child: const ColoredBox(color: Color(0x8A000000)),
                   ),
                 ),
-                Positioned(
+                const Positioned(
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: const UpdatePromptSheet(),
+                  child: UpdatePromptSheet(),
                 ),
               ],
             ),
@@ -90,8 +90,7 @@ class UpdatePromptSheet extends ConsumerWidget {
     if (release == null) {
       return const SizedBox.shrink();
     }
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme scheme = theme.colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final List<String> changes = release.changes;
     final String? error = update.error;
     final double maxHeight = MediaQuery.sizeOf(context).height * 0.8;
@@ -100,10 +99,7 @@ class UpdatePromptSheet extends ConsumerWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {},
-      child: Material(
-        color: scheme.surface,
-        clipBehavior: Clip.antiAlias,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: PlaySheet(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: maxHeight),
           child: SafeArea(
@@ -112,49 +108,54 @@ class UpdatePromptSheet extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                const SizedBox(height: AppSpacing.sm),
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: scheme.onSurfaceVariant.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
+                const PlaySheetHandle(width: 36),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.lg,
-                    AppSpacing.sm,
-                    AppSpacing.lg,
-                    AppSpacing.sm,
+                    PlaySpace.lg,
+                    0,
+                    PlaySpace.lg,
+                    PlaySpace.sm,
                   ),
                   child: Row(
                     children: <Widget>[
-                      Icon(Icons.system_update_alt, color: scheme.primary),
-                      const SizedBox(width: AppSpacing.sm),
+                      Icon(PlayIcons.download, color: colors.primary),
+                      const SizedBox(width: PlaySpace.sm),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
                             Text(
                               'Update available',
-                              style: theme.textTheme.titleMedium,
+                              style: PlayType.subtitle.copyWith(
+                                color: colors.ink,
+                              ),
                             ),
                             Text(
                               'OpenMaps ${release.versionName} is ready to '
                               'install',
-                              style: theme.textTheme.bodySmall,
+                              style: PlayType.caption.copyWith(
+                                color: colors.inkMuted,
+                              ),
                             ),
                           ],
                         ),
                       ),
                       if (release.mandatory)
-                        Chip(
-                          label: const Text('Required'),
-                          visualDensity: VisualDensity.compact,
-                          side: BorderSide(color: scheme.outlineVariant),
+                        PlaySurface(
+                          tone: PlayTone.coral,
+                          radius: PlayRadii.xs,
+                          shadow: PlayShadow.none,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: PlaySpace.sm,
+                            vertical: PlaySpace.xs,
+                          ),
+                          child: Text(
+                            'Required',
+                            style: PlayType.caption.copyWith(
+                              color: colors.onCoral,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                     ],
                   ),
@@ -163,21 +164,21 @@ class UpdatePromptSheet extends ConsumerWidget {
                   Flexible(
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.lg,
+                        PlaySpace.lg,
                         0,
-                        AppSpacing.lg,
-                        AppSpacing.sm,
+                        PlaySpace.lg,
+                        PlaySpace.sm,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
                             "What's new",
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              color: scheme.primary,
+                            style: PlayType.bodyStrong.copyWith(
+                              color: colors.primary,
                             ),
                           ),
-                          const SizedBox(height: AppSpacing.sm),
+                          const SizedBox(height: PlaySpace.sm),
                           for (final String change in changes)
                             _ChangeRow(text: change),
                         ],
@@ -185,50 +186,58 @@ class UpdatePromptSheet extends ConsumerWidget {
                     ),
                   )
                 else
-                  const SizedBox(height: AppSpacing.sm),
+                  const SizedBox(height: PlaySpace.sm),
                 if (update.installing)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.lg,
-                      AppSpacing.sm,
-                      AppSpacing.lg,
+                      PlaySpace.lg,
+                      PlaySpace.sm,
+                      PlaySpace.lg,
                       0,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: <Widget>[
-                        LinearProgressIndicator(
+                        PlayProgress(
                           value: update.progress > 0 && update.progress < 1
                               ? update.progress
                               : null,
                         ),
-                        const SizedBox(height: AppSpacing.xs),
-                        const Text('Downloading the update…'),
+                        const SizedBox(height: PlaySpace.sm),
+                        Text(
+                          'Downloading the update…',
+                          style: PlayType.body.copyWith(color: colors.ink),
+                        ),
                       ],
                     ),
                   ),
                 if (error != null)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.lg,
-                      AppSpacing.sm,
-                      AppSpacing.lg,
+                      PlaySpace.lg,
+                      PlaySpace.sm,
+                      PlaySpace.lg,
                       0,
                     ),
-                    child: Text(error, style: TextStyle(color: scheme.error)),
+                    child: Text(
+                      error,
+                      style: PlayType.body.copyWith(color: colors.coral),
+                    ),
                   ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.lg,
-                    AppSpacing.sm,
-                    AppSpacing.lg,
-                    AppSpacing.md,
+                    PlaySpace.lg,
+                    PlaySpace.lg,
+                    PlaySpace.lg,
+                    PlaySpace.md,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: <Widget>[
                       if (!update.isMandatory)
-                        TextButton(
+                        PlayButton(
+                          label: 'Later',
+                          variant: PlayButtonVariant.ghost,
                           onPressed: update.installing
                               ? null
                               : () => unawaited(
@@ -236,10 +245,10 @@ class UpdatePromptSheet extends ConsumerWidget {
                                       .read(updateControllerProvider.notifier)
                                       .dismissPrompt(),
                                 ),
-                          child: const Text('Later'),
                         ),
-                      const SizedBox(width: AppSpacing.sm),
-                      FilledButton(
+                      const SizedBox(width: PlaySpace.sm),
+                      PlayButton(
+                        label: update.installing ? 'Installing…' : 'Update',
                         onPressed: update.installing
                             ? null
                             : () => unawaited(
@@ -247,9 +256,6 @@ class UpdatePromptSheet extends ConsumerWidget {
                                     .read(updateControllerProvider.notifier)
                                     .install(),
                               ),
-                        child: Text(
-                          update.installing ? 'Installing…' : 'Update',
-                        ),
                       ),
                     ],
                   ),
@@ -271,24 +277,26 @@ class _ChangeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.only(bottom: PlaySpace.sm),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.only(top: 6, right: AppSpacing.sm),
+            padding: const EdgeInsets.only(top: 6, right: PlaySpace.sm),
             child: Container(
               width: 6,
               height: 6,
               decoration: BoxDecoration(
-                color: scheme.primary,
+                color: colors.primary,
                 shape: BoxShape.circle,
               ),
             ),
           ),
-          Expanded(child: Text(text)),
+          Expanded(
+            child: Text(text, style: PlayType.body.copyWith(color: colors.ink)),
+          ),
         ],
       ),
     );

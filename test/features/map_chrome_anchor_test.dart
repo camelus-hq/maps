@@ -11,6 +11,7 @@ import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/lat_lon_bounds.dart';
 import 'package:openmaps/domain/entities/place.dart';
 import 'package:openmaps/domain/ports/search_service.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/map_home/widgets/map_attribution.dart';
 import 'package:openmaps/features/map_home/widgets/map_controls.dart';
 import 'package:openmaps/state/ports.dart';
@@ -260,7 +261,7 @@ void main() {
 
     // Open a category sheet, then close it again (tap the chip twice). The
     // chrome must drop back onto the home sheet without a nudge.
-    final Finder chip = find.widgetWithText(FilterChip, 'Cafes');
+    final Finder chip = find.widgetWithText(PlayChip, 'Cafes');
     await tester.tap(chip);
     await tester.pumpAndSettle();
     expect(
@@ -293,7 +294,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(FilterChip, 'Cafes'));
+    await tester.tap(find.widgetWithText(PlayChip, 'Cafes'));
     await tester.pumpAndSettle();
 
     // The chrome must attach to the category sheet's real top edge immediately —
@@ -332,7 +333,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(FilterChip, 'Cafes'));
+    await tester.tap(find.widgetWithText(PlayChip, 'Cafes'));
     // The sheet switcher fades the home sheet out and the loading category
     // sheet in; the browse never completes.
     await tester.pump();

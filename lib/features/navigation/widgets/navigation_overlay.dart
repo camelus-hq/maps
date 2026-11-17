@@ -1,5 +1,5 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/app_spacing.dart';
 import '../../../domain/entities/travel_mode.dart';

@@ -1,8 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart' hide Route;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:material_ui/material_ui.dart' hide Route;
 import 'package:openmaps/app/app.dart';
 import 'package:openmaps/data/fakes/fake_map_service.dart';
 import 'package:openmaps/domain/entities/elevation.dart';
@@ -11,6 +11,7 @@ import 'package:openmaps/domain/entities/location_sample.dart';
 import 'package:openmaps/domain/entities/route.dart';
 import 'package:openmaps/domain/entities/travel_mode.dart';
 import 'package:openmaps/domain/ports/location_service.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/directions/widgets/maneuver_glyph.dart';
 import 'package:openmaps/features/navigation/nav_style.dart';
 import 'package:openmaps/features/navigation/widgets/car_nav_bottom_sheet.dart';
@@ -337,7 +338,7 @@ void main() {
     // Each step carries its own maneuver glyph (it used to be a single
     // hardcoded right-turn icon for every row).
     final Finder glyphs = find.descendant(
-      of: find.byType(ListTile),
+      of: find.byType(PlayRow),
       matching: find.byType(ManeuverGlyph),
     );
     expect(glyphs, findsOneWidget);

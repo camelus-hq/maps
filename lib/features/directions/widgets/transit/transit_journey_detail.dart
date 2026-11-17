@@ -1,7 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/format.dart';
@@ -9,6 +9,7 @@ import '../../../../domain/entities/transit.dart';
 import '../../../../state/commands/commands_provider.dart';
 import '../../../../state/route.dart';
 import '../../../../state/settings.dart';
+import '../../../design/play.dart';
 import 'transit_common.dart';
 import 'transit_line_badge.dart';
 import 'transit_timeline.dart';
@@ -29,7 +30,7 @@ class TransitJourneyDetail extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final bool imperial = ref.watch(imperialUnitsProvider);
     final RouteState routeState = ref.watch(routeControllerProvider);
     final List<TransitLeg> rides = itinerary.rides;
@@ -53,7 +54,7 @@ class TransitJourneyDetail extends ConsumerWidget {
             children: <Widget>[
               // The grab handle is part of the scrollable so it — and the badge
               // header — can drag the sheet at any size, including the peek.
-              const _DragHandle(),
+              const PlaySheetHandle(),
               Row(
                 children: <Widget>[
                   Expanded(
@@ -65,18 +66,20 @@ class TransitJourneyDetail extends ConsumerWidget {
                         for (int i = 0; i < rides.length; i++) ...<Widget>[
                           if (i > 0)
                             Icon(
-                              Icons.chevron_right,
+                              PlayIcons.next,
                               size: 18,
-                              color: scheme.outline,
+                              color: colors.inkFaint,
                             ),
                           TransitLineBadge(leg: rides[i]),
                         ],
                       ],
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Close',
-                    icon: const Icon(Icons.close),
+                  PlayIconButton(
+                    icon: PlayIcons.close,
+                    variant: PlayIconButtonVariant.plain,
+                    size: 40,
+                    semanticLabel: 'Close',
                     onPressed: () => unawaited(
                       ref
                           .read(commandRegistryProvider)
@@ -88,7 +91,10 @@ class TransitJourneyDetail extends ConsumerWidget {
                   ),
                 ],
               ),
-              const Divider(height: AppSpacing.md),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                child: PlayDivider(),
+              ),
               TransitTimeline(
                 itinerary: itinerary,
                 originName: originName,
@@ -118,29 +124,6 @@ class TransitJourneyDetail extends ConsumerWidget {
   }
 }
 
-/// The grab handle at the top of the detail sheet.
-class _DragHandle extends StatelessWidget {
-  const _DragHandle();
-
-  @override
-  Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.xs),
-      child: Center(
-        child: Container(
-          width: 40,
-          height: 4,
-          decoration: BoxDecoration(
-            color: scheme.outlineVariant,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// The sticky bottom bar: a pill Start button, the journey's duration and its
 /// arrival time.
 class _DetailFooter extends ConsumerWidget {
@@ -150,51 +133,46 @@ class _DetailFooter extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    return Container(
+    final PlayColors colors = PlayColors.of(context);
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: scheme.surface,
-        border: Border(top: BorderSide(color: scheme.outlineVariant)),
+        color: colors.surface,
+        border: Border(top: BorderSide(color: colors.line)),
       ),
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.sm,
-        AppSpacing.md,
-        AppSpacing.sm + MediaQuery.viewPaddingOf(context).bottom,
-      ),
-      child: Row(
-        children: <Widget>[
-          FilledButton.icon(
-            onPressed: () => unawaited(
-              ref
-                  .read(commandRegistryProvider)
-                  .dispatch('transit.navigate', const <String, Object?>{}),
-            ),
-            style: FilledButton.styleFrom(
-              shape: const StadiumBorder(),
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg,
-                vertical: AppSpacing.sm,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.sm,
+          AppSpacing.md,
+          AppSpacing.sm + MediaQuery.viewPaddingOf(context).bottom,
+        ),
+        child: Row(
+          children: <Widget>[
+            PlayButton(
+              label: 'Start',
+              icon: PlayIcons.navigation,
+              onPressed: () => unawaited(
+                ref
+                    .read(commandRegistryProvider)
+                    .dispatch('transit.navigate', const <String, Object?>{}),
               ),
             ),
-            icon: const Icon(Icons.navigation),
-            label: const Text('Start'),
-          ),
-          const Spacer(),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: <Widget>[
-              Text(
-                formatDuration(itinerary.duration),
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              Text(
-                transitClock(context, itinerary.endTime.toLocal()),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ],
+            const Spacer(),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: <Widget>[
+                Text(
+                  formatDuration(itinerary.duration),
+                  style: PlayType.subtitle.copyWith(color: colors.ink),
+                ),
+                Text(
+                  transitClock(context, itinerary.endTime.toLocal()),
+                  style: PlayType.caption.copyWith(color: colors.inkMuted),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -17,6 +17,7 @@ import 'package:openmaps/domain/entities/review_draft.dart';
 import 'package:openmaps/domain/ports/osm_place_source.dart';
 import 'package:openmaps/domain/ports/review_service.dart';
 import 'package:openmaps/features/common/shimmer.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/place_details/widgets/place_details_sheet.dart';
 import 'package:openmaps/features/reviews/widgets/star_rating.dart';
 import 'package:openmaps/state/place.dart';
@@ -24,6 +25,7 @@ import 'package:openmaps/state/ports.dart';
 import 'package:openmaps/state/reviews.dart';
 import 'package:openmaps/state/settings.dart';
 import 'package:openmaps/state/social.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// The place sheet: the rating / "Write a review" line, the Overview facts from
 /// OpenStreetMap (contact + wheelchair + hours) and the Reviews tab.
@@ -192,7 +194,7 @@ void main() {
     expect(find.text('instagram.com/willow'), findsOneWidget);
     expect(find.text('hi@willow.example'), findsOneWidget);
     expect(find.text('Wheelchair accessible'), findsOneWidget);
-    expect(find.byIcon(Icons.accessible), findsOneWidget);
+    expect(find.byIcon(PlayIcons.wheelchair), findsOneWidget);
     // The general weekly hours (all days) sit in the Overview.
     expect(find.text('Opening hours'), findsOneWidget);
     expect(find.text('Mon'), findsOneWidget);
@@ -222,9 +224,9 @@ void main() {
     await expand(tester);
 
     expect(find.text('Not wheelchair accessible'), findsOneWidget);
-    expect(find.byIcon(Icons.not_accessible), findsOneWidget);
+    expect(find.byIcon(PlayIcons.wheelchairOff), findsOneWidget);
     expect(find.text('Payment'), findsNothing);
-    expect(find.byTooltip('Cash'), findsNothing);
+    expect(find.bySemanticsLabel('Cash'), findsNothing);
   });
 
   testWidgets('the Call pill is disabled without a phone number', (
@@ -325,11 +327,11 @@ void main() {
     await expand(tester);
 
     expect(find.text('Payment'), findsOneWidget);
-    expect(find.byTooltip('Cash'), findsOneWidget);
-    expect(find.byTooltip('Visa'), findsOneWidget);
-    expect(find.byTooltip('Girocard (only)'), findsOneWidget);
+    expect(find.bySemanticsLabel('Cash'), findsOneWidget);
+    expect(find.bySemanticsLabel('Visa'), findsOneWidget);
+    expect(find.bySemanticsLabel('Girocard (only)'), findsOneWidget);
     // Declined methods are never shown.
-    expect(find.byTooltip('American Express'), findsNothing);
+    expect(find.bySemanticsLabel('American Express'), findsNothing);
   });
 
   testWidgets('shows card methods explicitly marked as not accepted', (
@@ -357,7 +359,7 @@ void main() {
       find.text('Not accepted: Cards, Credit cards, Debit cards'),
       findsOneWidget,
     );
-    expect(find.byIcon(Icons.credit_card_off), findsOneWidget);
+    expect(find.byIcon(PhosphorIconsRegular.creditCard), findsOneWidget);
   });
 
   testWidgets('promotes Lightning and Cashu below the review', (
@@ -385,7 +387,7 @@ void main() {
     expect(find.text('Bitcoin Lightning'), findsOneWidget);
     expect(find.text('Cashu'), findsOneWidget);
     // Plain Bitcoin is not promoted — only listed among the payments.
-    expect(find.byTooltip('Bitcoin'), findsOneWidget);
+    expect(find.bySemanticsLabel('Bitcoin'), findsOneWidget);
   });
 
   testWidgets('shows wheelchair notes, takeaway and a payment note', (

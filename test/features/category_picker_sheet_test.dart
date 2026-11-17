@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/features/map_home/widgets/category_picker_sheet.dart';
+import 'package:openmaps/state/home.dart';
 import 'package:openmaps/state/search.dart';
 import 'package:openmaps/state/settings.dart';
 
@@ -26,7 +27,7 @@ void main() {
 
     expect(find.text('Choose categories'), findsOneWidget);
     expect(find.textContaining('long press to pin'), findsOneWidget);
-    expect(find.text('Sustenance'), findsOneWidget);
+    expect(find.text('SUSTENANCE'), findsOneWidget);
     expect(find.text('Restaurants'), findsOneWidget);
     expect(find.text('Cafes'), findsOneWidget);
   });
@@ -47,6 +48,9 @@ void main() {
     );
     // Feedback confirms the pin.
     expect(find.textContaining('pinned'), findsWidgets);
+    // The long press must not also run the browse (a stray tap).
+    expect(container.read(searchControllerProvider).lastQuery, isNull);
+    expect(container.read(selectedCategoryProvider), isNull);
 
     // Long pressing again unpins it.
     await tester.longPress(find.text('Restaurants'));

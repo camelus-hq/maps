@@ -1,9 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format.dart';
 import '../../../domain/entities/lat_lon.dart';
 import '../../../domain/entities/place.dart';
@@ -16,15 +16,20 @@ import '../../../state/settings.dart';
 import '../../common/error_text.dart';
 import '../../common/navigation.dart';
 import '../../common/place_result_icon.dart';
+import '../../design/play.dart';
 
 /// Search screen: saved Home/Work and recent searches when empty, debounced
-/// results while typing.
+/// results while typing — all in the play style.
 ///
 /// Selecting a result marks it as the selected place and returns to the map,
 /// where the details sheet takes over. When a Home/Work slot is being filled
 /// ([savedPlacePickProvider]) the selection is saved to that slot instead.
 class SearchScreen extends ConsumerStatefulWidget {
-  const SearchScreen({super.key});
+  const SearchScreen({this.initialQuery, super.key});
+
+  /// A query carried in the URL (`/search?q=…`), seeded into the field and run
+  /// once on open so a deep link lands on its results. `null` on a plain open.
+  final String? initialQuery;
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
@@ -36,10 +41,22 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   void initState() {
     super.initState();
-    // Always open on the recent list: drop any query/results left by an earlier
-    // search so "Recent" (and Home/Work) is what the user sees first.
+    final String? initial = widget.initialQuery;
+    if (initial != null) {
+      _text.text = initial;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+      if (!mounted) {
+        return;
+      }
+      if (initial != null) {
+        unawaited(
+          ref.read(searchControllerProvider.notifier).submitText(initial),
+        );
+      } else {
+        // Always open on the recent list: drop any query/results left by an
+        // earlier search so "Recent" (and Home/Work) is what the user sees
+        // first.
         ref.read(searchControllerProvider.notifier).reset();
       }
     });
@@ -138,50 +155,64 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget build(BuildContext context) {
     final SearchState state = ref.watch(searchControllerProvider);
     final SavedPlaceSlot? pick = ref.watch(savedPlacePickProvider);
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            ref.read(savedPlacePickProvider.notifier).clear();
-            popOrHome(context);
-          },
-        ),
-        title: TextField(
-          controller: _text,
-          autofocus: true,
-          textInputAction: TextInputAction.search,
-          decoration: InputDecoration(
-            hintText: switch (pick) {
-              SavedPlaceSlot.home => 'Set home',
-              SavedPlaceSlot.work => 'Set work',
-              null => 'Search here',
-            },
-            border: InputBorder.none,
-          ),
-          onChanged: ref.read(searchControllerProvider.notifier).queryChanged,
-          onSubmitted: _submit,
-        ),
-        actions: <Widget>[
-          if (state.query.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.close),
-              tooltip: 'Clear',
-              onPressed: () {
-                _text.clear();
-                ref.read(searchControllerProvider.notifier).reset();
-              },
+    final String hint = switch (pick) {
+      SavedPlaceSlot.home => 'Set home',
+      SavedPlaceSlot.work => 'Set work',
+      null => 'Search here',
+    };
+    return PlayScaffold(
+      child: Column(
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              PlaySpace.sm,
+              PlaySpace.sm,
+              PlaySpace.lg,
+              PlaySpace.sm,
             ),
+            child: Row(
+              children: <Widget>[
+                PlayIconButton(
+                  icon: PlayIcons.back,
+                  variant: PlayIconButtonVariant.plain,
+                  size: 44,
+                  semanticLabel: 'Back',
+                  onPressed: () {
+                    ref.read(savedPlacePickProvider.notifier).clear();
+                    popOrHome(context);
+                  },
+                ),
+                const SizedBox(width: PlaySpace.xs),
+                Expanded(
+                  child: PlayTextField(
+                    controller: _text,
+                    hint: hint,
+                    autofocus: true,
+                    textInputAction: TextInputAction.search,
+                    leading: Icon(
+                      PlayIcons.search,
+                      size: 20,
+                      color: PlayColors.of(context).inkMuted,
+                    ),
+                    onChanged: ref
+                        .read(searchControllerProvider.notifier)
+                        .queryChanged,
+                    onSubmitted: _submit,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(child: _body(context, state, pick)),
         ],
       ),
-      body: _body(context, state, pick),
     );
   }
 
   Widget _body(BuildContext context, SearchState state, SavedPlaceSlot? pick) {
     switch (state.status) {
       case SearchStatus.loading:
-        return const Center(child: CircularProgressIndicator());
+        return const Center(child: PlaySpinner());
       case SearchStatus.error:
         final ({IconData icon, String text}) presentation = errorPresentation(
           state.error,
@@ -199,7 +230,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ? placeCategoryForSearch(state.query)
             : null;
         if (state.results.isEmpty && category == null) {
-          return const _Message(icon: Icons.search_off, text: 'No results');
+          return const _Message(
+            icon: PlayIcons.unsupported,
+            text: 'No results',
+          );
         }
         return _resultsList(state.results, category);
     }
@@ -209,6 +243,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final SavedPlaces saved = ref.watch(savedPlacesProvider);
     final List<RecentSearch> recents = ref.watch(recentSearchesProvider);
     return ListView(
+      padding: const EdgeInsets.fromLTRB(
+        PlaySpace.md,
+        0,
+        PlaySpace.md,
+        PlaySpace.xxl,
+      ),
       children: <Widget>[
         _SavedPlacesRow(
           saved: saved,
@@ -216,7 +256,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           onOpen: (Place place) => unawaited(_openSaved(place)),
           onRemove: (SavedPlaceSlot slot) => unawaited(_clearSlot(slot)),
         ),
-        const Divider(height: 1),
+        const PlayDivider(),
         _RecentHeader(
           onClear: recents.isEmpty
               ? null
@@ -225,14 +265,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ),
         ),
         if (recents.isEmpty)
-          const Padding(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.sm,
-              AppSpacing.md,
-              AppSpacing.md,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              PlaySpace.lg,
+              PlaySpace.sm,
+              PlaySpace.lg,
+              PlaySpace.xl,
             ),
-            child: Text('No recent searches yet'),
+            child: Text(
+              'No recent searches yet',
+              style: PlayType.body.copyWith(
+                color: PlayColors.of(context).inkMuted,
+              ),
+            ),
           )
         else
           for (final RecentSearch entry in recents)
@@ -263,9 +308,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final bool imperial = ref.watch(imperialUnitsProvider);
     final int leading = category == null ? 0 : 1;
     return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: PlaySpace.lg),
       itemCount: results.length + leading,
       separatorBuilder: (BuildContext context, int index) =>
-          const Divider(height: 1),
+          const PlayDivider(),
       itemBuilder: (BuildContext context, int index) {
         if (category != null && index == 0) {
           return _categoryTile(category);
@@ -279,15 +325,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             formatDistance(place.position.distanceTo(from), imperial: imperial),
           );
         }
-        return ListTile(
-          leading: Icon(placeResultIcon(place.category)),
-          title: Text(place.name),
-          subtitle: Text(
-            detail.join(' · '),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          onTap: () => _select(place),
+        return PlayRow(
+          icon: placeResultIcon(place.category),
+          label: place.name,
+          subtitle: detail.isEmpty ? null : detail.join(' · '),
+          onTap: () => unawaited(_select(place)),
         );
       },
     );
@@ -298,10 +340,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   /// the chip name. Tapping browses that category nearby — the map stays
   /// visible with the places pinned and a results sheet.
   Widget _categoryTile(PlaceCategory category) {
-    return ListTile(
-      leading: Icon(Icons.search, color: Theme.of(context).colorScheme.primary),
-      title: Text(category.label),
-      onTap: () => _browseCategory(category),
+    return PlayRow(
+      icon: PlayIcons.search,
+      label: category.label,
+      onTap: () => unawaited(_browseCategory(category)),
     );
   }
 
@@ -332,6 +374,7 @@ class _SavedPlacesRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final PlayColors colors = PlayColors.of(context);
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -340,18 +383,18 @@ class _SavedPlacesRow extends StatelessWidget {
             child: _SavedPlaceCard(
               slot: SavedPlaceSlot.home,
               place: saved.home,
-              icon: Icons.home,
+              icon: PlayIcons.home,
               onAdd: onAdd,
               onOpen: onOpen,
               onRemove: onRemove,
             ),
           ),
-          const VerticalDivider(width: 1, thickness: 1),
+          ColoredBox(color: colors.line, child: const SizedBox(width: 1)),
           Expanded(
             child: _SavedPlaceCard(
               slot: SavedPlaceSlot.work,
               place: saved.work,
-              icon: Icons.work,
+              icon: PlayIcons.work,
               onAdd: onAdd,
               onOpen: onOpen,
               onRemove: onRemove,
@@ -389,28 +432,30 @@ class _SavedPlaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final Place? value = place;
     final String subtitle = value == null
         ? 'Add'
         : (value.address ?? value.name);
-    return InkWell(
+    return PlayPressable(
       onTap: value == null ? () => onAdd(slot) : () => onOpen(value),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.md,
-          AppSpacing.sm,
-          AppSpacing.md,
+          PlaySpace.xs,
+          PlaySpace.md,
+          PlaySpace.xs,
+          PlaySpace.md,
         ),
         child: Row(
           children: <Widget>[
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: scheme.primaryContainer,
-              child: Icon(icon, size: 20, color: scheme.onPrimaryContainer),
+            PlaySurface(
+              radius: PlayRadii.pill,
+              tone: PlayTone.soft,
+              shadow: PlayShadow.none,
+              padding: const EdgeInsets.all(PlaySpace.md),
+              child: Icon(icon, size: 20, color: colors.onPrimarySoft),
             ),
-            const SizedBox(width: AppSpacing.sm),
+            const SizedBox(width: PlaySpace.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -418,7 +463,7 @@ class _SavedPlaceCard extends StatelessWidget {
                 children: <Widget>[
                   Text(
                     _label,
-                    style: Theme.of(context).textTheme.titleMedium,
+                    style: PlayType.subtitle.copyWith(color: colors.ink),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -426,26 +471,24 @@ class _SavedPlaceCard extends StatelessWidget {
                     subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium
-                        ?.copyWith(color: scheme.onSurfaceVariant),
+                    style: PlayType.caption.copyWith(color: colors.inkMuted),
                   ),
                 ],
               ),
             ),
             if (value != null)
-              PopupMenuButton<String>(
-                tooltip: 'Remove $_label',
-                icon: Icon(Icons.more_vert, color: scheme.onSurfaceVariant),
-                onSelected: (_) => onRemove(slot),
-                itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                  PopupMenuItem<String>(
+              PlayMenuButton<String>(
+                semanticLabel: 'Remove $_label',
+                onSelected: (String _) => onRemove(slot),
+                items: <PlayMenuItem<String>>[
+                  PlayMenuItem<String>(
                     value: 'remove',
-                    child: Text('Remove $_label'),
+                    label: 'Remove $_label',
                   ),
                 ],
               )
             else
-              const SizedBox(width: AppSpacing.sm),
+              const SizedBox(width: PlaySpace.sm),
           ],
         ),
       ),
@@ -461,28 +504,28 @@ class _RecentHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final PlayColors colors = PlayColors.of(context);
+    final VoidCallback? clear = onClear;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.sm,
-        AppSpacing.md,
-        AppSpacing.sm,
+        PlaySpace.xs,
+        PlaySpace.sm,
+        PlaySpace.xs,
+        PlaySpace.sm,
       ),
       child: Row(
         children: <Widget>[
           Expanded(
             child: Text(
               'Recent',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: PlayType.subtitle.copyWith(color: colors.ink),
             ),
           ),
-          FilledButton.tonal(
-            onPressed: onClear,
-            style: FilledButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              shape: const StadiumBorder(),
-            ),
-            child: const Text('Clear recents'),
+          PlayButton(
+            label: 'Clear recents',
+            variant: PlayButtonVariant.soft,
+            size: PlayButtonSize.sm,
+            onPressed: clear,
           ),
         ],
       ),
@@ -507,7 +550,6 @@ class _RecentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
     final (
       IconData icon,
       String title,
@@ -521,44 +563,40 @@ class _RecentTile extends StatelessWidget {
         value,
       ),
       RecentTextSearch(text: final String text) => (
-        Icons.history,
+        PlayIcons.recent,
         text,
         null,
         null,
       ),
     };
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: subtitle == null
-          ? null
-          : Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+    final Place? target = place;
+    return PlayRow(
+      icon: icon,
+      label: title,
+      subtitle: subtitle,
       onTap: () => onOpen(entry),
+      showChevron: false,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          SizedBox(
-            width: 40,
-            height: 40,
-            child: IconButton(
-              padding: EdgeInsets.zero,
-              icon: const Icon(Icons.north_east),
-              tooltip: place == null ? 'Search' : 'Directions',
-              onPressed: () =>
-                  place == null ? onOpen(entry) : onDirections(place),
-            ),
+          PlayIconButton(
+            icon: PlayIcons.goTo,
+            variant: PlayIconButtonVariant.plain,
+            size: 40,
+            iconSize: 18,
+            semanticLabel: target == null ? 'Search' : 'Directions',
+            onPressed: () =>
+                target == null ? onOpen(entry) : onDirections(target),
           ),
-          PopupMenuButton<String>(
-            tooltip: 'More',
-            icon: Icon(Icons.more_vert, color: scheme.onSurfaceVariant),
-            onSelected: (_) => onRemove(entry),
-            itemBuilder: (BuildContext context) =>
-                const <PopupMenuEntry<String>>[
-                  PopupMenuItem<String>(
-                    value: 'remove',
-                    child: Text('Remove from recent'),
-                  ),
-                ],
+          PlayMenuButton<String>(
+            semanticLabel: 'More',
+            onSelected: (String _) => onRemove(entry),
+            items: const <PlayMenuItem<String>>[
+              PlayMenuItem<String>(
+                value: 'remove',
+                label: 'Remove from recent',
+              ),
+            ],
           ),
         ],
       ),
@@ -575,22 +613,29 @@ class _Message extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final PlayColors colors = PlayColors.of(context);
+    final VoidCallback? retry = onRetry;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(icon, size: 40, color: Theme.of(context).colorScheme.outline),
-          const SizedBox(height: AppSpacing.sm),
+          Icon(icon, size: 44, color: colors.inkFaint),
+          const SizedBox(height: PlaySpace.md),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-            child: Text(text, textAlign: TextAlign.center),
+            padding: const EdgeInsets.symmetric(horizontal: PlaySpace.xl),
+            child: Text(
+              text,
+              textAlign: TextAlign.center,
+              style: PlayType.body.copyWith(color: colors.inkMuted),
+            ),
           ),
-          if (onRetry != null) ...<Widget>[
-            const SizedBox(height: AppSpacing.md),
-            OutlinedButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
+          if (retry != null) ...<Widget>[
+            const SizedBox(height: PlaySpace.lg),
+            PlayButton(
+              label: 'Retry',
+              icon: PlayIcons.refresh,
+              variant: PlayButtonVariant.ghost,
+              onPressed: retry,
             ),
           ],
         ],

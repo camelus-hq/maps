@@ -1,10 +1,10 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
 
-import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format.dart';
 import '../../../domain/entities/route.dart';
 import '../../../domain/entities/transit.dart';
 import '../../../state/navigation.dart';
+import '../../design/play.dart';
 import '../../directions/widgets/maneuver_glyph.dart';
 import '../../directions/widgets/transit/transit_common.dart';
 import '../nav_style.dart';
@@ -53,74 +53,67 @@ class TransitNavBanner extends StatelessWidget {
         ? formatDuration(rideRemaining(ride, progress))
         : formatDistance(distance, imperial: imperial);
     final String instruction = _instruction();
-    return Material(
-      color: Colors.transparent,
-      child: GestureDetector(
-        onTap: onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: style.banner,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: const <BoxShadow>[
-              BoxShadow(
-                color: Color(0x33000000),
-                blurRadius: 12,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: <Widget>[
-                    ManeuverGlyph(
-                      type: glyph,
-                      size: 54,
-                      color: style.bannerAccent,
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          Text(
-                            primaryText,
-                            style: TextStyle(
-                              color: style.bannerAccent,
-                              fontSize: 30,
-                              fontWeight: FontWeight.w600,
-                              height: 1.05,
-                            ),
+    return PlayPressable(
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: style.banner,
+          borderRadius: BorderRadius.circular(PlayRadii.md),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: Color(0x33000000),
+              blurRadius: 12,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.all(PlaySpace.lg),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: <Widget>[
+                  ManeuverGlyph(
+                    type: glyph,
+                    size: 54,
+                    color: style.bannerAccent,
+                  ),
+                  const SizedBox(width: PlaySpace.lg),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Text(
+                          primaryText,
+                          style: TextStyle(
+                            color: style.bannerAccent,
+                            fontSize: 30,
+                            fontWeight: FontWeight.w600,
+                            height: 1.05,
                           ),
-                          Text(
-                            instruction,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: style.bannerAccent.withValues(alpha: 0.92),
-                              fontSize: 19,
-                              height: 1.18,
-                            ),
+                        ),
+                        Text(
+                          instruction,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: style.bannerAccent.withValues(alpha: 0.92),
+                            fontSize: 19,
+                            height: 1.18,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              if (ride != null)
-                _TransitStatusStrip(
-                  leg: ride,
-                  progress: progress,
-                  style: style,
-                ),
-            ],
-          ),
+            ),
+            if (ride != null)
+              _TransitStatusStrip(leg: ride, progress: progress, style: style),
+          ],
         ),
       ),
     );
@@ -178,8 +171,8 @@ class _TransitStatusStrip extends StatelessWidget {
       width: double.infinity,
       color: style.laneStrip,
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
+        horizontal: PlaySpace.lg,
+        vertical: PlaySpace.sm,
       ),
       child: Row(
         children: <Widget>[
@@ -192,17 +185,17 @@ class _TransitStatusStrip extends StatelessWidget {
             ),
             child: Text(
               leg.lineLabel,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              style: PlayType.caption.copyWith(
                 color: Color(textColor),
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
           if (track != null) ...<Widget>[
-            const SizedBox(width: AppSpacing.sm),
+            const SizedBox(width: PlaySpace.sm),
             TransitPlatformChip(track: track),
           ],
-          const SizedBox(width: AppSpacing.sm),
+          const SizedBox(width: PlaySpace.sm),
           Expanded(
             child: Text(
               status,

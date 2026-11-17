@@ -347,7 +347,14 @@ class SearchController extends Notifier<SearchState> {
     // The result pins are drawn by the map, not the state tree, so clearing the
     // state alone would leave them on the map (deselecting a category chip or
     // closing the sheet left the POIs behind). Drop them with the results.
-    unawaited(ref.read(mapServiceProvider).setMarkers(const <Marker>[]));
+    //
+    // Skipped when nothing is drawn: the search screen resets on open, and a
+    // native `deleteAll()` round-trip on its very first frame (which also runs
+    // during the push transition) is pure overhead.
+    final MapService map = ref.read(mapServiceProvider);
+    if (map.markers.isNotEmpty) {
+      unawaited(map.setMarkers(const <Marker>[]));
+    }
   }
 }
 

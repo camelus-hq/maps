@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/data/fakes/fake_social_service.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/map_home/widgets/search_bar_pill.dart';
-import 'package:openmaps/features/social/widgets/friend_avatar.dart';
 import 'package:openmaps/state/ports.dart';
 
 void main() {
@@ -32,8 +32,8 @@ void main() {
     await pumpPill(tester, container);
     await tester.pumpAndSettle();
 
-    expect(find.byType(FriendAvatar), findsOneWidget);
-    expect(find.byIcon(Icons.person), findsNothing);
+    expect(find.byType(PlayAvatar), findsOneWidget);
+    expect(find.byIcon(PlayIcons.user), findsNothing);
   });
 
   testWidgets('the account slot falls back to a person icon when signed out', (
@@ -49,7 +49,6 @@ void main() {
     await pumpPill(tester, container);
     await tester.pumpAndSettle();
 
-    expect(find.byType(FriendAvatar), findsNothing);
-    expect(find.byIcon(Icons.person), findsOneWidget);
+    expect(find.byIcon(PlayIcons.user), findsOneWidget);
   });
 }

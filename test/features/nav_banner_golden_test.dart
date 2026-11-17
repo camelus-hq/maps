@@ -1,8 +1,8 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:material_ui/material_ui.dart';
-import 'package:openmaps/core/theme/app_theme.dart';
 import 'package:openmaps/domain/entities/route.dart';
 import 'package:openmaps/domain/entities/travel_mode.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/navigation/nav_style.dart';
 import 'package:openmaps/features/navigation/widgets/nav_widgets.dart';
 import 'package:openmaps/state/navigation.dart';
@@ -47,17 +47,23 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light(),
-        home: Scaffold(
-          backgroundColor: const Color(0xFFDDE3E0),
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: NavBanner(
-                nav: nav,
-                style: NavStyle.forMode(TravelMode.drive),
-                imperial: false,
+      PlayTheme(
+        colors: PlayColors.light,
+        child: MediaQuery(
+          data: const MediaQueryData(size: Size(420, 320)),
+          child: ColoredBox(
+            color: const Color(0xFFDDE3E0),
+            child: Directionality(
+              textDirection: TextDirection.ltr,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: NavBanner(
+                    nav: nav,
+                    style: NavStyle.forMode(TravelMode.drive),
+                    imperial: false,
+                  ),
+                ),
               ),
             ),
           ),

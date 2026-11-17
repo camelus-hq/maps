@@ -1,11 +1,11 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:material_ui/material_ui.dart';
-import 'package:openmaps/core/theme/app_theme.dart';
 import 'package:openmaps/data/fakes/fake_transit_routing_service.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/transit.dart';
 import 'package:openmaps/domain/entities/travel_mode.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/directions/widgets/transit/transit_common.dart';
 import 'package:openmaps/features/directions/widgets/transit/transit_departures_sheet.dart';
 import 'package:openmaps/features/directions/widgets/transit/transit_timeline.dart';
@@ -30,9 +30,12 @@ void main() {
     return line.first.distanceTo(line.last);
   }
 
-  Widget wrap(Widget child) => MaterialApp(
-    theme: AppTheme.light(),
-    home: Scaffold(body: child),
+  Widget wrap(Widget child) => PlayTheme(
+    colors: PlayColors.light,
+    child: MediaQuery(
+      data: const MediaQueryData(size: Size(800, 600)),
+      child: Directionality(textDirection: TextDirection.ltr, child: child),
+    ),
   );
 
   testWidgets('the transit banner shows the action and the line status', (
@@ -143,7 +146,7 @@ void main() {
     // The indicator is measured after layout, so pump past the post-frame pass.
     await tester.pump();
     await tester.pump();
-    expect(find.byIcon(Icons.navigation), findsOneWidget);
+    expect(find.byIcon(PlayIcons.navigation), findsOneWidget);
   });
 
   testWidgets('tapping a stop on the timeline opens its departures', (

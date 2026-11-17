@@ -1,7 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/format.dart';
@@ -16,6 +17,7 @@ import '../../../state/settings.dart';
 import '../../common/error_text.dart';
 import '../../common/navigation.dart';
 import '../../common/place_result_icon.dart';
+import '../../design/play.dart';
 
 /// The search-style place picker for a directions endpoint (start, stop or
 /// destination).
@@ -89,27 +91,23 @@ class _EndpointPickerScreenState extends ConsumerState<EndpointPickerScreen> {
         ref.watch(routeControllerProvider).editingEndpoint ??
         const RouteEndpointTarget.destination();
     final SearchState state = ref.watch(searchControllerProvider);
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: <Widget>[
-            _SearchField(
-              controller: _text,
-              hint: _hint(target),
-              onChanged: ref
-                  .read(searchControllerProvider.notifier)
-                  .queryChanged,
-              onSubmitted: _submit,
-              onBack: _close,
-              onClear: () {
-                _text.clear();
-                ref.read(searchControllerProvider.notifier).reset();
-              },
-              showClear: state.query.isNotEmpty,
-            ),
-            Expanded(child: _body(target, state)),
-          ],
-        ),
+    return PlayScaffold(
+      child: Column(
+        children: <Widget>[
+          _SearchField(
+            controller: _text,
+            hint: _hint(target),
+            onChanged: ref.read(searchControllerProvider.notifier).queryChanged,
+            onSubmitted: _submit,
+            onBack: _close,
+            onClear: () {
+              _text.clear();
+              ref.read(searchControllerProvider.notifier).reset();
+            },
+            showClear: state.query.isNotEmpty,
+          ),
+          Expanded(child: _body(target, state)),
+        ],
       ),
     );
   }
@@ -124,7 +122,7 @@ class _EndpointPickerScreenState extends ConsumerState<EndpointPickerScreen> {
   Widget _body(RouteEndpointTarget target, SearchState state) {
     switch (state.status) {
       case SearchStatus.loading:
-        return const Center(child: CircularProgressIndicator());
+        return const Center(child: PlaySpinner());
       case SearchStatus.error:
         final ({IconData icon, String text}) presentation = errorPresentation(
           state.error,
@@ -139,7 +137,10 @@ class _EndpointPickerScreenState extends ConsumerState<EndpointPickerScreen> {
         return _emptyState(target);
       case SearchStatus.data:
         if (state.results.isEmpty) {
-          return const _Message(icon: Icons.search_off, text: 'No results');
+          return const _Message(
+            icon: PlayIcons.unsupported,
+            text: 'No results',
+          );
         }
         return _resultsList(target, state.results);
     }
@@ -150,24 +151,18 @@ class _EndpointPickerScreenState extends ConsumerState<EndpointPickerScreen> {
     final List<RecentSearch> recent = ref.watch(recentSearchesProvider);
     return ListView(
       children: <Widget>[
-        ListTile(
-          leading: Icon(
-            Icons.my_location,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          title: const Text('Your location'),
+        PlayRow(
+          icon: PlayIcons.locate,
+          label: 'Your location',
           onTap: () => _useCurrentLocation(target),
         ),
-        ListTile(
-          leading: Icon(
-            Icons.pin_drop_outlined,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          title: const Text('Choose on map'),
-          subtitle: const Text('Long-press the map'),
+        PlayRow(
+          icon: PlayIcons.place,
+          label: 'Choose on map',
+          subtitle: 'Long-press the map',
           onTap: () => _chooseOnMap(target),
         ),
-        const Divider(height: 1),
+        const PlayDivider(),
         ...saved.maybeWhen<List<Widget>>(
           data: (List<Place> places) => places.isEmpty
               ? const <Widget>[]
@@ -189,7 +184,7 @@ class _EndpointPickerScreenState extends ConsumerState<EndpointPickerScreen> {
                       ],
                     ),
                   ),
-                  const Divider(height: 1),
+                  const PlayDivider(),
                 ],
           orElse: () => const <Widget>[],
         ),
@@ -207,21 +202,15 @@ class _EndpointPickerScreenState extends ConsumerState<EndpointPickerScreen> {
         else
           for (final RecentSearch entry in recent)
             switch (entry) {
-              RecentPlaceSearch(place: final Place place) => ListTile(
-                leading: Icon(placeResultIcon(place.category)),
-                title: Text(place.name),
-                subtitle: place.address == null
-                    ? null
-                    : Text(
-                        place.address!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+              RecentPlaceSearch(place: final Place place) => PlayRow(
+                icon: placeResultIcon(place.category),
+                label: place.name,
+                subtitle: place.address,
                 onTap: () => _choose(target, place),
               ),
-              RecentTextSearch(text: final String text) => ListTile(
-                leading: const Icon(Icons.history),
-                title: Text(text),
+              RecentTextSearch(text: final String text) => PlayRow(
+                icon: PlayIcons.recent,
+                label: text,
                 onTap: () {
                   _text.text = text;
                   _submit(text);
@@ -238,7 +227,7 @@ class _EndpointPickerScreenState extends ConsumerState<EndpointPickerScreen> {
     return ListView.separated(
       itemCount: results.length,
       separatorBuilder: (BuildContext context, int index) =>
-          const Divider(height: 1),
+          const PlayDivider(),
       itemBuilder: (BuildContext context, int index) {
         final Place place = results[index];
         final String? category = place.category;
@@ -249,16 +238,10 @@ class _EndpointPickerScreenState extends ConsumerState<EndpointPickerScreen> {
             formatDistance(place.position.distanceTo(from), imperial: imperial),
           );
         }
-        return ListTile(
-          leading: Icon(placeResultIcon(place.category)),
-          title: Text(place.name),
-          subtitle: detail.isEmpty
-              ? null
-              : Text(
-                  detail.join(' · '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
+        return PlayRow(
+          icon: placeResultIcon(place.category),
+          label: place.name,
+          subtitle: detail.isEmpty ? null : detail.join(' · '),
           onTap: () => _choose(target, place),
         );
       },
@@ -288,7 +271,6 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
@@ -296,40 +278,31 @@ class _SearchField extends StatelessWidget {
         AppSpacing.md,
         AppSpacing.sm,
       ),
-      child: Material(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppSpacing.pillRadius),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Row(
-            children: <Widget>[
-              IconButton(
-                icon: const Icon(Icons.arrow_back),
-                tooltip: 'Back',
-                onPressed: onBack,
-              ),
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  autofocus: true,
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    hintText: hint,
-                    border: InputBorder.none,
-                  ),
-                  onChanged: onChanged,
-                  onSubmitted: onSubmitted,
-                ),
-              ),
-              if (showClear)
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  tooltip: 'Clear',
-                  onPressed: onClear,
-                ),
-            ],
-          ),
+      child: PlayTextField(
+        controller: controller,
+        autofocus: true,
+        textInputAction: TextInputAction.search,
+        hint: hint,
+        clearable: false,
+        leading: PlayIconButton(
+          icon: PlayIcons.back,
+          variant: PlayIconButtonVariant.plain,
+          size: 40,
+          semanticLabel: 'Back',
+          onPressed: onBack,
         ),
+        trailing: showClear
+            ? PlayIconButton(
+                icon: PlayIcons.close,
+                variant: PlayIconButtonVariant.plain,
+                size: 40,
+                iconSize: 18,
+                semanticLabel: 'Clear',
+                onPressed: onClear,
+              )
+            : null,
+        onChanged: onChanged,
+        onSubmitted: onSubmitted,
       ),
     );
   }
@@ -349,7 +322,10 @@ class _SectionHeader extends StatelessWidget {
         AppSpacing.md,
         AppSpacing.sm,
       ),
-      child: Text(title, style: Theme.of(context).textTheme.titleSmall),
+      child: Text(
+        title,
+        style: PlayType.bodyStrong.copyWith(color: PlayColors.of(context).ink),
+      ),
     );
   }
 }
@@ -362,49 +338,46 @@ class _SavedTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final PlayColors colors = PlayColors.of(context);
     final String? address = place.address;
     return SizedBox(
       width: 160,
-      child: InkWell(
+      child: PlaySurface(
+        radius: AppSpacing.sheetRadius,
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        shadow: PlayShadow.none,
+        borderWidth: 1,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppSpacing.sheetRadius),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.sm),
-          child: Row(
-            children: <Widget>[
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: scheme.primaryContainer,
-                child: Icon(
-                  Icons.star,
-                  size: 18,
-                  color: scheme.onPrimaryContainer,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
+        child: Row(
+          children: <Widget>[
+            PlayAvatar(
+              label: place.name,
+              icon: PlayIcons.saved,
+              size: 32,
+              tone: PlayTone.soft,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    place.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: PlayType.body.copyWith(color: colors.ink),
+                  ),
+                  if (address != null)
                     Text(
-                      place.name,
+                      address,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium,
+                      style: PlayType.caption.copyWith(color: colors.inkMuted),
                     ),
-                    if (address != null)
-                      Text(
-                        address,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                  ],
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -420,22 +393,28 @@ class _Message extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final PlayColors colors = PlayColors.of(context);
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(icon, size: 40, color: Theme.of(context).colorScheme.outline),
-          const SizedBox(height: AppSpacing.sm),
+          Icon(icon, size: 44, color: colors.inkFaint),
+          const SizedBox(height: AppSpacing.md),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-            child: Text(text, textAlign: TextAlign.center),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+            child: Text(
+              text,
+              textAlign: TextAlign.center,
+              style: PlayType.body.copyWith(color: colors.inkMuted),
+            ),
           ),
           if (onRetry != null) ...<Widget>[
-            const SizedBox(height: AppSpacing.md),
-            OutlinedButton.icon(
+            const SizedBox(height: AppSpacing.lg),
+            PlayButton(
+              label: 'Retry',
+              icon: PlayIcons.refresh,
+              variant: PlayButtonVariant.ghost,
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
             ),
           ],
         ],

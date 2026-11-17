@@ -1,8 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
-import 'package:material_ui/material_ui.dart';
 
+import '../../core/theme/play/play_colors.dart';
 import 'mapbox_map_service.dart';
 
 /// The raw Mapbox map widget.
@@ -28,7 +29,9 @@ class _MapboxMapViewState extends State<MapboxMapView> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final bool darkMode = Theme.of(context).brightness == Brightness.dark;
+    // Follows the app's effective theme (System/Light/Dark) — the Play palette
+    // is resolved from the selected ThemeMode, so the map switches with it.
+    final bool darkMode = PlayColors.of(context).brightness == Brightness.dark;
     if (_lastDarkMode == darkMode) {
       return;
     }
