@@ -235,6 +235,7 @@ class DirectionsSheet extends ConsumerWidget {
               const SizedBox(height: AppSpacing.sm),
               Wrap(
                 spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
                 children: <Widget>[
                   for (int i = 0; i < state.routes.length; i++)
                     PlayChip(
