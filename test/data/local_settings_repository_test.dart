@@ -97,12 +97,12 @@ void main() {
     }
   });
 
-  test('an unknown stored search provider falls back to Mapbox', () async {
+  test('an unknown stored search provider falls back to Camelus', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{
       'openmaps.search.backend': 'retired-provider',
     });
 
-    expect((await repository().load()).searchBackend, SearchBackend.mapbox);
+    expect((await repository().load()).searchBackend, SearchBackend.camelus);
   });
 
   test(

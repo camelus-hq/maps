@@ -59,12 +59,15 @@ class LocalSettingsRepository implements SettingsRepository {
       'dark' => AppThemeMode.dark,
       _ => AppThemeMode.system,
     };
-    // Unknown/absent values (a renamed or removed provider, schema drift) fall
-    // back to Mapbox; every current value round-trips by its own name.
+    // Unknown/absent values (a renamed or removed provider, schema drift, or a
+    // first run before the setting was ever written) fall back to the app's
+    // default, Camelus — which itself falls back to OpenStreetMap when no
+    // Camelus key is configured (see `buildSearchService`). Every current value
+    // round-trips by its own name.
     final String? backendName = await database.readString(_searchBackendKey);
     final SearchBackend searchBackend = SearchBackend.values.firstWhere(
       (SearchBackend backend) => backend.name == backendName,
-      orElse: () => SearchBackend.mapbox,
+      orElse: () => SearchBackend.camelus,
     );
     return AppSettings(
       unit: unit,

@@ -51,9 +51,10 @@ const Camera _defaultCamera = Camera(target: LatLon(52.52, 13.405));
 ///
 /// With no `--dart-define` secrets everything runs on the keyless fakes in
 /// `lib/state/ports.dart`. The map adapter is wired when a Mapbox token is
-/// present; search follows the setting (Mapbox token or key-less OpenStreetMap);
-/// Valhalla joins in M4. [ndk] and [ndkFlutter] are created once at bootstrap
-/// and wire the live-share backend.
+/// present; search defaults to the Camelus service set (falling back to
+/// key-less OpenStreetMap when no Camelus key is set, and to Mapbox when the
+/// user picks it); Valhalla joins in M4. [ndk] and [ndkFlutter] are created once
+/// at bootstrap and wire the live-share backend.
 List<Override> buildAppOverrides(
   AppConfig config, {
   Ndk? ndk,
@@ -118,10 +119,10 @@ List<Override> buildAppOverrides(
     externalActionsProvider.overrideWith(
       (Ref ref) => const UrlLauncherExternalActions(),
     ),
-    // Search runs on whichever backend the user picked in settings. All
-    // adapters sit behind the same port, so the choice is one provider rebuild;
-    // OpenStreetMap (Photon + Overpass) needs no key, so it stays available
-    // even without a Mapbox or Camelus token.
+    // Search runs on whichever backend the user picked in settings (Camelus by
+    // default). All adapters sit behind the same port, so the choice is one
+    // provider rebuild; OpenStreetMap (Photon + Overpass) needs no key, so it
+    // stays available even without a Mapbox or Camelus token.
     searchServiceProvider.overrideWith(
       (Ref ref) => buildSearchService(ref, config),
     ),
