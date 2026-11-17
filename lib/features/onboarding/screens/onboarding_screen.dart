@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/legal_links.dart';
 import '../../../state/ports.dart';
 import '../../../state/settings.dart';
 import '../../design/play.dart';
@@ -124,9 +125,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 class _LegalNotice extends ConsumerWidget {
   const _LegalNotice({required this.colors});
 
-  static const String termsUrl = 'https://about.map.camelus.app/terms';
-  static const String privacyUrl = 'https://about.map.camelus.app/privacy';
-
   final PlayColors colors;
 
   @override
@@ -146,14 +144,15 @@ class _LegalNotice extends ConsumerWidget {
         _LegalLink(
           label: 'Terms of Service',
           style: link,
-          onTap: () => ref.read(externalActionsProvider).openWebsite(termsUrl),
+          onTap: () =>
+              ref.read(externalActionsProvider).openWebsite(LegalLinks.terms),
         ),
         Text(' and ', style: base),
         _LegalLink(
           label: 'Privacy Policy',
           style: link,
           onTap: () =>
-              ref.read(externalActionsProvider).openWebsite(privacyUrl),
+              ref.read(externalActionsProvider).openWebsite(LegalLinks.privacy),
         ),
         Text('.', style: base),
       ],

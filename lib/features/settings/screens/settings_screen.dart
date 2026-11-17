@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:ndk_flutter/ndk_flutter.dart';
 
 import '../../../core/config/app_config.dart';
+import '../../../core/config/legal_links.dart';
 import '../../../domain/entities/app_settings.dart';
 import '../../../domain/entities/app_update.dart';
 import '../../../domain/entities/friend.dart';
@@ -155,6 +156,23 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: 'Searches and directions need a connection',
             showChevron: false,
             enabled: false,
+          ),
+          const _Section('Legal'),
+          PlayRow(
+            icon: PlayIcons.globe,
+            label: 'Terms of Service',
+            showChevron: false,
+            onTap: () => unawaited(
+              ref.read(externalActionsProvider).openWebsite(LegalLinks.terms),
+            ),
+          ),
+          PlayRow(
+            icon: PlayIcons.lock,
+            label: 'Privacy Policy',
+            showChevron: false,
+            onTap: () => unawaited(
+              ref.read(externalActionsProvider).openWebsite(LegalLinks.privacy),
+            ),
           ),
         ],
       ),

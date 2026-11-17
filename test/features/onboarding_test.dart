@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openmaps/app/app.dart';
+import 'package:openmaps/core/config/legal_links.dart';
+import 'package:openmaps/data/fakes/fake_external_actions.dart';
 import 'package:openmaps/data/fakes/fake_location_service.dart';
 import 'package:openmaps/data/fakes/fake_settings_repository.dart';
 import 'package:openmaps/domain/entities/location_sample.dart';
@@ -112,5 +114,31 @@ void main() {
     expect(find.text('Search here'), findsOneWidget);
     expect(location.lastKnownCalls, greaterThan(0));
     expect(await repository.onboardingSeen(), isTrue);
+  });
+
+  testWidgets('the onboarding links open the terms and privacy pages', (
+    WidgetTester tester,
+  ) async {
+    final FakeSettingsRepository repository = FakeSettingsRepository();
+    await repository.setOnboardingSeen(false);
+    final FakeExternalActions external = FakeExternalActions();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsRepositoryProvider.overrideWithValue(repository),
+          externalActionsProvider.overrideWithValue(external),
+        ],
+        child: const OpenMapsApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Terms of Service'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Privacy Policy'));
+    await tester.pumpAndSettle();
+
+    expect(external.websites, <String>[LegalLinks.terms, LegalLinks.privacy]);
   });
 }
