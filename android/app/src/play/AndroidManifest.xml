@@ -1,0 +1,10 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- The play flavor updates through Google Play, so it never hands a
+         downloaded APK to the system installer. The permission lives in the
+         `main` manifest for the self-updating `direct` flavor; remove it here
+         so the play bundle never declares it. -->
+    <uses-permission
+        android:name="android.permission.REQUEST_INSTALL_PACKAGES"
+        tools:node="remove"/>
+</manifest>
