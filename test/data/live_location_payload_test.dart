@@ -38,6 +38,23 @@ void main() {
     );
   });
 
+  test('round-trips a start marking the session start', () {
+    final String encoded = LiveLocationPayload.encode(
+      LiveShareBroadcast(
+        sessionId: 'session-2',
+        kind: LiveShareBroadcastKind.start,
+        position: const LatLon(52.52, 13.405),
+        sampledAt: now,
+        expiresAt: now.add(const Duration(hours: 1)),
+      ),
+    );
+    final LiveLocationPayload? decoded = LiveLocationPayload.decode(encoded);
+    expect(decoded, isNotNull);
+    expect(decoded!.isStart, isTrue);
+    expect(decoded.isStop, isFalse);
+    expect(decoded.sessionId, 'session-2');
+  });
+
   test('round-trips a stop that carries no position', () {
     final String encoded = LiveLocationPayload.encode(
       LiveShareBroadcast(

@@ -41,18 +41,24 @@ class PushNotificationContent {
   }) {
     if (kind == LiveLocationPayload.rumorKind) {
       final LiveLocationPayload? share = LiveLocationPayload.decode(content);
-      // A "stop" (or an unreadable payload) is not worth a notification.
-      if (share == null || share.isStop || share.position == null) {
+      // Only the **start** of a session is a notification: a stream of position
+      // updates would otherwise spam the recipient (a stop, an unreadable
+      // payload or an update is not worth waking the phone for).
+      if (share == null ||
+          !share.isStart ||
+          share.isStop ||
+          share.position == null) {
         return null;
       }
       return PushNotificationContent(
-        id: _id(senderPubkey, kind),
+        id: _id(senderPubkey, kind, share.sessionId),
         title: _displayName(share.displayName, senderName, senderPubkey),
         body: 'is sharing their location with you',
         payload: jsonEncode(<String, Object?>{
           'kind': kind,
           'route': '/friends',
           'pubkey': senderPubkey,
+          'session': share.sessionId,
         }),
       );
     }
@@ -63,7 +69,7 @@ class PushNotificationContent {
         return null;
       }
       return PushNotificationContent(
-        id: _id(senderPubkey, kind),
+        id: _id(senderPubkey, kind, null),
         title: _displayName(null, senderName, senderPubkey),
         body: text,
         payload: jsonEncode(<String, Object?>{
@@ -95,8 +101,10 @@ class PushNotificationContent {
       ? pubkey
       : '${pubkey.substring(0, 8)}…${pubkey.substring(pubkey.length - 4)}';
 
-  static int _id(String pubkey, int kind) =>
-      Object.hash(pubkey, kind) & 0x7fffffff;
+  /// A stable id so re-posts about the same sender/session collapse onto one
+  /// notice instead of stacking.
+  static int _id(String pubkey, int kind, String? sessionId) =>
+      Object.hash(pubkey, kind, sessionId) & 0x7fffffff;
 
   static String _truncate(String value, int max) =>
       value.length <= max ? value : '${value.substring(0, max - 1)}…';

@@ -13,6 +13,12 @@ abstract interface class PushRegistrationApi {
 
   /// Removes the identity's registration, or only [token]'s when given.
   Future<bool> unregister(String signedEventJson, {String? token});
+
+  /// Opens a server-side **foreground session** for the identity behind
+  /// [signedEventJson]: while the returned stream stays open the server pauses
+  /// forwarding to the identity (the app is receiving gift wraps itself). The
+  /// stream ends when the subscription is cancelled or the socket times out.
+  Stream<String> foreground(String signedEventJson);
 }
 
 /// [PushRegistrationApi] over the generated Serverpod client.
@@ -28,6 +34,10 @@ class ServerpodPushRegistrationApi implements PushRegistrationApi {
   @override
   Future<bool> unregister(String signedEventJson, {String? token}) =>
       _client.push.unregister(signedEventJson, token);
+
+  @override
+  Stream<String> foreground(String signedEventJson) =>
+      _client.push.foreground(signedEventJson);
 }
 
 /// Builds and sends a **signed** push registration.
@@ -84,6 +94,22 @@ class PushRegistrar {
       return false;
     }
     return api.unregister(proof, token: token);
+  }
+
+  /// Opens a **foreground session** with the server: while the returned stream
+  /// is open, the server pauses forwarding to this identity because the app is
+  /// receiving gift wraps on its own relay subscription.
+  ///
+  /// Returns an empty stream when signed out (nothing to pause).
+  Future<Stream<String>> foreground() async {
+    final String? proof = await social.signEvent(
+      kind: proofKind,
+      tags: const <List<String>>[],
+    );
+    if (proof == null) {
+      return const Stream<String>.empty();
+    }
+    return api.foreground(proof);
   }
 
   List<List<String>> _tags({

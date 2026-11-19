@@ -68,6 +68,15 @@ abstract interface class SocialService {
   /// silently — the stream only ever carries trustworthy [FriendLocation]s.
   Stream<FriendLocation> watchFriendLocations();
 
+  /// Decrypted gift wraps the app has received on its **own** relay
+  /// subscription, for the notification bridge.
+  ///
+  /// While the app is in the foreground the push server pauses forwarding (the
+  /// app already has these), so the app surfaces them itself: a live-share
+  /// **start** or a direct message raises a notification. Carries every
+  /// decrypted rumor — the consumer decides which kinds are worth surfacing.
+  Stream<DecryptedPushEvent> get incomingPushes;
+
   /// Closes the incoming subscription opened by [watchFriendLocations].
   Future<void> stopWatching();
 

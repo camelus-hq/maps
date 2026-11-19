@@ -417,7 +417,7 @@ class LiveShareController extends Notifier<LiveShareState> {
       await _send(
         LiveShareBroadcast(
           sessionId: session.sessionId,
-          kind: LiveShareBroadcastKind.update,
+          kind: LiveShareBroadcastKind.start,
           position: sample.position,
           sampledAt: now,
           expiresAt: session.expiresAt,

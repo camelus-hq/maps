@@ -676,6 +676,38 @@ class _PushEndpoint {
     });
   }
 
+  _ida.Stream<String> foreground(
+    _ist.TestSessionBuilder sessionBuilder,
+    String proof,
+  ) {
+    var _localTestStreamManager = _ist.TestStreamManager<String>();
+    _ist.callStreamFunctionAndHandleExceptions(
+      () async {
+        var _localUniqueSession =
+            (sessionBuilder as _ist.InternalTestSessionBuilder).internalBuild(
+              endpoint: 'push',
+              method: 'foreground',
+            );
+        var _localCallContext = await _endpointDispatch
+            .getMethodStreamCallContext(
+              createSessionCallback: (_) => _localUniqueSession,
+              endpointPath: 'push',
+              methodName: 'foreground',
+              arguments: {'proof': proof},
+              requestedInputStreams: [],
+              serializationManager: _serializationManager,
+            );
+        await _localTestStreamManager.callStreamMethod(
+          _localCallContext,
+          _localUniqueSession,
+          {},
+        );
+      },
+      _localTestStreamManager.outputStreamController,
+    );
+    return _localTestStreamManager.outputStreamController.stream;
+  }
+
   _ida.Future<_iubxwria.PushRegistrationState> getState(
     _ist.TestSessionBuilder sessionBuilder,
     String proof,

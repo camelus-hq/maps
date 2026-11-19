@@ -24,6 +24,7 @@ class FakeSocialService implements SocialService {
        _follows = List<Friend>.of(followings ?? demoFollowings) {
     _identityController = StreamController<String?>.broadcast();
     _incoming = StreamController<FriendLocation>.broadcast();
+    _incomingPushes = StreamController<DecryptedPushEvent>.broadcast();
     for (final FriendLocation location
         in liveFriends ?? const <FriendLocation>[]) {
       _live[location.pubkey] = location;
@@ -104,6 +105,7 @@ class FakeSocialService implements SocialService {
   bool signedIn;
   late final StreamController<String?> _identityController;
   late final StreamController<FriendLocation> _incoming;
+  late final StreamController<DecryptedPushEvent> _incomingPushes;
   final Map<String, FriendLocation> _live = <String, FriendLocation>{};
 
   /// Every broadcast this fake was asked to publish (newest last).
@@ -282,6 +284,16 @@ class FakeSocialService implements SocialService {
   }
 
   @override
+  Stream<DecryptedPushEvent> get incomingPushes => _incomingPushes.stream;
+
+  /// Delivers a decrypted gift wrap the app received itself (tests).
+  void emitIncomingPush(DecryptedPushEvent event) {
+    if (!_incomingPushes.isClosed) {
+      _incomingPushes.add(event);
+    }
+  }
+
+  @override
   Future<void> stopWatching() async {}
 
   @override
@@ -393,6 +405,9 @@ class FakeSocialService implements SocialService {
     }
     if (!_incoming.isClosed) {
       unawaited(_incoming.close());
+    }
+    if (!_incomingPushes.isClosed) {
+      unawaited(_incomingPushes.close());
     }
   }
 }

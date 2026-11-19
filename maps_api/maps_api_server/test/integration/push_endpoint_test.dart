@@ -1,4 +1,10 @@
+import 'dart:async';
+
 import 'package:maps_api_server/src/generated/protocol.dart';
+import 'package:maps_api_server/src/push/push.dart';
+import 'package:maps_api_server/src/push/push_dispatcher.dart';
+import 'package:maps_api_server/src/push/push_repository.dart';
+import 'package:maps_api_server/src/push/push_sender.dart';
 import 'package:test/test.dart';
 
 import '../push/test_identity.dart';
@@ -69,5 +75,61 @@ void main() {
       final state = await endpoints.push.getState(sessionBuilder, proof);
       expect(state.subscriptions, isEmpty);
     });
+
+    test('a foreground stream pauses forwarding until it ends', () async {
+      pushPresence.clear();
+      addTearDown(pushPresence.clear);
+
+      final TestIdentity me = TestIdentity.generate();
+      await endpoints.push.register(
+        sessionBuilder,
+        await me.registration(token: 'fcm-token-1'),
+      );
+
+      final RecordingSender sender = RecordingSender('firebase');
+      final PushDispatcher dispatcher = PushDispatcher(
+        repository: const PushRepository(),
+        senders: PushSenderRegistry(<PushSender>[sender]),
+        presence: pushPresence,
+      );
+
+      final Stream<String> session = endpoints.push.foreground(
+        sessionBuilder,
+        await me.registration(token: 'proof'),
+      );
+      final StreamSubscription<String> sub = session.listen((String _) {});
+      await _until(() => pushPresence.isActive(me.pubKey));
+
+      await dispatcher.dispatch(
+        sessionBuilder.build(),
+        TestIdentity.giftWrap(me.pubKey),
+      );
+      expect(
+        sender.sent,
+        isEmpty,
+        reason: 'the app is receiving the gift wrap itself',
+      );
+
+      // Backgrounding (or a socket timeout) cancels the stream; push resumes.
+      await sub.cancel();
+      await _until(() => !pushPresence.isActive(me.pubKey));
+
+      await dispatcher.dispatch(
+        sessionBuilder.build(),
+        TestIdentity.giftWrap(me.pubKey),
+      );
+      expect(sender.sent, hasLength(1));
+    });
   });
+}
+
+/// Polls [condition] until it holds, failing if it never does.
+Future<void> _until(bool Function() condition) async {
+  for (int i = 0; i < 200; i++) {
+    if (condition()) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  fail('condition was not met in time');
 }

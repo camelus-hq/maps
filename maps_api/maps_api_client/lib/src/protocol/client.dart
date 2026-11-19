@@ -373,6 +373,23 @@ class EndpointPush extends _isc.EndpointRef {
         {'registrationJson': registrationJson},
       );
 
+  /// Holds a server connection open on behalf of [proof]'s identity while the
+  /// app is in the foreground and receiving gift wraps on its own relay
+  /// subscription.
+  ///
+  /// While this stream is open the forwarder **pauses** pushing to the identity
+  /// — the app already has the gift wrap, so a push would only duplicate it.
+  /// The stream ends when the app backgrounds (the client cancels it) or the
+  /// connection times out (Serverpod pings the websocket every 30 s and closes
+  /// a dead one); forwarding then resumes automatically.
+  _ida.Stream<String> foreground(String proof) =>
+      caller.callStreamingServerEndpoint<_ida.Stream<String>, String>(
+        'push',
+        'foreground',
+        {'proof': proof},
+        {},
+      );
+
   /// Reports what [proof]'s identity is registered for.
   ///
   /// [proof] is any event signed by the identity (its tags are not read).

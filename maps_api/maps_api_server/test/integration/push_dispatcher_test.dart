@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:maps_api_server/src/push/push_dispatcher.dart';
+import 'package:maps_api_server/src/push/push_presence.dart';
 import 'package:maps_api_server/src/push/push_repository.dart';
 import 'package:maps_api_server/src/push/push_sender.dart';
 import 'package:test/test.dart';
@@ -21,6 +22,7 @@ void main() {
       final PushDispatcher dispatcher = PushDispatcher(
         repository: const PushRepository(),
         senders: PushSenderRegistry(<PushSender>[sender]),
+        presence: PushPresence(),
       );
 
       await dispatcher.dispatch(
@@ -58,6 +60,7 @@ void main() {
       final PushDispatcher dispatcher = PushDispatcher(
         repository: const PushRepository(),
         senders: PushSenderRegistry(<PushSender>[sender]),
+        presence: PushPresence(),
       );
 
       await dispatcher.dispatch(
@@ -80,6 +83,7 @@ void main() {
       final PushDispatcher dispatcher = PushDispatcher(
         repository: const PushRepository(),
         senders: PushSenderRegistry(<PushSender>[sender]),
+        presence: PushPresence(),
       );
 
       await dispatcher.dispatch(
@@ -90,6 +94,40 @@ void main() {
       expect(sender.sent, hasLength(1));
       final state = await endpoints.push.getState(sessionBuilder, proof);
       expect(state.subscriptions, isEmpty);
+    });
+
+    test('skips a recipient whose client is connected (foreground)', () async {
+      final TestIdentity me = TestIdentity.generate();
+      await endpoints.push.register(
+        sessionBuilder,
+        await me.registration(token: 'fcm-token-1'),
+      );
+
+      final RecordingSender sender = RecordingSender('firebase');
+      final PushPresence presence = PushPresence()..add(me.pubKey);
+      final PushDispatcher dispatcher = PushDispatcher(
+        repository: const PushRepository(),
+        senders: PushSenderRegistry(<PushSender>[sender]),
+        presence: presence,
+      );
+
+      await dispatcher.dispatch(
+        sessionBuilder.build(),
+        TestIdentity.giftWrap(me.pubKey),
+      );
+      expect(
+        sender.sent,
+        isEmpty,
+        reason: 'the app is receiving the gift wrap itself',
+      );
+
+      // When the foreground connection ends, forwarding resumes.
+      presence.remove(me.pubKey);
+      await dispatcher.dispatch(
+        sessionBuilder.build(),
+        TestIdentity.giftWrap(me.pubKey),
+      );
+      expect(sender.sent, hasLength(1));
     });
   });
 }

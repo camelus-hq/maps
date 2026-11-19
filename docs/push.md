@@ -75,13 +75,17 @@ later move to the dedicated `fid` field.
   on sign-out it invalidates the device token so the server stops delivering to
   the old identity. It is owned by `pushStatusProvider` and kept alive by the
   invisible `PushNotificationLayer` in the map home.
-* **Foreground**: while the app is open, an incoming push is decrypted and a
-  **direct message** raises a notification. A live share is **not** re-notified —
-  the map's own relay subscription already draws it, so notifying again would
-  duplicate it.
+* **Foreground session**: while the app is open it holds a **streaming**
+  connection to the server (`client.push.foreground`) that tells it to **pause**
+  forwarding — the app is receiving gift wraps on its own relay subscription, so
+  a push would only duplicate. The stream ends (and forwarding resumes) when the
+  app goes to the background or the socket times out. Because the app is then the
+  receiver, `SocialService.incomingPushes` feeds decrypted wraps back into the
+  same notification bridge (`PushNotificationContent`), so a **direct message**
+  and a **live-share start** still notify.
 * `PushRegistrar` (`lib/data/notifications/`) signs a proof event with your
   Nostr identity and calls the server's `push.register`, carrying the token, the
-  transport and the relays.
+  transport and the relays; `foreground()` opens the pause session the same way.
 * `pushBackgroundHandler` is the `@pragma('vm:entry-point')` entry point FCM
   runs in a **separate isolate** for a data-only message. It:
   1. **attaches** to the same ObjectBox store the running app has open
@@ -105,12 +109,18 @@ deliberately ignored (a relay/app cannot make the app pop an arbitrary alert).
 
 | Inner (decrypted) kind | Notification |
 |---|---|
-| `20510` (live location) | "<name> is sharing their location with you" (a `stop` is ignored) |
+| `20510` (live location) | "<name> is sharing their location with you" — only the session **`start`**, so a stream of position updates does not spam |
 | `14` (NIP-17 direct message) | "<name>: <text>" |
+
+A live-share rumor carries a type: `start` (the first payload of a session),
+`update` (a later position) or `stop`. Only `start` notifies; `update`/`stop`
+just move or drop the pin.
 
 ## Tests
 
 `test/data/push_notification_content_test.dart`,
+`test/data/live_location_payload_test.dart`,
 `test/data/push_registrar_test.dart` and
 `test/state/push_notifications_test.dart` cover the decrypted-kind mapping, the
-signed registration, and the register/unregister lifecycle with fakes.
+start-only notification rule, the signed registration, the foreground session
+and the register/unregister lifecycle with fakes.

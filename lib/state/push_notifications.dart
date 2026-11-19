@@ -30,6 +30,7 @@ class PushRegistrationBootstrap {
     required this.notifications,
     this.transport = PushTransport.firebase,
     this.serverConfigured = false,
+    this.startInForeground = false,
   });
 
   final PushMessaging messaging;
@@ -43,6 +44,10 @@ class PushRegistrationBootstrap {
   /// Whether a push backend is configured in this build.
   final bool serverConfigured;
 
+  /// Whether the app already starts in the foreground (opens the server pause
+  /// session immediately rather than waiting for the first lifecycle event).
+  final bool startInForeground;
+
   /// The live status shown in settings.
   final ValueNotifier<PushStatus> status = ValueNotifier<PushStatus>(
     const PushStatus(),
@@ -51,7 +56,12 @@ class PushRegistrationBootstrap {
   StreamSubscription<String?>? _identitySub;
   StreamSubscription<PushToken>? _tokenSub;
   StreamSubscription<String>? _foregroundSub;
+  StreamSubscription<DecryptedPushEvent>? _incomingPushSub;
+  StreamSubscription<String>? _foregroundSession;
   bool _started = false;
+
+  /// Whether the app is in the foreground, so the server should pause pushing.
+  bool _appForeground = false;
 
   /// The token the last successful registration used, so a token event that
   /// races the first sync does not register twice.
@@ -83,12 +93,23 @@ class PushRegistrationBootstrap {
     await sync();
     _identitySub = social.identityChanges.listen(_onIdentity);
     _foregroundSub = messaging.foregroundMessages.listen(_onForeground);
+    // Gift wraps the app receives on its own relay subscription (the server is
+    // paused while foreground) still need to raise notifications.
+    _incomingPushSub = social.incomingPushes.listen(
+      _onIncomingPush,
+      onError: (Object _) {},
+    );
+    _appForeground = startInForeground;
+    await _applyForegroundSession();
   }
 
   void _onIdentity(String? pubkey) {
     if (_hasSynced && pubkey == _syncedIdentity) {
       return;
     }
+    // The foreground session is bound to an identity; re-assert it (or drop it)
+    // for the new one.
+    unawaited(_applyForegroundSession());
     unawaited(sync());
   }
 
@@ -184,16 +205,22 @@ class PushRegistrationBootstrap {
     );
   }
 
-  /// A foreground push. Only DMs are surfaced — a live share is already drawn by
-  /// the map's own relay subscription, so notifying again would duplicate it.
+  /// A foreground push. Both a **direct message** and the **start of a live
+  /// share** raise a notification; later live-share updates do not (whether the
+  /// app is foreground or waking in the background).
   Future<void> _onForeground(String encryptedEvent) async {
     final DecryptedPushEvent? event = await social.decryptPushEvent(
       encryptedEvent,
     );
-    if (event == null ||
-        event.kind != PushNotificationContent.directMessageKind) {
+    if (event == null) {
       return;
     }
+    await _onIncomingPush(event);
+  }
+
+  /// Surfaces a decrypted gift wrap the app received itself (its own relay
+  /// subscription) as a notification, exactly like a forwarded push would.
+  Future<void> _onIncomingPush(DecryptedPushEvent event) async {
     final PushNotificationContent? content =
         PushNotificationContent.fromDecryptedEvent(
           kind: event.kind,
@@ -211,6 +238,42 @@ class PushRegistrationBootstrap {
     );
   }
 
+  /// Tells the server whether the app is in the **foreground**.
+  ///
+  /// While it is, the app is receiving gift wraps on its own relay subscription,
+  /// so the server pauses forwarding to this identity (a push would only
+  /// duplicate). The app keeps the session open with a streaming method; when it
+  /// goes to the background, or the connection times out, the server resumes.
+  Future<void> setForeground(bool foreground) async {
+    if (_appForeground == foreground) {
+      return;
+    }
+    _appForeground = foreground;
+    await _applyForegroundSession();
+  }
+
+  Future<void> _applyForegroundSession() async {
+    await _foregroundSession?.cancel();
+    _foregroundSession = null;
+    if (!_started ||
+        !_appForeground ||
+        !serverConfigured ||
+        !transport.isEnabled ||
+        !social.isLoggedIn) {
+      return;
+    }
+    try {
+      final Stream<String> session = await registrar.foreground();
+      _foregroundSession = session.listen(
+        (String _) {},
+        onError: (Object _) {},
+        cancelOnError: false,
+      );
+    } catch (_) {
+      // The server will simply keep forwarding; not fatal.
+    }
+  }
+
   void _update(PushStatus Function(PushStatus) change) {
     status.value = change(status.value);
   }
@@ -219,9 +282,13 @@ class PushRegistrationBootstrap {
     await _identitySub?.cancel();
     await _tokenSub?.cancel();
     await _foregroundSub?.cancel();
+    await _incomingPushSub?.cancel();
+    await _foregroundSession?.cancel();
     _identitySub = null;
     _tokenSub = null;
     _foregroundSub = null;
+    _incomingPushSub = null;
+    _foregroundSession = null;
   }
 }
 
@@ -231,6 +298,10 @@ class PushRegistrationBootstrap {
 /// transport preference changes re-syncs against the new transport.
 class PushNotificationsController extends Notifier<PushStatus> {
   PushRegistrationBootstrap? _bootstrap;
+
+  /// Last lifecycle state, so a rebuild (transport change) re-opens the
+  /// foreground session against the new bootstrap.
+  bool _foreground = false;
 
   @override
   PushStatus build() {
@@ -250,6 +321,7 @@ class PushNotificationsController extends Notifier<PushStatus> {
       notifications: ref.watch(pushNotificationsProvider),
       transport: transport,
       serverConfigured: config.hasPushServer,
+      startInForeground: _foreground,
     );
     _bootstrap = bootstrap;
 
@@ -270,6 +342,13 @@ class PushNotificationsController extends Notifier<PushStatus> {
 
   /// Re-runs the registration sync (settings "retry").
   Future<void> refresh() => _bootstrap?.sync() ?? Future<void>.value();
+
+  /// Tells the server whether the app is foreground: while it is, the server
+  /// pauses forwarding and the app receives gift wraps itself.
+  Future<void> setForeground(bool foreground) {
+    _foreground = foreground;
+    return _bootstrap?.setForeground(foreground) ?? Future<void>.value();
+  }
 }
 
 final NotifierProvider<PushNotificationsController, PushStatus>

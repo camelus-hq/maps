@@ -138,7 +138,12 @@ class LiveShareState {
 
 /// What kind of live-location event is being broadcast.
 enum LiveShareBroadcastKind {
-  /// A position update (or the session's first payload).
+  /// The **first** payload of a session: the recipient is told the friend
+  /// started sharing. Only this raises a notification, so a stream of position
+  /// updates does not spam the recipient.
+  start,
+
+  /// A position update after the session's start.
   update,
 
   /// The share ended early, so recipients can drop the pin immediately.

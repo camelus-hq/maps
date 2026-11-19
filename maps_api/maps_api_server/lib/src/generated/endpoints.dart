@@ -410,6 +410,27 @@ class Endpoints extends _is.EndpointDispatch {
                     params['token'],
                   ),
         ),
+        'foreground': _is.MethodStreamConnector(
+          name: 'foreground',
+          params: {
+            'proof': _is.ParameterDescription(
+              name: 'proof',
+              type: _is.getType<String>(),
+              nullable: false,
+            ),
+          },
+          streamParams: {},
+          returnType: _is.MethodStreamReturnType.streamType,
+          call:
+              (
+                _is.Session session,
+                Map<String, dynamic> params,
+                Map<String, Stream> streamParams,
+              ) => (endpoints['push'] as _ii21ahkp.PushEndpoint).foreground(
+                session,
+                params['proof'],
+              ),
+        ),
       },
     );
   }

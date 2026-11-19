@@ -7,11 +7,14 @@ import 'package:openmaps/domain/entities/live_share.dart';
 const String _sender =
     'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-LiveShareBroadcast _share({bool stop = false, String? name = 'Mira'}) {
+LiveShareBroadcast _share({
+  LiveShareBroadcastKind kind = LiveShareBroadcastKind.start,
+  String? name = 'Mira',
+}) {
   final DateTime now = DateTime.now();
   return LiveShareBroadcast(
     sessionId: 'session-1',
-    kind: stop ? LiveShareBroadcastKind.stop : LiveShareBroadcastKind.update,
+    kind: kind,
     position: const LatLon(52.52, 13.405),
     sampledAt: now,
     expiresAt: now.add(const Duration(minutes: 30)),
@@ -21,7 +24,7 @@ LiveShareBroadcast _share({bool stop = false, String? name = 'Mira'}) {
 
 void main() {
   group('PushNotificationContent', () {
-    test('maps a live-share update to a notification', () {
+    test('maps a live-share start to a notification', () {
       final PushNotificationContent? content =
           PushNotificationContent.fromDecryptedEvent(
             kind: LiveLocationPayload.rumorKind,
@@ -35,11 +38,26 @@ void main() {
       expect(content.payload, contains('/friends'));
     });
 
+    test('ignores a live-share position update (only a start notifies)', () {
+      final PushNotificationContent? content =
+          PushNotificationContent.fromDecryptedEvent(
+            kind: LiveLocationPayload.rumorKind,
+            content: LiveLocationPayload.encode(
+              _share(kind: LiveShareBroadcastKind.update),
+            ),
+            senderPubkey: _sender,
+          );
+
+      expect(content, isNull);
+    });
+
     test('ignores a share stop', () {
       final PushNotificationContent? content =
           PushNotificationContent.fromDecryptedEvent(
             kind: LiveLocationPayload.rumorKind,
-            content: LiveLocationPayload.encode(_share(stop: true)),
+            content: LiveLocationPayload.encode(
+              _share(kind: LiveShareBroadcastKind.stop),
+            ),
             senderPubkey: _sender,
           );
 

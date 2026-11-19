@@ -97,7 +97,7 @@ void main() {
     expect(state.expiresAt, isNotNull);
 
     expect(social.published, hasLength(1));
-    expect(social.published.single.kind, LiveShareBroadcastKind.update);
+    expect(social.published.single.kind, LiveShareBroadcastKind.start);
     expect(social.published.single.position, berlin.position);
     expect(social.publishedRecipients.single, <String>[friends.first.pubkey]);
 

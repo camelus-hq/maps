@@ -1,5 +1,6 @@
 import 'fcm_sender.dart';
 import 'push_dispatcher.dart';
+import 'push_presence.dart';
 import 'push_repository.dart';
 import 'push_sender.dart';
 import 'push_service.dart';
@@ -11,6 +12,9 @@ import 'push_service.dart';
 /// [pushRepository] and tells [pushService] about new relays; the forwarder
 /// reads registrations and dispatches through [pushDispatcher].
 const PushRepository pushRepository = PushRepository();
+
+/// Which identities currently have a live foreground connection to this server.
+final PushPresence pushPresence = PushPresence();
 
 final PushSenderRegistry pushSenders = PushSenderRegistry(<PushSender>[
   // Firebase Cloud Messaging is the default transport.
@@ -24,6 +28,7 @@ final PushSenderRegistry pushSenders = PushSenderRegistry(<PushSender>[
 final PushDispatcher pushDispatcher = PushDispatcher(
   repository: pushRepository,
   senders: pushSenders,
+  presence: pushPresence,
 );
 
 final PushService pushService = PushService(

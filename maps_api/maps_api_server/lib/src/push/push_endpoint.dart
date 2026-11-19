@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:serverpod/serverpod.dart';
 
 import '../generated/protocol.dart';
@@ -30,6 +32,58 @@ class PushEndpoint extends Endpoint {
       'relay(s) via ${registration.transport}',
     );
     return true;
+  }
+
+  /// Holds a server connection open on behalf of [proof]'s identity while the
+  /// app is in the foreground and receiving gift wraps on its own relay
+  /// subscription.
+  ///
+  /// While this stream is open the forwarder **pauses** pushing to the identity
+  /// — the app already has the gift wrap, so a push would only duplicate it.
+  /// The stream ends when the app backgrounds (the client cancels it) or the
+  /// connection times out (Serverpod pings the websocket every 30 s and closes
+  /// a dead one); forwarding then resumes automatically.
+  Stream<String> foreground(Session session, String proof) {
+    final StreamController<String> controller = StreamController<String>();
+    String? pubKey;
+    bool added = false;
+    bool cancelled = false;
+
+    controller.onListen = () {
+      unawaited(() async {
+        final String verified;
+        try {
+          verified = await PushRegistration.verifyPubKey(proof);
+        } catch (error) {
+          if (!controller.isClosed) {
+            controller.addError(error);
+            await controller.close();
+          }
+          return;
+        }
+        // The client may have disconnected while the signature was verified.
+        if (cancelled) {
+          return;
+        }
+        pubKey = verified;
+        added = true;
+        pushPresence.add(verified);
+        session.log('Push paused for $verified (foreground session open)');
+        if (!controller.isClosed) {
+          controller.add('active');
+        }
+      }());
+    };
+
+    controller.onCancel = () {
+      cancelled = true;
+      final String? key = pubKey;
+      if (added && key != null) {
+        pushPresence.remove(key);
+      }
+    };
+
+    return controller.stream;
   }
 
   /// Reports what [proof]'s identity is registered for.

@@ -15,5 +15,6 @@ jwtRefresh:
   - refreshAccessToken:
 push:
   - register:
+  - foreground:
   - getState:
   - unregister:

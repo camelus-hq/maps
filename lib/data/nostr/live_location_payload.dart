@@ -13,6 +13,7 @@ import '../../domain/entities/live_share.dart';
 class LiveLocationPayload {
   const LiveLocationPayload({
     required this.isStop,
+    required this.isStart,
     required this.sessionId,
     required this.position,
     required this.sampledAt,
@@ -34,6 +35,7 @@ class LiveLocationPayload {
   /// Tag carrying the session id.
   static const String sessionTag = 'session';
 
+  static const String _typeStart = 'start';
   static const String _typeUpdate = 'update';
   static const String _typeStop = 'stop';
 
@@ -45,6 +47,10 @@ class LiveLocationPayload {
 
   /// Whether this payload ends the session instead of updating it.
   final bool isStop;
+
+  /// Whether this payload is the session's **first** one (a friend just started
+  /// sharing). Only a start is worth a notification.
+  final bool isStart;
 
   /// The share session this payload belongs to.
   final String sessionId;
@@ -68,9 +74,11 @@ class LiveLocationPayload {
     final String? name = broadcast.displayName?.trim();
     return jsonEncode(<String, Object?>{
       'v': version,
-      't': broadcast.kind == LiveShareBroadcastKind.stop
-          ? _typeStop
-          : _typeUpdate,
+      't': switch (broadcast.kind) {
+        LiveShareBroadcastKind.stop => _typeStop,
+        LiveShareBroadcastKind.start => _typeStart,
+        LiveShareBroadcastKind.update => _typeUpdate,
+      },
       'session': broadcast.sessionId,
       'at': broadcast.sampledAt.millisecondsSinceEpoch ~/ 1000,
       'exp': broadcast.expiresAt.millisecondsSinceEpoch ~/ 1000,
@@ -106,7 +114,8 @@ class LiveLocationPayload {
     }
     final Object? type = decoded['t'];
     final bool isStop = type == _typeStop;
-    if (!isStop && type != _typeUpdate) {
+    final bool isStart = type == _typeStart;
+    if (!isStop && !isStart && type != _typeUpdate) {
       return null;
     }
     final String? sessionId = _asBoundedString(
@@ -154,6 +163,7 @@ class LiveLocationPayload {
     final String? name = _asBoundedString(decoded['name'], _maxNameLength);
     return LiveLocationPayload(
       isStop: isStop,
+      isStart: isStart,
       sessionId: sessionId,
       position: position,
       sampledAt: sampledAt,
@@ -168,7 +178,11 @@ class LiveLocationPayload {
   /// for tests and the fake service).
   LiveShareBroadcast toBroadcast() => LiveShareBroadcast(
     sessionId: sessionId,
-    kind: isStop ? LiveShareBroadcastKind.stop : LiveShareBroadcastKind.update,
+    kind: isStop
+        ? LiveShareBroadcastKind.stop
+        : (isStart
+              ? LiveShareBroadcastKind.start
+              : LiveShareBroadcastKind.update),
     position: position,
     sampledAt: sampledAt,
     expiresAt: expiresAt,

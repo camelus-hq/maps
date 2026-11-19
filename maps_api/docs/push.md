@@ -26,6 +26,9 @@ message.
   it. Any other supported kind is gift-wrapped by the server first, so FCM/APNs
   still only ever carry ciphertext.
 * **Deletes** tokens the transport reports as dead.
+* **Pauses** forwarding to an identity while its app is in the foreground and
+  holding a `foreground` stream open: the app is receiving gift wraps on its own
+  relay subscription then, so a push would only duplicate it.
 
 ## Endpoint (`client.push`)
 
@@ -38,6 +41,13 @@ event's tags, so the signature covers it.
 | `register` | `registrationJson` — a signed event | `bool` |
 | `getState` | `proof` — any signed event by the identity | `PushRegistrationState` |
 | `unregister` | `proof`, optional `token` | `bool` |
+| `foreground` | `proof` — any signed event by the identity | `Stream<String>` |
+
+`foreground` is a **streaming method**: the client keeps it open while the app is
+in the foreground. While it is open the forwarder skips that identity
+(`PushDispatcher` consults an in-memory `PushPresence`). The stream ends when the
+client cancels it (app backgrounded) or Serverpod's websocket ping times a dead
+connection out (30 s) — then forwarding resumes, and `PushPresence` is cleared.
 
 Tags understood by `register`:
 
@@ -92,4 +102,5 @@ accepts). A `404`/`410` deletes the endpoint.
 
 `dart test` in `maps_api_server` covers the protocol (signature verification and
 tag parsing), the relay filters, the dispatcher (forward-as-is, recipient
-filtering, dead-token deletion) and the endpoint against a real database.
+filtering, foreground pause, dead-token deletion) and the endpoint against a real
+database.

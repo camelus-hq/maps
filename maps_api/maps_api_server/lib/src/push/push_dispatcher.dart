@@ -3,6 +3,7 @@ import 'package:serverpod/serverpod.dart';
 
 import '../generated/protocol.dart';
 import 'push_config.dart';
+import 'push_presence.dart';
 import 'push_repository.dart';
 import 'push_sender.dart';
 
@@ -20,10 +21,17 @@ import 'push_sender.dart';
 /// 4. The wrapped payload goes to every token the recipient registered, on the
 ///    transport that token declares. Dead tokens are deleted.
 class PushDispatcher {
-  const PushDispatcher({required this.repository, required this.senders});
+  const PushDispatcher({
+    required this.repository,
+    required this.senders,
+    required this.presence,
+  });
 
   final PushRepository repository;
   final PushSenderRegistry senders;
+
+  /// Which identities are connected (foreground) and must not be pushed to.
+  final PushPresence presence;
 
   /// Forwards [event] to its recipient, if the recipient asked for it.
   Future<void> dispatch(Session session, ndk.Nip01Event event) async {
@@ -41,6 +49,13 @@ class PushDispatcher {
       return;
     }
     final String recipient = recipients.last;
+
+    // The app has its own relay subscription while it is in the foreground, so
+    // it already has this gift wrap. Forwarding would only duplicate it.
+    if (presence.isActive(recipient)) {
+      session.log('Skipping push for $recipient: client is connected');
+      return;
+    }
 
     final List<int> kinds = await repository.kindsFor(session, recipient);
     if (!kinds.contains(event.kind)) {

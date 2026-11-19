@@ -54,6 +54,9 @@ class NdkSocialService implements SocialService {
   final StreamController<FriendLocation> _incoming =
       StreamController<FriendLocation>.broadcast();
 
+  final StreamController<DecryptedPushEvent> _incomingPushes =
+      StreamController<DecryptedPushEvent>.broadcast();
+
   NdkResponse? _subscription;
   StreamSubscription<Nip01Event>? _subscriptionSub;
   String? _subscribedFor;
@@ -473,6 +476,9 @@ class NdkSocialService implements SocialService {
   }
 
   @override
+  Stream<DecryptedPushEvent> get incomingPushes => _incomingPushes.stream;
+
+  @override
   Future<void> stopWatching() async {
     _subscribedFor = null;
     _closeSubscription();
@@ -604,6 +610,7 @@ class NdkSocialService implements SocialService {
     _disposed = true;
     _closeSubscription();
     await _incoming.close();
+    await _incomingPushes.close();
   }
 
   void _openSubscription(String me) {
@@ -660,11 +667,23 @@ class NdkSocialService implements SocialService {
     }
     try {
       final Nip01Event rumor = await ndk.giftWrap.fromGiftWrap(giftWrap: event);
-      if (rumor.kind != LiveLocationPayload.rumorKind) {
-        return;
-      }
       final String sender = rumor.pubKey.trim().toLowerCase();
       if (!_hexPubkey.hasMatch(sender) || sender == currentUserPubkey) {
+        return;
+      }
+      // The app is receiving this gift wrap itself; surface it so a live-share
+      // start or a direct message can still raise a notification while the
+      // server is paused.
+      if (!_incomingPushes.isClosed) {
+        _incomingPushes.add(
+          DecryptedPushEvent(
+            kind: rumor.kind,
+            content: rumor.content,
+            senderPubkey: sender,
+          ),
+        );
+      }
+      if (rumor.kind != LiveLocationPayload.rumorKind) {
         return;
       }
       final LiveLocationPayload? payload = LiveLocationPayload.decode(
