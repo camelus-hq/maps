@@ -14,6 +14,26 @@ import '../../domain/entities/push.dart';
 import '../../domain/ports/social_service.dart';
 import 'live_location_payload.dart';
 
+/// The relay `REQ` filter for the gift wraps addressed to [pubKey].
+///
+/// **Live-only**: `limit: 0` asks a relay for no stored events, and [since]
+/// (seconds, the moment the subscription opened) bounds it, so a relay never
+/// replays the gift wraps it already has — an old DM or share would otherwise
+/// surface, and raise a notification, on every (re)subscribe or reconnect.
+/// `since` is fixed for the life of the subscription, so a reconnect still
+/// catches what arrived while the socket was down.
+///
+/// Exposed (rather than inlined) so the live-only contract has a regression
+/// test.
+Filter liveLocationFilter(String pubKey, {required int since}) => Filter(
+  kinds: <int>[GiftWrap.kGiftWrapEventkind],
+  pTags: <String>[pubKey],
+
+  /// somehow with since filter it does not work (may be a relay or ndk issue?)
+  //since: since,
+  limit: 0,
+);
+
 /// [SocialService] backed by Nostr through the NDK client.
 ///
 /// Live shares are published as NIP-59 gift wraps: the location payload is
@@ -619,9 +639,11 @@ class NdkSocialService implements SocialService {
     try {
       final NdkResponse response = ndk.requests.subscription(
         name: 'openmaps-live-location',
-        filter: Filter(
-          kinds: <int>[GiftWrap.kGiftWrapEventkind],
-          pTags: <String>[me],
+        // Live-only: see [liveLocationFilter] — a relay must not replay the gift
+        // wraps it has already stored.
+        filter: liveLocationFilter(
+          me,
+          since: (DateTime.now().millisecondsSinceEpoch ~/ 1000) - 1,
         ),
         explicitRelays: _relays.isEmpty ? null : _relays,
         desiredCoverage: _relays.isEmpty ? null : _relays.length,

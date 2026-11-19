@@ -82,7 +82,9 @@ later move to the dedicated `fid` field.
   app goes to the background or the socket times out. Because the app is then the
   receiver, `SocialService.incomingPushes` feeds decrypted wraps back into the
   same notification bridge (`PushNotificationContent`), so a **direct message**
-  and a **live-share start** still notify.
+  and a **live-share start** still notify. That subscription is **live-only**
+  (`limit: 0` + `since` = subscribe time, see `liveLocationFilter`), so a relay
+  never replays stored gift wraps into it.
 * `PushRegistrar` (`lib/data/notifications/`) signs a proof event with your
   Nostr identity and calls the server's `push.register`, carrying the token, the
   transport and the relays; `foreground()` opens the pause session the same way.
