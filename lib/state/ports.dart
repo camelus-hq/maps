@@ -12,6 +12,9 @@ import '../data/fakes/fake_map_service.dart';
 import '../data/fakes/fake_navigation_notifications.dart';
 import '../data/fakes/fake_osm_place_source.dart';
 import '../data/fakes/fake_places_repository.dart';
+import '../data/fakes/fake_push_messaging.dart';
+import '../data/fakes/fake_push_notifications.dart';
+import '../data/fakes/fake_push_registration_api.dart';
 import '../data/fakes/fake_release_source.dart';
 import '../data/fakes/fake_review_service.dart';
 import '../data/fakes/fake_routing_service.dart';
@@ -20,6 +23,7 @@ import '../data/fakes/fake_settings_repository.dart';
 import '../data/fakes/fake_social_service.dart';
 import '../data/fakes/fake_transit_routing_service.dart';
 import '../data/fakes/in_memory_app_database.dart';
+import '../data/notifications/push_registrar.dart';
 import '../domain/ports/anonymous_identity.dart';
 import '../domain/ports/app_database.dart';
 import '../domain/ports/app_installer.dart';
@@ -33,6 +37,8 @@ import '../domain/ports/map_service.dart';
 import '../domain/ports/navigation_notifications.dart';
 import '../domain/ports/osm_place_source.dart';
 import '../domain/ports/places_repository.dart';
+import '../domain/ports/push_messaging.dart';
+import '../domain/ports/push_notifications.dart';
 import '../domain/ports/release_source.dart';
 import '../domain/ports/review_service.dart';
 import '../domain/ports/routing_service.dart';
@@ -111,6 +117,28 @@ final Provider<FeedbackService> feedbackServiceProvider =
 /// database-backed adapter so the identity survives restarts.
 final Provider<AnonymousIdentity> anonymousIdentityProvider =
     Provider<AnonymousIdentity>((Ref ref) => FakeAnonymousIdentity());
+
+/// Receives push over FCM. The keyless default is an in-memory
+/// fake; `lib/app/di.dart` swaps in the Firebase adapter when a backend is
+/// configured. See `lib/data/notifications/`.
+final Provider<PushMessaging> pushMessagingProvider = Provider<PushMessaging>((
+  Ref ref,
+) {
+  final FakePushMessaging fake = FakePushMessaging();
+  ref.onDispose(fake.dispose);
+  return fake;
+});
+
+/// The server side of push registration (the Serverpod `push` endpoint). The
+/// keyless default accepts and records registrations; `lib/app/di.dart` swaps in
+/// the generated-client adapter when `PUSH_SERVER_URL` is set.
+final Provider<PushRegistrationApi> pushRegistrationApiProvider =
+    Provider<PushRegistrationApi>((Ref ref) => FakePushRegistrationApi());
+
+/// Shows a local notification for a decrypted push. The keyless default records
+/// it; `lib/app/di.dart` swaps in the native plugin when a backend is set.
+final Provider<PushNotifications> pushNotificationsProvider =
+    Provider<PushNotifications>((Ref ref) => FakePushNotifications());
 
 final Provider<LiveShareStore> liveShareStoreProvider =
     Provider<LiveShareStore>((Ref ref) => FakeLiveShareStore());

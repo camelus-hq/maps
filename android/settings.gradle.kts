@@ -21,6 +21,9 @@ plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     id("com.android.application") version "9.5.0" apply false
     id("org.jetbrains.kotlin.android") version "2.4.20" apply false
+    // Reads android/app/google-services.json into Firebase resources. The file
+    // is gitignored (public repo); without it, apply=false keeps the build green.
+    id("com.google.gms.google-services") version "4.4.4" apply false
 }
 
 include(":app")

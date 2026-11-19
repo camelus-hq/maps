@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:ndk/entities.dart' show RelayBroadcastResponse;
 import 'package:ndk/ndk.dart';
@@ -9,6 +10,7 @@ import '../../core/errors/app_exception.dart';
 import '../../domain/entities/friend.dart';
 import '../../domain/entities/friend_location.dart';
 import '../../domain/entities/live_share.dart';
+import '../../domain/entities/push.dart';
 import '../../domain/ports/social_service.dart';
 import 'live_location_payload.dart';
 
@@ -500,6 +502,56 @@ class NdkSocialService implements SocialService {
         'messages set up yet.',
         cause: error,
       );
+    }
+  }
+
+  @override
+  Future<String?> signEvent({
+    required int kind,
+    required List<List<String>> tags,
+    String content = '',
+  }) async {
+    final Account? account = ndk.accounts.getLoggedAccount();
+    if (account == null) {
+      return null;
+    }
+    try {
+      final Nip01Event event = Nip01Event(
+        pubKey: account.pubkey,
+        kind: kind,
+        tags: tags,
+        content: content,
+      );
+      final Nip01Event signed = await account.signer.sign(event);
+      return Nip01EventModel.fromEntity(signed).toJsonString();
+    } catch (error) {
+      throw NetworkException('Could not sign the request', cause: error);
+    }
+  }
+
+  @override
+  Future<DecryptedPushEvent?> decryptPushEvent(
+    String encryptedEventJson,
+  ) async {
+    if (!isLoggedIn) {
+      return null;
+    }
+    try {
+      final Object? decoded = jsonDecode(encryptedEventJson);
+      if (decoded is! Map<String, dynamic>) {
+        return null;
+      }
+      final Nip01Event rumor = await ndk.giftWrap.fromGiftWrap(
+        giftWrap: Nip01EventModel.fromJson(decoded),
+      );
+      return DecryptedPushEvent(
+        kind: rumor.kind,
+        content: rumor.content,
+        senderPubkey: rumor.pubKey,
+      );
+    } catch (_) {
+      // A malformed or unrelated wrap is not a notification.
+      return null;
     }
   }
 

@@ -1,0 +1,24 @@
+### One push destination for one Nostr identity on one relay.
+###
+### A user can have several rows: one per (relay, token) pair, so they can be
+### reached on any of their relays and from any of their devices. The token is
+### either an FCM registration token (Firebase transport) or a UnifiedPush
+### endpoint URL; `transport` records which, so the forwarder knows how to send.
+class: PushSubscription
+table: push_subscriptions
+fields:
+  ### The recipient's Nostr public key (64-character lowercase hex).
+  pubKey: String
+  ### A relay the recipient's events can be picked up on.
+  relay: String
+  ### An FCM registration token, or a UnifiedPush endpoint URL.
+  token: String
+  ### The transport for [token]: `firebase` or `unifiedpush`.
+  transport: String
+  ### The outer event kinds the recipient wants pushed. `1059` is a NIP-59 gift
+  ### wrap, which carries every private notification (live share, DM, …).
+  kinds: List<int>?
+indexes:
+  push_subscription_unique_idx:
+    fields: pubKey, relay, token
+    unique: true

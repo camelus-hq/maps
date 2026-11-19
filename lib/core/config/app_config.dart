@@ -17,6 +17,7 @@ class AppConfig {
     this.transitBaseUrl = defaultTransitBaseUrl,
     this.transitUserAgent = defaultTransitUserAgent,
     this.updateManifestUrl = defaultUpdateManifestUrl,
+    this.pushServerUrl = '',
     this.appFlavor = '',
     this.feedbackPubkey = '',
     this.nostrNsec = '',
@@ -173,6 +174,11 @@ class AppConfig {
   /// URL of the self-update manifest (see [defaultUpdateManifestUrl]).
   final String updateManifestUrl;
 
+  /// Base URL of the Serverpod backend that forwards push (see `maps_api/`),
+  /// supplied with `--dart-define=PUSH_SERVER_URL=…`. Empty disables push
+  /// registration entirely, so a build without a backend behaves as before.
+  final String pushServerUrl;
+
   /// The distribution flavor this build was made from (see [directFlavor]).
   final String appFlavor;
 
@@ -239,6 +245,9 @@ class AppConfig {
 
   bool get hasValhallaEndpoint => valhallaBaseUrl.isNotEmpty;
 
+  /// Whether a push backend is configured (see [pushServerUrl]).
+  bool get hasPushServer => pushServerUrl.trim().isNotEmpty;
+
   static const AppConfig empty = AppConfig();
 
   factory AppConfig.fromEnvironment() => AppConfig(
@@ -298,6 +307,10 @@ class AppConfig {
     updateManifestUrl: _httpBase(
       const String.fromEnvironment('UPDATE_MANIFEST_URL'),
       defaultUpdateManifestUrl,
+    ),
+    pushServerUrl: _nonEmpty(
+      const String.fromEnvironment('PUSH_SERVER_URL'),
+      '',
     ),
     appFlavor: const String.fromEnvironment('APP_FLAVOR').trim(),
     feedbackPubkey: const String.fromEnvironment('FEEDBACK_PUBKEY').trim(),

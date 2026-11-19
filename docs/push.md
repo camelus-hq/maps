@@ -1,0 +1,95 @@
+# Push notifications
+
+OpenMaps can be woken by a push when something happens for **you** — a friend
+starts sharing their location, or you get a direct message — without a relay
+learning who you are. The server (`maps_api/`, see `maps_api/docs/push.md`)
+forwards only **NIP-59 gift wraps** addressed to your public key; FCM/APNs never
+see the message.
+
+```
+friend's app ──gift wrap──▶ relay ──▶ maps_api server ──data-only──▶ FCM ─┬─▶ app (foreground)
+                                                                         └─▶ background isolate
+                                                                              decrypt → local notification
+```
+
+## Transport
+
+**Firebase Cloud Messaging** is used. Only `firebase_messaging` +
+`firebase_core` are pulled in; no analytics/crashlytics or other Google library.
+
+> The server also supports **UnifiedPush**, selected by supplying an `https://`
+> endpoint as the token, but the app does not use that transport: the Dart
+> `unifiedpush` package's transitive Android dependencies were incompatible with
+> the project's AGP 9 toolchain. Adding it is a client-only change once a
+> compatible package exists; the server side needs no change.
+
+Settings → **Notifications** holds the transport picker (**Firebase** / **Off**,
+stored as `AppSettings.pushTransport`) and a **status** row that reports whether
+push is configured, supported, allowed, has a token and is registered on the
+server.
+
+## Configuration
+
+| Where | What |
+|---|---|
+| `--dart-define=PUSH_SERVER_URL=https://api.example.com` | Base URL of the Serverpod backend. **Unset disables push entirely**, so a build without a backend behaves exactly as before. |
+| `android/app/google-services.json` | Firebase Android config. **Gitignored**; the gradle plugin is applied only when the file exists, so a clone without keys still builds. |
+| `ios/Runner/GoogleService-Info.plist` | Firebase iOS config. **Gitignored**; add it to the **Runner** target in Xcode. |
+| `maps_api_server/config/firebase_service_account_key.json` | Server-side FCM sender key. **Gitignored**; see the server doc. |
+
+Register relays default to the live-share relay set
+(`AppConfig.liveShareRelays`), and the outer kind subscribed is `1059` (a gift
+wrap).
+
+### iOS, once
+
+1. Add `Runner/GoogleService-Info.plist` to the Xcode project (Runner target).
+2. Enable the **Push Notifications** capability (adds the `aps-environment`
+   entitlement) and **Background Modes → Remote notifications**.
+
+## What runs where
+
+* `PushRegistrationBootstrap` (`lib/state/`) initializes FCM and keeps the
+  registration in sync: register on sign-in, re-register on token rotation, and
+  on sign-out it invalidates the device token so the server stops delivering to
+  the old identity. It is owned by `pushStatusProvider` and kept alive by the
+  invisible `PushNotificationLayer` in the map home.
+* **Foreground**: while the app is open, an incoming push is decrypted and a
+  **direct message** raises a notification. A live share is **not** re-notified —
+  the map's own relay subscription already draws it, so notifying again would
+  duplicate it.
+* `PushRegistrar` (`lib/data/notifications/`) signs a proof event with your
+  Nostr identity and calls the server's `push.register`, carrying the token, the
+  transport and the relays.
+* `pushBackgroundHandler` is the `@pragma('vm:entry-point')` entry point FCM
+  runs in a **separate isolate** for a data-only message. It:
+  1. **attaches** to the same ObjectBox store the running app has open
+     (`openAppDatabaseAttached` → `Store.attach`, falling back to a normal open
+     if the app is not running) — this is what lets the two isolates share the
+     database;
+  2. restores the Nostr account from secure storage (a plugin, so it works in
+     the background engine too);
+  3. unwraps the gift wrap with `ndk.giftWrap.fromGiftWrap`;
+  4. maps the rumor through `PushNotificationContent` and shows a notification
+     with the first-party `openmaps_notifications` plugin.
+* `openmaps_notifications` (`plugins/openmaps_notifications/`) is a local
+  **plugin** rather than a channel in `MainActivity`, because only plugins are
+  registered on the background engine that FCM creates — a `MainActivity`
+  channel is unreachable there.
+
+## Supported kinds
+
+Only kinds the app understands produce a notification; anything else is
+deliberately ignored (a relay/app cannot make the app pop an arbitrary alert).
+
+| Inner (decrypted) kind | Notification |
+|---|---|
+| `20510` (live location) | "<name> is sharing their location with you" (a `stop` is ignored) |
+| `14` (NIP-17 direct message) | "<name>: <text>" |
+
+## Tests
+
+`test/data/push_notification_content_test.dart`,
+`test/data/push_registrar_test.dart` and
+`test/state/push_notifications_test.dart` cover the decrypted-kind mapping, the
+signed registration, and the register/unregister lifecycle with fakes.

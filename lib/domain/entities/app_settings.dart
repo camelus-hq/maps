@@ -1,4 +1,5 @@
 import 'place_category.dart';
+import 'push.dart';
 
 /// User-selectable app settings (our own options; persisted locally).
 enum DistanceUnit { metric, imperial }
@@ -27,6 +28,7 @@ class AppSettings {
     this.showOsmTags = false,
     this.searchBackend = SearchBackend.mapbox,
     this.pinnedCategoryIds = defaultPinnedCategoryIds,
+    this.pushTransport = PushTransport.firebase,
   });
 
   final DistanceUnit unit;
@@ -41,6 +43,10 @@ class AppSettings {
   /// The category ids pinned to the chip row under the search bar, in order.
   final List<String> pinnedCategoryIds;
 
+  /// How push notifications reach this device (Firebase by default; `off`
+  /// disables push).
+  final PushTransport pushTransport;
+
   bool get imperial => unit == DistanceUnit.imperial;
 
   AppSettings copyWith({
@@ -49,12 +55,14 @@ class AppSettings {
     bool? showOsmTags,
     SearchBackend? searchBackend,
     List<String>? pinnedCategoryIds,
+    PushTransport? pushTransport,
   }) => AppSettings(
     unit: unit ?? this.unit,
     theme: theme ?? this.theme,
     showOsmTags: showOsmTags ?? this.showOsmTags,
     searchBackend: searchBackend ?? this.searchBackend,
     pinnedCategoryIds: pinnedCategoryIds ?? this.pinnedCategoryIds,
+    pushTransport: pushTransport ?? this.pushTransport,
   );
 
   @override
@@ -64,6 +72,7 @@ class AppSettings {
       other.theme == theme &&
       other.showOsmTags == showOsmTags &&
       other.searchBackend == searchBackend &&
+      other.pushTransport == pushTransport &&
       _sameList(other.pinnedCategoryIds, pinnedCategoryIds);
 
   @override
@@ -72,6 +81,7 @@ class AppSettings {
     theme,
     showOsmTags,
     searchBackend,
+    pushTransport,
     Object.hashAll(pinnedCategoryIds),
   );
 }

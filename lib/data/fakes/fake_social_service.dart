@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import '../../core/errors/app_exception.dart';
@@ -6,6 +7,7 @@ import '../../domain/entities/friend.dart';
 import '../../domain/entities/friend_location.dart';
 import '../../domain/entities/lat_lon.dart';
 import '../../domain/entities/live_share.dart';
+import '../../domain/entities/push.dart';
 import '../../domain/ports/social_service.dart';
 
 /// In-memory [SocialService] so the app runs, and tests run, without relays.
@@ -119,6 +121,11 @@ class FakeSocialService implements SocialService {
 
   /// When set, calls to [publishLiveShare] throw it (tests).
   AppException? publishError;
+
+  /// What [decryptPushEvent] returns; `null` kind disables it.
+  int? decryptPushKind;
+  String decryptPushContent = '';
+  String decryptPushSender = demoUserPubkey;
 
   @override
   bool get isLoggedIn => signedIn;
@@ -296,6 +303,41 @@ class FakeSocialService implements SocialService {
     signedInWithKey = privateKey.trim();
     signedIn = true;
     _identityController.add(currentUserPubkey);
+  }
+
+  @override
+  Future<String?> signEvent({
+    required int kind,
+    required List<List<String>> tags,
+    String content = '',
+  }) async {
+    if (!signedIn) {
+      return null;
+    }
+    // A deterministic stand-in for a real signature, shaped like an event.
+    return jsonEncode(<String, Object?>{
+      'id': 'fake',
+      'pubkey': demoUserPubkey,
+      'kind': kind,
+      'tags': tags,
+      'content': content,
+      'sig': 'fake-signature',
+    });
+  }
+
+  @override
+  Future<DecryptedPushEvent?> decryptPushEvent(
+    String encryptedEventJson,
+  ) async {
+    final int? kind = decryptPushKind;
+    if (!signedIn || kind == null) {
+      return null;
+    }
+    return DecryptedPushEvent(
+      kind: kind,
+      content: decryptPushContent,
+      senderPubkey: decryptPushSender,
+    );
   }
 
   @override

@@ -26,6 +26,7 @@ import 'package:ndk_flutter/ndk_flutter.dart';
 import 'app/app.dart';
 import 'app/database_bootstrap.dart';
 import 'app/di.dart';
+import 'app/push_bootstrap.dart';
 import 'control/control_args.dart';
 import 'control/control_server.dart';
 import 'core/config/app_config.dart';
@@ -82,6 +83,10 @@ Future<void> main(List<String> args) async {
       debugPrint('Could not sign in with the configured Nostr key: $error');
     }
   }
+
+  // Push: install the FCM background handler (a no-op without a backend). The
+  // registration itself is driven by `pushStatusProvider`.
+  installPushBackgroundHandler(config);
 
   // The control channel is debug/profile only and localhost-bound; it must
   // never exist in a release build (AGENTS.md §Driving the app).

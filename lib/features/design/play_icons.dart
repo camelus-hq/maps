@@ -66,6 +66,7 @@ abstract final class PlayIcons {
   static const IconData refresh = PhosphorIconsRegular.arrowClockwise;
   static const IconData check = PhosphorIconsRegular.checkCircle;
   static const IconData info = PhosphorIconsRegular.info;
+  static const IconData notifications = PhosphorIconsRegular.bell;
   static const IconData signOut = PhosphorIconsRegular.signOut;
   static const IconData code = PhosphorIconsRegular.code;
   static const IconData device = PhosphorIconsRegular.deviceMobile;

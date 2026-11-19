@@ -51,6 +51,28 @@ dependencies:
   package_info_plus: ^10.2.2
 
   material_ui: any
+  # Push transport. Only the messaging part of Firebase is used — no analytics,
+  # crashlytics or other Google libraries.
+  firebase_core: ^5.2.0
+  firebase_messaging: ^17.1.0
+  # Generated Serverpod client for the push registration endpoint
+  # (`client.push.register`). The backend lives in `maps_api/`.
+  maps_api_client:
+    path: maps_api/maps_api_client
+  # OpenMaps' own local-notification channel. A plugin (not a MainActivity
+  # channel) so it is registered on the FCM background engine too.
+  openmaps_notifications:
+    path: plugins/openmaps_notifications
+
+# dependency_overrides:
+#   ndk:
+#      # path: ../ndk/packages/ndk
+#      git:
+#        url: https://github.com/relaystr/ndk.git
+#        path: packages/ndk
+#        ref: dostr-2026-11-11
+
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -72,3 +94,6 @@ objectbox:
 
 flutter:
   uses-material-design: true
+
+
+

@@ -1,0 +1,8 @@
+### A relay a Nostr identity is registered on, with the outer kinds requested
+### for it. Returned by `PushEndpoint.getState`; carries no token.
+class: PushSubscriptionInfo
+fields:
+  ### The relay URL the identity can be reached on.
+  relay: String
+  ### The outer event kinds requested for this relay.
+  kinds: List<int>

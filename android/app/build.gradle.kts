@@ -8,6 +8,13 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Firebase reads android/app/google-services.json. The file is gitignored (the
+// repo is public), so apply the plugin only when it is present — a clone without
+// keys still builds, it just cannot receive FCM until the file is added.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")

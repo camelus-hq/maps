@@ -22,6 +22,7 @@ import '../../navigation/widgets/navigation_notification_layer.dart';
 import '../../navigation/widgets/navigation_overlay.dart';
 import '../../onboarding/screens/onboarding_screen.dart';
 import '../../place_details/widgets/place_details_sheet.dart';
+import '../../push/push_notification_layer.dart';
 import '../../reviews/widgets/write_review_sheet.dart';
 import '../../social/screens/friend_location_sheet.dart';
 import '../widgets/category_chips.dart';
@@ -167,6 +168,9 @@ class MapHomeScreen extends ConsumerWidget {
             // Drives the ongoing OS notification of the running trip (and routes
             // its "Exit navigation" action back into guidance). Invisible.
             const NavigationNotificationLayer(),
+            // Keeps the push registration alive and turns foreground DMs into
+            // notifications. Invisible.
+            const PushNotificationLayer(),
           ],
         ),
       ),

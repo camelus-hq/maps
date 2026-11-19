@@ -1,6 +1,7 @@
 import '../entities/friend.dart';
 import '../entities/friend_location.dart';
 import '../entities/live_share.dart';
+import '../entities/push.dart';
 
 /// Publishes and receives live location over Nostr.
 ///
@@ -75,6 +76,22 @@ abstract interface class SocialService {
     required String recipientPubkey,
     required String text,
   });
+
+  /// Signs an arbitrary event with the signed-in identity and returns its JSON.
+  ///
+  /// Used by push registration, which must prove ownership of the public key to
+  /// the notification server. Returns `null` when nobody is signed in.
+  Future<String?> signEvent({
+    required int kind,
+    required List<List<String>> tags,
+    String content,
+  });
+
+  /// Decrypts a push gift wrap (as forwarded by the push server) into the event
+  /// it carries, or `null` when it cannot be decrypted or nobody is signed in.
+  ///
+  /// Malformed, unsigned or wrongly-addressed wraps are dropped silently.
+  Future<DecryptedPushEvent?> decryptPushEvent(String encryptedEventJson);
 
   /// Signs in with a raw private key (`nsec…` or 64-char hex). Agents and the
   /// login screen use this; the interactive widget path goes through NDK.

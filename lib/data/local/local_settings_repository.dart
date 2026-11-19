@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/entities/app_settings.dart';
 import '../../domain/entities/place_category.dart';
+import '../../domain/entities/push.dart';
 import '../../domain/ports/app_database.dart';
 import '../../domain/ports/settings_repository.dart';
 import 'database/app_database_values.dart';
@@ -39,6 +40,7 @@ class LocalSettingsRepository implements SettingsRepository {
   static const String _showOsmTagsKey = 'settings.showOsmTags';
   static const String _searchBackendKey = 'settings.searchBackend';
   static const String _pinnedCategoriesKey = 'settings.pinnedCategories';
+  static const String _pushTransportKey = 'settings.pushTransport';
   static const String _migratedFromPrefsKey = 'settings.migratedFromPrefs';
 
   Future<SharedPreferences>? _prefs;
@@ -75,6 +77,9 @@ class LocalSettingsRepository implements SettingsRepository {
       showOsmTags: await database.readBool(_showOsmTagsKey) ?? false,
       searchBackend: searchBackend,
       pinnedCategoryIds: await _pinnedCategories(),
+      pushTransport: PushTransport.fromStorage(
+        await database.readString(_pushTransportKey),
+      ),
     );
   }
 
@@ -113,6 +118,7 @@ class LocalSettingsRepository implements SettingsRepository {
       _pinnedCategoriesKey,
       settings.pinnedCategoryIds,
     );
+    await database.writeString(_pushTransportKey, settings.pushTransport.wire);
     final SharedPreferences prefs = await _instance();
     await prefs.setString(_themeKey, settings.theme.name);
   }

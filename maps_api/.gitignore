@@ -1,0 +1,46 @@
+# Files and directories created by pub
+.dart_tool/
+.packages
+
+# Pubspec overrides
+pubspec_overrides.yaml
+
+# Agents
+.dart_skills/
+.agents/
+.claude/
+.gemini/
+.cursor/
+.vscode/mcp.json
+.codex/
+.mcp.json
+.opencode
+
+# Serverpod Cloud CLI
+.scloud/
+
+# Secrets — this repository is public, so nothing sensitive is ever committed.
+# These patterns are a safety net for the whole workspace; the server package
+# keeps its own rules for `config/passwords.yaml` and service-account keys.
+*.env
+.env
+.dart-define.json
+*.jks
+*.keystore
+key.properties
+
+# Firebase / Google configuration. `google-services.json` and
+# `GoogleService-Info.plist` carry project keys; `firebase_options.dart` is
+# generated from them. All are supplied locally and never published.
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+firebase_app_id_file.json
+
+# Service-account keys (FCM sender, Google APIs).
+*service-account*.json
+*service_account*.json
+*firebase-adminsdk*.json
+*adminsdk*.json
+firebase_service_account_key.json
+*.pem

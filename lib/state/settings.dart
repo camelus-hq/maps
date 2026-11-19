@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/entities/app_settings.dart';
 import '../domain/entities/place_category.dart';
+import '../domain/entities/push.dart';
 import 'ports.dart';
 
 /// The user's app settings (units, theme), loaded from and persisted through
@@ -60,6 +61,15 @@ class SettingsController extends Notifier<AppSettings> {
     }
     _modified = true;
     state = state.copyWith(searchBackend: backend);
+    await ref.read(settingsRepositoryProvider).save(state);
+  }
+
+  Future<void> setPushTransport(PushTransport transport) async {
+    if (state.pushTransport == transport) {
+      return;
+    }
+    _modified = true;
+    state = state.copyWith(pushTransport: transport);
     await ref.read(settingsRepositoryProvider).save(state);
   }
 
