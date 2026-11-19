@@ -26,13 +26,16 @@ friend's app ──gift wrap──▶ relay ──▶ maps_api server ──data
 Settings → **Notifications** holds the transport picker (**Firebase** / **Off**,
 stored as `AppSettings.pushTransport`) and a **status** row that reports whether
 push is configured, supported, allowed, has a token and is registered on the
-server.
+server. Registration is automatic; when it cannot complete the row shows the
+concrete reason (signed out, permission refused, no token, server refusal) and
+tapping it re-runs the sync (`PushNotificationsController.refresh`, exposed to
+agents as `app.pushStatus` with `refresh: true`).
 
 ## Configuration
 
 | Where | What |
 |---|---|
-| `--dart-define=PUSH_SERVER_URL=https://api.example.com` | Base URL of the Serverpod backend. **Unset disables push entirely**, so a build without a backend behaves exactly as before. |
+| `--dart-define=PUSH_SERVER_URL=https://api.example.com` | Base URL of the Serverpod backend. Defaults to `https://api.map.camelus.app`. |
 | `android/app/google-services.json` | Firebase Android config. **Gitignored**; the gradle plugin is applied only when the file exists, so a clone without keys still builds. |
 | `ios/Runner/GoogleService-Info.plist` | Firebase iOS config. **Gitignored**; add it to the **Runner** target in Xcode. |
 | `maps_api_server/config/firebase_service_account_key.json` | Server-side FCM sender key. **Gitignored**; see the server doc. |
@@ -41,11 +44,29 @@ Register relays default to the live-share relay set
 (`AppConfig.liveShareRelays`), and the outer kind subscribed is `1059` (a gift
 wrap).
 
+### Firebase Installation IDs (FID)
+
+Firebase deprecated FCM registration tokens in favour of **Firebase Installation
+IDs**. `firebase_messaging` 17 uses the new API (`register()` / `onRegistered`),
+but FID registration is **opt-in** and, without the flag, `register()` throws
+`IllegalStateException: API disabled`. Both are checked in:
+
+| Platform | Where | Value |
+|---|---|---|
+| Android | `android/app/src/main/AndroidManifest.xml` (`<application>`) | `<meta-data android:name="firebase_messaging_installation_id_enabled" android:value="true" />` |
+| iOS | `ios/Runner/Info.plist` | key `FirebaseMessagingInstallationIdEnabled` = `true` |
+
+The value registered with the server is the FID. FCM's `token` field (which the
+sender uses) accepts an FID during Firebase's transition period; the sender can
+later move to the dedicated `fid` field.
+
 ### iOS, once
 
 1. Add `Runner/GoogleService-Info.plist` to the Xcode project (Runner target).
 2. Enable the **Push Notifications** capability (adds the `aps-environment`
    entitlement) and **Background Modes → Remote notifications**.
+   `remote-notification` is already in `UIBackgroundModes`; the entitlement needs
+   Xcode (signing).
 
 ## What runs where
 

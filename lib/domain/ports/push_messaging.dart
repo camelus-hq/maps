@@ -13,7 +13,13 @@ abstract interface class PushMessaging {
   /// Whether this platform/build can receive push at all.
   bool get isSupported;
 
-  /// Prepares the transport(s). Idempotent and safe to call at startup.
+  /// A human-readable reason the transport could not provide a token (missing
+  /// Firebase config, a failed registration, no Play services, …), or `null`
+  /// when there is none. Shown in settings so a silent failure is visible.
+  String? get lastError;
+
+  /// Prepares the transport(s). Idempotent and safe to call at startup. A
+  /// failed initialization may be retried by calling it again.
   Future<void> initialize();
 
   /// Requests OS notification permission. Returns whether it is granted.

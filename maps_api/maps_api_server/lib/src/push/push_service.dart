@@ -72,7 +72,11 @@ class PushService {
       options: const PushRelayOptions(),
     );
     _pool = pool;
-    _activeFilters = buildPushFilters(pubkeys);
+    // Copy into a mutable map: refreshSubscriptions mutates this in place, and
+    // buildPushFilters may (defensively) return an unmodifiable map.
+    _activeFilters = <String, Map<String, Object>>{
+      ...buildPushFilters(pubkeys),
+    };
 
     _subscriptions.add(
       pool.onOpen.listen((PushRelay relay) {

@@ -98,9 +98,9 @@ List<Override> buildAppOverrides(
     navigationNotificationsProvider.overrideWith(
       (Ref ref) => LocalNavigationNotifications(),
     ),
-    // Push (FCM) against the Serverpod backend. Only wired when a
-    // backend URL is configured; otherwise the keyless fakes in
-    // `lib/state/ports.dart` keep the app (and tests) offline and Firebase-free.
+    // Push (FCM) against the configured Serverpod backend. The default is
+    // `https://api.map.camelus.app`; keyless fakes remain available for builds
+    // that explicitly set an empty push URL.
     if (!kIsWeb && config.hasPushServer) ...<Override>[
       pushMessagingProvider.overrideWith((Ref ref) {
         final FirebasePushMessaging messaging = FirebasePushMessaging();

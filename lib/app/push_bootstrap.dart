@@ -6,9 +6,9 @@ import '../data/notifications/push_background_handler.dart';
 
 /// Installs the FCM background message handler, once, at startup.
 ///
-/// A no-op without a push backend configured (`PUSH_SERVER_URL` unset), so a
-/// build without a backend never touches Firebase. The registration itself is
-/// owned by `pushStatusProvider` (kept alive by `PushNotificationLayer`).
+/// A no-op for web builds or builds without a push backend. The registration
+/// itself is owned by `pushStatusProvider` (kept alive by
+/// `PushNotificationLayer`).
 void installPushBackgroundHandler(AppConfig config) {
   if (kIsWeb || !config.hasPushServer) {
     return;

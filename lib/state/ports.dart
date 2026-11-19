@@ -131,7 +131,7 @@ final Provider<PushMessaging> pushMessagingProvider = Provider<PushMessaging>((
 
 /// The server side of push registration (the Serverpod `push` endpoint). The
 /// keyless default accepts and records registrations; `lib/app/di.dart` swaps in
-/// the generated-client adapter when `PUSH_SERVER_URL` is set.
+/// the generated-client adapter when a push server URL is configured.
 final Provider<PushRegistrationApi> pushRegistrationApiProvider =
     Provider<PushRegistrationApi>((Ref ref) => FakePushRegistrationApi());
 

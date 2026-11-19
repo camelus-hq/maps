@@ -119,6 +119,153 @@ void main() {
       await messaging.dispose();
     });
 
+    test('registers a token that only arrives after start', () async {
+      final FakeSocialService social = FakeSocialService();
+      final FakePushMessaging messaging = FakePushMessaging();
+      final FakePushRegistrationApi api = FakePushRegistrationApi();
+      final PushRegistrationBootstrap bootstrap = PushRegistrationBootstrap(
+        messaging: messaging,
+        registrar: PushRegistrar(
+          social: social,
+          api: api,
+          relays: const <String>[],
+        ),
+        social: social,
+        notifications: FakePushNotifications(),
+        serverConfigured: true,
+      );
+
+      await bootstrap.start();
+      expect(api.registrations, isEmpty);
+
+      // FCM delivers the token after the initial sync already gave up waiting.
+      messaging.setToken(PushTransport.firebase, 'late-token');
+      await pumpEventQueue();
+
+      expect(api.registrations, hasLength(1));
+      expect(bootstrap.status.value.registered, isTrue);
+      expect(bootstrap.status.value.hasToken, isTrue);
+      expect(bootstrap.status.value.error, isNull);
+
+      await bootstrap.dispose();
+      await messaging.dispose();
+    });
+
+    test('surfaces the transport reason when no token is available', () async {
+      final FakeSocialService social = FakeSocialService();
+      final FakePushMessaging messaging = FakePushMessaging()
+        ..lastError = 'Firebase is not configured for this build';
+      final PushRegistrationBootstrap bootstrap = PushRegistrationBootstrap(
+        messaging: messaging,
+        registrar: PushRegistrar(
+          social: social,
+          api: FakePushRegistrationApi(),
+          relays: const <String>[],
+        ),
+        social: social,
+        notifications: FakePushNotifications(),
+        serverConfigured: true,
+      );
+
+      await bootstrap.start();
+
+      expect(bootstrap.status.value.hasToken, isFalse);
+      expect(bootstrap.status.value.registered, isFalse);
+      expect(
+        bootstrap.status.value.error,
+        contains('Firebase is not configured'),
+      );
+
+      await bootstrap.dispose();
+      await messaging.dispose();
+    });
+
+    test('tells a signed-out user to sign in', () async {
+      final FakeSocialService social = FakeSocialService(signedIn: false);
+      final FakePushMessaging messaging = FakePushMessaging(
+        tokens: <PushTransport, String>{PushTransport.firebase: 'fcm-token-1'},
+      );
+      final PushRegistrationBootstrap bootstrap = PushRegistrationBootstrap(
+        messaging: messaging,
+        registrar: PushRegistrar(
+          social: social,
+          api: FakePushRegistrationApi(),
+          relays: const <String>[],
+        ),
+        social: social,
+        notifications: FakePushNotifications(),
+        serverConfigured: true,
+      );
+
+      await bootstrap.start();
+
+      expect(bootstrap.status.value.registered, isFalse);
+      expect(bootstrap.status.value.error, contains('Sign in'));
+
+      await bootstrap.dispose();
+      await messaging.dispose();
+    });
+
+    test('reports a server refusal', () async {
+      final FakeSocialService social = FakeSocialService();
+      final FakePushMessaging messaging = FakePushMessaging(
+        tokens: <PushTransport, String>{PushTransport.firebase: 'fcm-token-1'},
+      );
+      final FakePushRegistrationApi api = FakePushRegistrationApi(
+        result: false,
+      );
+      final PushRegistrationBootstrap bootstrap = PushRegistrationBootstrap(
+        messaging: messaging,
+        registrar: PushRegistrar(
+          social: social,
+          api: api,
+          relays: const <String>[],
+        ),
+        social: social,
+        notifications: FakePushNotifications(),
+        serverConfigured: true,
+      );
+
+      await bootstrap.start();
+
+      expect(bootstrap.status.value.hasToken, isTrue);
+      expect(bootstrap.status.value.registered, isFalse);
+      expect(bootstrap.status.value.error, contains('rejected'));
+
+      await bootstrap.dispose();
+      await messaging.dispose();
+    });
+
+    test('reports an unreachable server instead of throwing', () async {
+      final FakeSocialService social = FakeSocialService();
+      final FakePushMessaging messaging = FakePushMessaging(
+        tokens: <PushTransport, String>{PushTransport.firebase: 'fcm-token-1'},
+      );
+      final FakePushRegistrationApi api = FakePushRegistrationApi(
+        registerError: Exception('connection refused'),
+      );
+      final PushRegistrationBootstrap bootstrap = PushRegistrationBootstrap(
+        messaging: messaging,
+        registrar: PushRegistrar(
+          social: social,
+          api: api,
+          relays: const <String>[],
+        ),
+        social: social,
+        notifications: FakePushNotifications(),
+        serverConfigured: true,
+      );
+
+      await bootstrap.start();
+
+      expect(bootstrap.status.value.hasToken, isTrue);
+      expect(bootstrap.status.value.registered, isFalse);
+      expect(bootstrap.status.value.error, contains('reach the push server'));
+
+      await bootstrap.dispose();
+      await messaging.dispose();
+    });
+
     test('shows a notification for a foreground DM', () async {
       final FakeSocialService social = FakeSocialService();
       social.decryptPushKind = 14;

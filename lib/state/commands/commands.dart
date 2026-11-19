@@ -31,6 +31,7 @@ import '../../domain/entities/marker.dart';
 import '../../domain/entities/metric_event.dart';
 import '../../domain/entities/place.dart';
 import '../../domain/entities/place_category.dart';
+import '../../domain/entities/push.dart';
 import '../../domain/entities/recent_search.dart';
 import '../../domain/entities/review.dart';
 import '../../domain/entities/review_draft.dart';
@@ -57,6 +58,7 @@ import '../navigation_keys.dart';
 import '../navigation_notifications.dart';
 import '../place.dart';
 import '../ports.dart';
+import '../push_notifications.dart';
 import '../reviews.dart';
 import '../route.dart';
 import '../saved_places.dart';
@@ -290,6 +292,27 @@ List<Command> buildCommands(Ref ref) {
           'showOsmTags': settings.showOsmTags,
           'searchBackend': settings.searchBackend.name,
           'pinnedCategories': settings.pinnedCategoryIds,
+        };
+      },
+    ),
+    Command(
+      id: 'app.pushStatus',
+      description:
+          'Return the push registration status (params: {refresh?: bool}); '
+          '"refresh" re-runs the registration sync.',
+      handler: (CommandRequest request) async {
+        if (request.params['refresh'] == true) {
+          await ref.read(pushStatusProvider.notifier).refresh();
+        }
+        final PushStatus status = ref.read(pushStatusProvider);
+        return <String, Object?>{
+          'serverConfigured': status.serverConfigured,
+          'supported': status.supported,
+          'transport': status.transport.wire,
+          'permissionGranted': status.permissionGranted,
+          'hasToken': status.hasToken,
+          'registered': status.registered,
+          'error': status.error,
         };
       },
     ),

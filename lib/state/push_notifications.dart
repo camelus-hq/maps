@@ -53,6 +53,10 @@ class PushRegistrationBootstrap {
   StreamSubscription<String>? _foregroundSub;
   bool _started = false;
 
+  /// The token the last successful registration used, so a token event that
+  /// races the first sync does not register twice.
+  String? _registeredToken;
+
   /// The identity the last [sync] ran for, so the replayed first emission of
   /// [SocialService.identityChanges] does not register twice.
   String? _syncedIdentity;
@@ -68,12 +72,16 @@ class PushRegistrationBootstrap {
         serverConfigured: serverConfigured,
         supported: messaging.isSupported,
         transport: transport,
+        clearError: true,
       ),
     );
     await messaging.initialize();
+    // Listen for token refreshes *before* the first sync: the stream does not
+    // replay, so a token delivered while the sync is still waiting for one
+    // would otherwise be dropped and leave the device unregistered.
+    _tokenSub = messaging.tokenChanges.listen(_onToken);
     await sync();
     _identitySub = social.identityChanges.listen(_onIdentity);
-    _tokenSub = messaging.tokenChanges.listen(_onToken);
     _foregroundSub = messaging.foregroundMessages.listen(_onForeground);
   }
 
@@ -88,11 +96,27 @@ class PushRegistrationBootstrap {
     if (token.transport != transport || !social.isLoggedIn) {
       return;
     }
-    final bool ok = await registrar.register(
-      token: token.value,
-      transport: transport,
+    if (token.value == _registeredToken) {
+      return;
+    }
+    bool ok = false;
+    String? error;
+    try {
+      ok = await registrar.register(token: token.value, transport: transport);
+    } catch (e) {
+      error = 'Could not reach the push server ($e).';
+    }
+    if (ok) {
+      _registeredToken = token.value;
+    }
+    _update(
+      (PushStatus s) => s.copyWith(
+        hasToken: true,
+        registered: ok,
+        error: ok ? null : (error ?? 'The server rejected the registration.'),
+        clearError: ok,
+      ),
     );
-    _update((PushStatus s) => s.copyWith(hasToken: true, registered: ok));
   }
 
   /// Registers when signed in with push enabled; unregisters (and invalidates
@@ -101,30 +125,63 @@ class PushRegistrationBootstrap {
     _syncedIdentity = social.currentUserPubkey;
     _hasSynced = true;
     if (!serverConfigured) {
-      _update((PushStatus s) => s.copyWith(registered: false));
+      _update(
+        (PushStatus s) => s.copyWith(registered: false, clearError: true),
+      );
       return;
     }
     if (!transport.isEnabled || !social.isLoggedIn) {
       // Signed out: the server cannot be told with a proof, so invalidate the
       // device token instead — the server drops a token it cannot deliver to.
+      _registeredToken = null;
       await registrar.unregister();
       await messaging.deleteToken(transport);
-      _update((PushStatus s) => s.copyWith(hasToken: false, registered: false));
+      _update(
+        (PushStatus s) => s.copyWith(
+          hasToken: false,
+          registered: false,
+          error: transport.isEnabled
+              ? 'Sign in to receive notifications.'
+              : null,
+          clearError: !transport.isEnabled,
+        ),
+      );
       return;
     }
     final bool granted = await messaging.requestPermission();
     _update((PushStatus s) => s.copyWith(permissionGranted: granted));
     final String? token = await messaging.tokenFor(transport);
     final bool hasToken = token != null && token.isNotEmpty;
-    _update((PushStatus s) => s.copyWith(hasToken: hasToken));
     if (!hasToken) {
+      // Show *why* there is no token (Firebase misconfigured, no Play services,
+      // permission refused, still fetching) rather than a bare "not registered".
+      final String reason = !granted
+          ? 'Notifications are not allowed in system settings.'
+          : messaging.lastError ?? 'Waiting for a device token…';
+      _update(
+        (PushStatus s) =>
+            s.copyWith(hasToken: false, registered: false, error: reason),
+      );
       return;
     }
-    final bool ok = await registrar.register(
-      token: token,
-      transport: transport,
+    _update((PushStatus s) => s.copyWith(hasToken: true));
+    bool ok = false;
+    String? error;
+    try {
+      ok = await registrar.register(token: token, transport: transport);
+    } catch (e) {
+      error = 'Could not reach the push server ($e).';
+    }
+    if (ok) {
+      _registeredToken = token;
+    }
+    _update(
+      (PushStatus s) => s.copyWith(
+        registered: ok,
+        error: ok ? null : (error ?? 'The server rejected the registration.'),
+        clearError: ok,
+      ),
     );
-    _update((PushStatus s) => s.copyWith(registered: ok));
   }
 
   /// A foreground push. Only DMs are surfaced — a live share is already drawn by

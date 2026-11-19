@@ -20,6 +20,10 @@ class FirebasePushMessaging implements PushMessaging {
   FirebaseMessaging? messaging;
   bool _firebaseReady = false;
   String? _fcmToken;
+  String? _lastError;
+
+  @override
+  String? get lastError => _lastError;
 
   final StreamController<PushToken> _tokenChanges =
       StreamController<PushToken>.broadcast();
@@ -42,11 +46,14 @@ class FirebasePushMessaging implements PushMessaging {
     if (!isSupported || _firebaseReady) {
       return;
     }
-    _firebaseReady = true;
     try {
       if (Firebase.apps.isEmpty) {
         await Firebase.initializeApp();
       }
+      // Only mark ready once setup fully succeeded, so a misconfigured build
+      // can be retried after the config is fixed.
+      _firebaseReady = true;
+      _lastError = null;
       _fcmRegisteredSub = _fcm.onRegistered.listen((String token) {
         _fcmToken = token;
         _tokenChanges.add(
@@ -55,7 +62,10 @@ class FirebasePushMessaging implements PushMessaging {
       });
       _fcmMessageSub = FirebaseMessaging.onMessage.listen(_onFcmMessage);
     } catch (error) {
-      // Firebase is not configured for this build; push stays off.
+      // Firebase is not configured for this build; push stays off. Keep the
+      // reason so settings can show it (and retry later).
+      _firebaseReady = false;
+      _lastError = 'Firebase is not configured for this build ($error)';
       debugPrint('FCM unavailable: $error');
     }
   }
@@ -87,21 +97,55 @@ class FirebasePushMessaging implements PushMessaging {
       return null;
     }
     if (_fcmToken != null) {
+      _lastError = null;
       return _fcmToken;
+    }
+    // On Apple platforms FCM API calls require the APNs token first (iOS SDK
+    // 10.4+); register() rejects before it is available.
+    if (defaultTargetPlatform == TargetPlatform.iOS &&
+        !await _waitForApnsToken()) {
+      _lastError = 'Waiting for the APNs token';
+      return null;
     }
     try {
       await _fcm.register();
-    } catch (_) {
+    } catch (error) {
       // Firebase not configured; fall through to the cached value.
+      _lastError = 'Firebase registration failed ($error)';
     }
     if (_fcmToken != null) {
+      _lastError = null;
       return _fcmToken;
     }
     try {
-      return await _fcm.onRegistered.first.timeout(const Duration(seconds: 8));
+      final String token = await _fcm.onRegistered.first.timeout(
+        const Duration(seconds: 8),
+      );
+      _lastError = null;
+      return token;
     } catch (_) {
+      // A timeout here usually means no Google Play services / FCM isn't
+      // reachable on this device or emulator.
+      _lastError ??=
+          'No Firebase token was provided — check Google Play services and '
+          'the Firebase configuration';
       return null;
     }
+  }
+
+  /// Polls for the APNs token (Apple only) so [register] has it available.
+  Future<bool> _waitForApnsToken() async {
+    for (int attempt = 0; attempt < 5; attempt++) {
+      try {
+        if (await _fcm.getAPNSToken() != null) {
+          return true;
+        }
+      } catch (_) {
+        // Not ready yet; retry.
+      }
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+    return false;
   }
 
   @override

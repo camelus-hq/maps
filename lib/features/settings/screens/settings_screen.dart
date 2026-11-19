@@ -139,6 +139,11 @@ class SettingsScreen extends ConsumerWidget {
               icon: PlayIcons.notifications,
               label: 'Push status',
               subtitle: _pushStatusText(ref.watch(pushStatusProvider)),
+              subtitleMaxLines: 3,
+              // Tapping re-runs the registration sync, so a transient failure
+              // (no token yet, server unreachable) can be retried in place.
+              onTap: () =>
+                  unawaited(ref.read(pushStatusProvider.notifier).refresh()),
               showChevron: false,
             ),
           ),
@@ -528,7 +533,7 @@ class _AboutSheet extends StatelessWidget {
   }
 }
 
-/// A one-line description of the current push state for the settings row.
+/// A short description of the current push state for the settings row.
 String _pushStatusText(PushStatus status) {
   if (!status.serverConfigured) {
     return 'No push backend configured in this build';
@@ -542,11 +547,17 @@ String _pushStatusText(PushStatus status) {
   if (status.registered) {
     return 'Registered over Firebase';
   }
-  if (status.hasToken) {
-    return 'Registered, waiting for the server (Firebase)';
+  // Prefer the concrete reason the bootstrap recorded (sign out, no token,
+  // server refusal), so a failure is never hidden behind a generic line.
+  final String? error = status.error;
+  if (error != null && error.isNotEmpty) {
+    return error;
   }
   if (!status.permissionGranted) {
     return 'Notifications are not allowed in system settings';
+  }
+  if (status.hasToken) {
+    return 'Registered, waiting for the server (Firebase)';
   }
   return 'Not registered yet';
 }

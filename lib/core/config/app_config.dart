@@ -17,7 +17,7 @@ class AppConfig {
     this.transitBaseUrl = defaultTransitBaseUrl,
     this.transitUserAgent = defaultTransitUserAgent,
     this.updateManifestUrl = defaultUpdateManifestUrl,
-    this.pushServerUrl = '',
+    this.pushServerUrl = defaultPushServerUrl,
     this.appFlavor = '',
     this.feedbackPubkey = '',
     this.nostrNsec = '',
@@ -175,8 +175,11 @@ class AppConfig {
   final String updateManifestUrl;
 
   /// Base URL of the Serverpod backend that forwards push (see `maps_api/`),
-  /// supplied with `--dart-define=PUSH_SERVER_URL=…`. Empty disables push
-  /// registration entirely, so a build without a backend behaves as before.
+  /// supplied with `--dart-define=PUSH_SERVER_URL=…`.
+  static const String defaultPushServerUrl = 'https://api.map.camelus.app';
+
+  /// Base URL of the Serverpod backend that forwards push (see `maps_api/`),
+  /// supplied with `--dart-define=PUSH_SERVER_URL=…`.
   final String pushServerUrl;
 
   /// The distribution flavor this build was made from (see [directFlavor]).
@@ -310,7 +313,7 @@ class AppConfig {
     ),
     pushServerUrl: _nonEmpty(
       const String.fromEnvironment('PUSH_SERVER_URL'),
-      '',
+      defaultPushServerUrl,
     ),
     appFlavor: const String.fromEnvironment('APP_FLAVOR').trim(),
     feedbackPubkey: const String.fromEnvironment('FEEDBACK_PUBKEY').trim(),

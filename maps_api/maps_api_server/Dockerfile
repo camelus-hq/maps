@@ -4,6 +4,22 @@
 # Build stage
 FROM dart:3.12.2 AS build
 
+# The `ndk` dependency builds a Rust native library through Dart's native-assets
+# build hooks (`dart build cli` runs them), so the build stage needs a Rust
+# toolchain and a C compiler.
+ARG RUST_VERSION=1.98.1
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential ca-certificates curl pkg-config \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+        | sh -s -- -y --profile minimal --no-modify-path \
+            --default-toolchain "${RUST_VERSION}"
+# Use exactly the toolchain ndk pins in its rust-toolchain.toml, but skip that
+# file's long cross-compilation target list: only the host target is built here.
+ENV PATH="/root/.cargo/bin:${PATH}" \
+    RUSTUP_TOOLCHAIN="${RUST_VERSION}"
+
 # Create a minimal workspace that preserves locked server dependency versions.
 WORKDIR /app
 COPY pubspec.lock .

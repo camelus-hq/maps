@@ -13,6 +13,10 @@ class FakePushMessaging implements PushMessaging {
   @override
   final bool isSupported;
 
+  /// Tests may set this to simulate an unavailable transport.
+  @override
+  String? lastError;
+
   final Map<PushTransport, String> _tokens;
   final StreamController<PushToken> _tokenChanges =
       StreamController<PushToken>.broadcast();

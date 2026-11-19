@@ -10,13 +10,17 @@ import 'push_config.dart';
 ///
 /// Returns a map of subscription id to filter. An empty map means nobody is
 /// registered and the forwarder should watch nothing.
+///
+/// The returned map is always a fresh, **modifiable** map: [PushService] keeps
+/// it and mutates it in place as registrations change, so it must not be a
+/// `const`/unmodifiable literal.
 Map<String, Map<String, Object>> buildPushFilters(List<String> pubkeys) {
   final List<String> unique = <String>{
     for (final String pubkey in pubkeys)
       if (pubkey.length == 64) pubkey.toLowerCase(),
   }.toList(growable: false);
   if (unique.isEmpty) {
-    return const <String, Map<String, Object>>{};
+    return <String, Map<String, Object>>{};
   }
 
   final List<int> kinds = PushConfig.availableKinds;

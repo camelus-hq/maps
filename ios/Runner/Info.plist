@@ -24,6 +24,11 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- Firebase Messaging registers this app with FCM using a Firebase
+	     Installation ID; `firebase_messaging` 17 requires this opt-in key.
+	     The server sends to the FID. -->
+	<key>FirebaseMessagingInstallationIdEnabled</key>
+	<true/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
@@ -37,6 +42,9 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
+		<!-- Data-only pushes must wake the app in the background to decrypt the
+		     gift wrap and raise the local notification. -->
+		<string>remote-notification</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

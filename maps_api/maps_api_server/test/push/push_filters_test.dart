@@ -42,5 +42,26 @@ void main() {
 
       expect(filters.values.single['#p'], <String>[valid]);
     });
+
+    test('returns a modifiable map the service can mutate in place', () {
+      // PushService keeps this map and adds/removes subscriptions as
+      // registrations change, so a const/unmodifiable result would throw
+      // "Cannot modify unmodifiable map" on the first registration.
+      final Map<String, Map<String, Object>> empty = buildPushFilters(
+        const <String>[],
+      );
+      expect(
+        () => empty['sub-0'] = <String, Object>{'#p': <String>[]},
+        returnsNormally,
+      );
+
+      final Map<String, Map<String, Object>> one = buildPushFilters(
+        <String>['c' * 64],
+      );
+      expect(
+        () => one['sub-1'] = <String, Object>{'#p': <String>[]},
+        returnsNormally,
+      );
+    });
   });
 }

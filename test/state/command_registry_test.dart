@@ -418,6 +418,23 @@ void main() {
     );
   });
 
+  test('app.pushStatus reports the push state and refreshes', () async {
+    final CommandRegistrySource registry = CommandRegistrySource(container);
+    final Map<String, Object?> status = await registry.dispatch(
+      'app.pushStatus',
+      const <String, Object?>{},
+    ) as Map<String, Object?>;
+    expect(status['serverConfigured'], isA<bool>());
+    expect(status['transport'], isA<String>());
+    expect(status['registered'], isA<bool>());
+
+    final Map<String, Object?> refreshed = await registry.dispatch(
+      'app.pushStatus',
+      <String, Object?>{'refresh': true},
+    ) as Map<String, Object?>;
+    expect(refreshed['transport'], isA<String>());
+  });
+
   test('search.category browses on the map and stays there', () async {
     final CommandRegistrySource registry = CommandRegistrySource(container);
     final List<Object?> results = await registry.dispatch(

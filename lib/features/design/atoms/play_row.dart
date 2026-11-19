@@ -23,6 +23,7 @@ class PlayRow extends StatelessWidget {
     this.onTap,
     this.enabled = true,
     this.showChevron = true,
+    this.subtitleMaxLines = 1,
   });
 
   final String label;
@@ -38,6 +39,10 @@ class PlayRow extends StatelessWidget {
   /// Shows a trailing chevron when there is no explicit [trailing] and the row
   /// is tappable.
   final bool showChevron;
+
+  /// How many lines the [subtitle] may wrap to before it is ellipsised. Rows
+  /// that carry a status message (not just a hint) can raise this.
+  final int subtitleMaxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +95,7 @@ class PlayRow extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(
                         sub,
-                        maxLines: 1,
+                        maxLines: subtitleMaxLines,
                         overflow: TextOverflow.ellipsis,
                         style: PlayType.caption.copyWith(
                           color: colors.inkMuted,
