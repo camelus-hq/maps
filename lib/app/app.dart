@@ -40,7 +40,7 @@ class _OpenMapsAppState extends State<OpenMapsApp> {
         builder: (BuildContext context, WidgetRef ref, Widget? child) {
           final AppThemeMode theme = ref.watch(settingsProvider).theme;
           return MaterialApp.router(
-            title: 'OpenMaps',
+            title: 'Maps',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.light(),
             darkTheme: AppTheme.dark(),

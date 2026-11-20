@@ -53,6 +53,11 @@ import '../domain/ports/transit_routing_service.dart';
 /// overrides them with real adapters (Mapbox/Valhalla/…) when configured; tests
 /// override them with fakes or stubs. No widget or notifier changes when a
 /// backend changes.
+/// Override the wall clock in tests that render time-dependent UI.
+final Provider<DateTime Function()> nowProvider = Provider<DateTime Function()>(
+  (Ref ref) => DateTime.now,
+);
+
 final Provider<MapService> mapServiceProvider = Provider<MapService>((Ref ref) {
   final FakeMapService service = FakeMapService();
   ref.onDispose(service.dispose);

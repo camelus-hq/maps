@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/app/app.dart';
@@ -39,6 +40,7 @@ void main() {
     category: 'Cafe',
     address: 'Alexanderufer 1, Berlin',
   );
+  final DateTime goldenNow = DateTime(2025, 1, 15, 12);
 
   testWidgets('the empty search screen with recents matches the golden', (
     WidgetTester tester,
@@ -150,7 +152,9 @@ void main() {
     WidgetTester tester,
   ) async {
     setSurface(tester);
-    final ProviderContainer container = ProviderContainer();
+    final ProviderContainer container = ProviderContainer(
+      overrides: <Override>[nowProvider.overrideWithValue(() => goldenNow)],
+    );
     addTearDown(container.dispose);
     final registry = container.read(commandRegistryProvider);
     final List<Object?> results = await registry.dispatch(
@@ -183,7 +187,9 @@ void main() {
     WidgetTester tester,
   ) async {
     setSurface(tester);
-    final ProviderContainer container = ProviderContainer();
+    final ProviderContainer container = ProviderContainer(
+      overrides: <Override>[nowProvider.overrideWithValue(() => goldenNow)],
+    );
     addTearDown(container.dispose);
     final registry = container.read(commandRegistryProvider);
     final List<Object?> results = await registry.dispatch(

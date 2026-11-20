@@ -34,7 +34,7 @@ abstract final class ReviewEvent {
   static const int kind = 31987;
 
   /// Marks events produced by this app.
-  static const String clientName = 'openmaps';
+  static const String clientName = 'camelus-maps';
 
   /// The place-key namespace written to the `d` tag.
   static const String placePrefix = ReviewPlace.prefix;

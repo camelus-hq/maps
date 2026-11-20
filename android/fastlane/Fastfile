@@ -138,7 +138,7 @@ platform :android do
       track: "beta",
       package_name: app_package_name,
       aab: aab,
-      json_key_data: play_json_key,
+      json_key_data: ENV['G_PLAY_FASTLANE_SERVICE_ACCOUNT'],
     )
   end
 
@@ -149,7 +149,7 @@ platform :android do
       track: "production",
       package_name: app_package_name,
       aab: aab,
-      json_key_data: play_json_key,
+      json_key_data: ENV['G_PLAY_FASTLANE_SERVICE_ACCOUNT'],
     )
   end
 
@@ -219,18 +219,7 @@ def app_package_name
   match[1]
 end
 
-# The Play service-account JSON key the publish lanes upload with, from the
-# environment (never committed). Its contents, not a path to the file.
-def play_json_key
-  key = ENV["G_PLAY_FASTLANE_SERVICE_ACCOUNT"].to_s
-  if key.strip.empty?
-    UI.user_error!(
-      "G_PLAY_FASTLANE_SERVICE_ACCOUNT is not set — it must hold the Google " \
-      "Play service-account JSON key's contents"
-    )
-  end
-  key
-end
+
 
 def write_manifest(options, version_name, version_code, sha256)
   manifest = {
