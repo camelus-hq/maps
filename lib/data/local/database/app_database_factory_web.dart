@@ -7,9 +7,12 @@ import 'drift/drift_app_database.dart';
 /// `app_database_factory.dart`.
 ///
 /// Requires `sqlite3.wasm` and `drift_worker.js` in `web/` (see
-/// `docs/database.md`). [directory] is ignored — the browser storage location
-/// is chosen by drift.
-Future<AppDatabase> openAppDatabase({String? directory}) async {
+/// `docs/database.md`). [directory] and [attach] are ignored — the browser
+/// storage location is chosen by drift, and there is no background isolate.
+Future<AppDatabase> openAppDatabase({
+  String? directory,
+  bool attach = false,
+}) async {
   final WasmDatabaseResult result = await WasmDatabase.open(
     databaseName: 'openmaps',
     sqlite3Uri: Uri.parse('sqlite3.wasm'),

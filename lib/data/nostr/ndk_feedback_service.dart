@@ -223,6 +223,7 @@ class NdkFeedbackService implements FeedbackService {
         rumor: rumor,
         recipientPubkey: recipient,
         customSigner: sender.account.signer,
+        createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
       );
       final List<RelayBroadcastResponse> responses = await ndk.broadcast
           .broadcast(

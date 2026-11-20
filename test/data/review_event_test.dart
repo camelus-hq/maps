@@ -79,7 +79,7 @@ void main() {
       );
       expect(
         tags.firstWhere((List<String> tag) => tag.first == 'client'),
-        equals(<String>['client', 'openmaps']),
+        equals(<String>['client', 'camelus-maps']),
       );
 
       final List<String> geohashes = <String>[

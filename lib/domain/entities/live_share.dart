@@ -137,8 +137,17 @@ class LiveShareState {
 }
 
 /// What kind of live-location event is being broadcast.
+///
+/// The kind also selects the wire envelope: **start** and **stop** are stored
+/// NIP-59 gift wraps (kind `1059`) the push server forwards; an **update** is an
+/// ephemeral wrap (kind `21059`) that only a listening app receives.
 enum LiveShareBroadcastKind {
-  /// A position update (or the session's first payload).
+  /// The **first** payload of a session: the recipient is told the friend
+  /// started sharing. Only this raises a notification, so a stream of position
+  /// updates does not spam the recipient.
+  start,
+
+  /// A position update after the session's start.
   update,
 
   /// The share ended early, so recipients can drop the pin immediately.
@@ -146,6 +155,10 @@ enum LiveShareBroadcastKind {
 }
 
 /// The payload gift-wrap encrypted to each recipient of a live share.
+///
+/// It carries only the share itself — no sender name or avatar. A recipient
+/// resolves those from the sender's Nostr profile (`kind: 0`), so the wire
+/// payload stays minimal and the identity is always the profile.
 class LiveShareBroadcast {
   const LiveShareBroadcast({
     required this.sessionId,
@@ -155,7 +168,6 @@ class LiveShareBroadcast {
     required this.expiresAt,
     this.accuracyMeters,
     this.heading,
-    this.displayName,
   });
 
   final String sessionId;
@@ -172,8 +184,4 @@ class LiveShareBroadcast {
 
   final double? accuracyMeters;
   final double? heading;
-
-  /// The sender's display name, so a recipient can label the pin without an
-  /// extra profile lookup.
-  final String? displayName;
 }

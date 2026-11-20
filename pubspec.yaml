@@ -1,7 +1,7 @@
 name: openmaps
 description: "A new Flutter project."
 publish_to: 'none'
-version: 0.5.1+31
+version: 0.5.4+41
 
 environment:
   sdk: ^3.13.5
@@ -20,11 +20,7 @@ dependencies:
   mapbox_maps_flutter: ^3.35.0
   mobile_scanner: 7.5.0
   phosphor_icons: ^3.0.1
-  # QR *encoding* for the "My code" screen. Note: qr ^4.0.0 cannot be used —
-  # ndk_flutter (>=0.8.4) → pretty_qr_code 3.6.0 calls the qr 3 API
-  # (`QrErrorCorrectLevel.M`, `QrCode.fromData`), which qr 4 removed, so
-  # forcing qr 4 fails to compile. 3.0.2 is the newest compatible release.
-  qr: ^3.0.2
+  qr: ^4.0.1
   ndk: ^0.10.1
   ndk_flutter: ^0.10.1
   # SHA-256 verification of a downloaded update APK.
@@ -51,6 +47,38 @@ dependencies:
   package_info_plus: ^10.2.2
 
   material_ui: any
+  # Push transport. Only the messaging part of Firebase is used — no analytics,
+  # crashlytics or other Google libraries.
+  firebase_core: ^5.2.0
+  firebase_messaging: ^17.1.0
+  # Generated Serverpod client for the push registration endpoint
+  # (`client.push.register`). The backend lives in `maps_api/`.
+  maps_api_client:
+    path: maps_api/maps_api_client
+  # OpenMaps' own local-notification channel. A plugin (not a MainActivity
+  # channel) so it is registered on the FCM background engine too.
+  openmaps_notifications:
+    path: plugins/openmaps_notifications
+
+dependency_overrides:
+  ndk:
+     # path: ../ndk/packages/ndk
+     git:
+       url: https://github.com/relaystr/ndk.git
+       path: packages/ndk
+       ref: 091bd38574d90148afc1170d05cfb8fbaab16f37
+  # ndk_flutter must be the same revision as the overridden ndk: the release on
+  # pub.dev is built against ndk 0.10.x and does not compile against the newer
+  # `ndk` (it misses `SignerMethod.switchRelays`). The matching revision also
+  # drops the pretty_qr_code dependency and uses qr 4 directly (see the `qr`
+  # dependency above).
+  ndk_flutter:
+     git:
+       url: https://github.com/relaystr/ndk.git
+       path: packages/ndk_flutter
+       ref: 091bd38574d90148afc1170d05cfb8fbaab16f37
+
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -72,3 +100,6 @@ objectbox:
 
 flutter:
   uses-material-design: true
+
+
+

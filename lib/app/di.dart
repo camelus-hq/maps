@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:http/http.dart' as http;
+import 'package:maps_api_client/maps_api_client.dart';
 import 'package:ndk/ndk.dart';
 import 'package:ndk_flutter/ndk_flutter.dart';
 
@@ -22,8 +23,11 @@ import '../data/nostr/ndk_anonymous_identity.dart';
 import '../data/nostr/ndk_feedback_service.dart';
 import '../data/nostr/ndk_review_service.dart';
 import '../data/nostr/ndk_social_service.dart';
+import '../data/notifications/firebase_push_messaging.dart';
 import '../data/notifications/local_live_share_notifications.dart';
 import '../data/notifications/local_navigation_notifications.dart';
+import '../data/notifications/local_push_notifications.dart';
+import '../data/notifications/push_registrar.dart';
 import '../data/osm/osm_search_service.dart';
 import '../data/osm/overpass_place_source.dart';
 import '../data/platform/url_launcher_external_actions.dart';
@@ -94,6 +98,24 @@ List<Override> buildAppOverrides(
     navigationNotificationsProvider.overrideWith(
       (Ref ref) => LocalNavigationNotifications(),
     ),
+    // Push (FCM) against the configured Serverpod backend. The default is
+    // `https://api.map.camelus.app`; keyless fakes remain available for builds
+    // that explicitly set an empty push URL.
+    if (!kIsWeb && config.hasPushServer) ...<Override>[
+      pushMessagingProvider.overrideWith((Ref ref) {
+        final FirebasePushMessaging messaging = FirebasePushMessaging();
+        ref.onDispose(() => unawaited(messaging.dispose()));
+        return messaging;
+      }),
+      pushRegistrationApiProvider.overrideWith((Ref ref) {
+        final Client serverpod = Client(config.pushServerUrl);
+        ref.onDispose(serverpod.close);
+        return ServerpodPushRegistrationApi(serverpod);
+      }),
+      pushNotificationsProvider.overrideWith(
+        (Ref ref) => const LocalPushNotifications(),
+      ),
+    ],
     // Device location (GNSS) behind the port; degrades gracefully without
     // permission, so keyless/test runs still use the fake default.
     locationServiceProvider.overrideWith(

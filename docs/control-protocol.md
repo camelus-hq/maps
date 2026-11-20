@@ -124,6 +124,7 @@ sync test fails if it drifts from the registry.
 | `app.deepLink` | Apply a deep link URL (params: {url}) — opens the place, search or route plan it names, the same path a shared link takes. Returns the canonical URL. E.g. /place/way/159230368, /directions?mode=drive&destination=52.5,13.4, /search?q=coffee, or any of them with ?at=52.48,13.36,13z. |
 | `app.link` | Return the canonical deep link for the last applied URL, or null when none has been applied yet. |
 | `app.onboarding` | Get or set the onboarding-seen flag (params: {seen?}); returns it. |
+| `app.pushStatus` | Return the push registration status (params: {refresh?: bool}); "refresh" re-runs the registration sync. |
 | `app.ready` | Return true once the app is running. |
 | `app.settings` | Return app settings (distance unit, theme, search provider, developer options). |
 | `app.settings.set` | Update app settings (params: {unit?: metric\|imperial, theme?: system\|light\|dark, showOsmTags?: bool, searchBackend?: mapbox\|openstreetmap\|camelus}). |

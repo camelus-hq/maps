@@ -65,9 +65,9 @@ class QrCodeView extends StatelessWidget {
     }
     try {
       return QrImage(
-        QrCode.fromData(
-          data: payload,
-          errorCorrectLevel: QrErrorCorrectLevel.M,
+        QrCode(
+          payload: QrPayload.fromString(payload),
+          errorCorrectLevel: QrErrorCorrectLevel.medium,
         ),
       );
     } catch (_) {

@@ -1,0 +1,10 @@
+### The push destinations registered for one Nostr identity, as reported back
+### to the client. Tokens are never echoed back.
+class: PushRegistrationState
+fields:
+  ### The Nostr public key these subscriptions belong to.
+  pubKey: String
+  ### The outer event kinds this server can forward (see `PushConfig`).
+  availableKinds: List<int>
+  ### One entry per relay the identity is registered on, with its kinds.
+  subscriptions: List<PushSubscriptionInfo>

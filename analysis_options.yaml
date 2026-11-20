@@ -17,6 +17,11 @@ analyzer:
     - "**/*.g.dart"
     - "**/*.drift.dart"
     - ios/**
+    # The Serverpod backend workspace has its own analyzer and lints; it is not
+    # part of this app's analysis context.
+    - maps_api/**
+    # The first-party notification plugin is its own package with its own lints.
+    - plugins/**
 
 linter:
   rules:

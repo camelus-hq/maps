@@ -17,6 +17,7 @@ class AppConfig {
     this.transitBaseUrl = defaultTransitBaseUrl,
     this.transitUserAgent = defaultTransitUserAgent,
     this.updateManifestUrl = defaultUpdateManifestUrl,
+    this.pushServerUrl = defaultPushServerUrl,
     this.appFlavor = '',
     this.feedbackPubkey = '',
     this.nostrNsec = '',
@@ -42,9 +43,9 @@ class AppConfig {
   /// alone is not enough for two friends to meet. Override with
   /// `--dart-define=LIVE_SHARE_RELAYS=wss://a,wss://b`.
   static const List<String> defaultLiveShareRelays = <String>[
-    'wss://relay.primal.net',
-    'wss://relay.snort.social',
-    'wss://relay.camelus.app',
+    // 'wss://relay.primal.net',
+    // 'wss://relay.snort.social',
+    // 'wss://relay.camelus.app',
     'wss://relay.map.camelus.app',
   ];
 
@@ -59,9 +60,9 @@ class AppConfig {
   /// `relay.nos.social` answers `blocked: kind not allowed`, so it is not in
   /// the default set.
   static const List<String> defaultReviewRelays = <String>[
-    'wss://relay.primal.net',
-    'wss://relay.snort.social',
-    'wss://nostr.mom',
+    // 'wss://relay.primal.net',
+    // 'wss://relay.snort.social',
+    // 'wss://nostr.mom',
     'wss://relay.map.camelus.app',
   ];
 
@@ -173,6 +174,14 @@ class AppConfig {
   /// URL of the self-update manifest (see [defaultUpdateManifestUrl]).
   final String updateManifestUrl;
 
+  /// Base URL of the Serverpod backend that forwards push (see `maps_api/`),
+  /// supplied with `--dart-define=PUSH_SERVER_URL=…`.
+  static const String defaultPushServerUrl = 'https://api.map.camelus.app';
+
+  /// Base URL of the Serverpod backend that forwards push (see `maps_api/`),
+  /// supplied with `--dart-define=PUSH_SERVER_URL=…`.
+  final String pushServerUrl;
+
   /// The distribution flavor this build was made from (see [directFlavor]).
   final String appFlavor;
 
@@ -239,6 +248,9 @@ class AppConfig {
 
   bool get hasValhallaEndpoint => valhallaBaseUrl.isNotEmpty;
 
+  /// Whether a push backend is configured (see [pushServerUrl]).
+  bool get hasPushServer => pushServerUrl.trim().isNotEmpty;
+
   static const AppConfig empty = AppConfig();
 
   factory AppConfig.fromEnvironment() => AppConfig(
@@ -298,6 +310,10 @@ class AppConfig {
     updateManifestUrl: _httpBase(
       const String.fromEnvironment('UPDATE_MANIFEST_URL'),
       defaultUpdateManifestUrl,
+    ),
+    pushServerUrl: _nonEmpty(
+      const String.fromEnvironment('PUSH_SERVER_URL'),
+      defaultPushServerUrl,
     ),
     appFlavor: const String.fromEnvironment('APP_FLAVOR').trim(),
     feedbackPubkey: const String.fromEnvironment('FEEDBACK_PUBKEY').trim(),

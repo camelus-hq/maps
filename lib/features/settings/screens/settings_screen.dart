@@ -10,9 +10,11 @@ import '../../../core/config/legal_links.dart';
 import '../../../domain/entities/app_settings.dart';
 import '../../../domain/entities/app_update.dart';
 import '../../../domain/entities/friend.dart';
+import '../../../domain/entities/push.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/config.dart';
 import '../../../state/ports.dart';
+import '../../../state/push_notifications.dart';
 import '../../../state/settings.dart';
 import '../../../state/social.dart';
 import '../../../state/update.dart';
@@ -109,6 +111,40 @@ class SettingsScreen extends ConsumerWidget {
                       : 'Needs an API key — OpenStreetMap is used instead',
                 ),
               ],
+            ),
+          ),
+          const _Section('Notifications'),
+          Padding(
+            padding: pad,
+            child: PlaySegmented<PushTransport>(
+              selected: settings.pushTransport,
+              onChanged: (PushTransport transport) => unawaited(
+                ref.read(settingsProvider.notifier).setPushTransport(transport),
+              ),
+              segments: <PlaySegment<PushTransport>>[
+                const PlaySegment<PushTransport>(
+                  value: PushTransport.firebase,
+                  label: 'Firebase',
+                ),
+                const PlaySegment<PushTransport>(
+                  value: PushTransport.off,
+                  label: 'Off',
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: pad,
+            child: PlayRow(
+              icon: PlayIcons.notifications,
+              label: 'Push status',
+              subtitle: _pushStatusText(ref.watch(pushStatusProvider)),
+              subtitleMaxLines: 3,
+              // Tapping re-runs the registration sync, so a transient failure
+              // (no token yet, server unreachable) can be retried in place.
+              onTap: () =>
+                  unawaited(ref.read(pushStatusProvider.notifier).refresh()),
+              showChevron: false,
             ),
           ),
           const _Section('Developer'),
@@ -495,4 +531,33 @@ class _AboutSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A short description of the current push state for the settings row.
+String _pushStatusText(PushStatus status) {
+  if (!status.serverConfigured) {
+    return 'No push backend configured in this build';
+  }
+  if (!status.supported) {
+    return 'Not supported on this platform';
+  }
+  if (status.transport == PushTransport.off) {
+    return 'Off';
+  }
+  if (status.registered) {
+    return 'Registered over Firebase';
+  }
+  // Prefer the concrete reason the bootstrap recorded (sign out, no token,
+  // server refusal), so a failure is never hidden behind a generic line.
+  final String? error = status.error;
+  if (error != null && error.isNotEmpty) {
+    return error;
+  }
+  if (!status.permissionGranted) {
+    return 'Notifications are not allowed in system settings';
+  }
+  if (status.hasToken) {
+    return 'Registered, waiting for the server (Firebase)';
+  }
+  return 'Not registered yet';
 }

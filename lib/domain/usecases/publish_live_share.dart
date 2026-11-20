@@ -24,7 +24,7 @@ class PublishLiveShare {
     if (broadcast.sessionId.trim().isEmpty) {
       throw const ValidationException('Live share has no session id');
     }
-    if (broadcast.kind == LiveShareBroadcastKind.update &&
+    if (broadcast.kind != LiveShareBroadcastKind.stop &&
         broadcast.position == null) {
       throw const ValidationException('Live share update has no position');
     }

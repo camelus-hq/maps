@@ -1,6 +1,7 @@
 import '../entities/friend.dart';
 import '../entities/friend_location.dart';
 import '../entities/live_share.dart';
+import '../entities/push.dart';
 
 /// Publishes and receives live location over Nostr.
 ///
@@ -56,6 +57,12 @@ abstract interface class SocialService {
   /// Gift-wrap encrypts [broadcast] to each of [recipientPubkeys] and publishes
   /// it. Throws an [AppException] when nobody is signed in, no recipient is
   /// selected, or no relay accepted the event.
+  ///
+  /// A session **start** and **stop** are published as stored gift wraps
+  /// (kind `1059`) so the push server can forward them to a closed app; the
+  /// recurring **updates** are ephemeral gift wraps (kind `21059`) that relays
+  /// do not store and the server never forwards, so they reach only a listening
+  /// app.
   Future<void> publishLiveShare({
     required LiveShareBroadcast broadcast,
     required List<String> recipientPubkeys,
@@ -67,6 +74,15 @@ abstract interface class SocialService {
   /// silently — the stream only ever carries trustworthy [FriendLocation]s.
   Stream<FriendLocation> watchFriendLocations();
 
+  /// Decrypted gift wraps the app has received on its **own** relay
+  /// subscription, for the notification bridge.
+  ///
+  /// While the app is in the foreground the push server pauses forwarding (the
+  /// app already has these), so the app surfaces them itself: a live-share
+  /// **start** or a direct message raises a notification. Carries every
+  /// decrypted rumor — the consumer decides which kinds are worth surfacing.
+  Stream<DecryptedPushEvent> get incomingPushes;
+
   /// Closes the incoming subscription opened by [watchFriendLocations].
   Future<void> stopWatching();
 
@@ -75,6 +91,22 @@ abstract interface class SocialService {
     required String recipientPubkey,
     required String text,
   });
+
+  /// Signs an arbitrary event with the signed-in identity and returns its JSON.
+  ///
+  /// Used by push registration, which must prove ownership of the public key to
+  /// the notification server. Returns `null` when nobody is signed in.
+  Future<String?> signEvent({
+    required int kind,
+    required List<List<String>> tags,
+    String content,
+  });
+
+  /// Decrypts a push gift wrap (as forwarded by the push server) into the event
+  /// it carries, or `null` when it cannot be decrypted or nobody is signed in.
+  ///
+  /// Malformed, unsigned or wrongly-addressed wraps are dropped silently.
+  Future<DecryptedPushEvent?> decryptPushEvent(String encryptedEventJson);
 
   /// Signs in with a raw private key (`nsec…` or 64-char hex). Agents and the
   /// login screen use this; the interactive widget path goes through NDK.

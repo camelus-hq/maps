@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import '../../core/errors/app_exception.dart';
@@ -6,6 +7,7 @@ import '../../domain/entities/friend.dart';
 import '../../domain/entities/friend_location.dart';
 import '../../domain/entities/lat_lon.dart';
 import '../../domain/entities/live_share.dart';
+import '../../domain/entities/push.dart';
 import '../../domain/ports/social_service.dart';
 
 /// In-memory [SocialService] so the app runs, and tests run, without relays.
@@ -22,6 +24,7 @@ class FakeSocialService implements SocialService {
        _follows = List<Friend>.of(followings ?? demoFollowings) {
     _identityController = StreamController<String?>.broadcast();
     _incoming = StreamController<FriendLocation>.broadcast();
+    _incomingPushes = StreamController<DecryptedPushEvent>.broadcast();
     for (final FriendLocation location
         in liveFriends ?? const <FriendLocation>[]) {
       _live[location.pubkey] = location;
@@ -102,6 +105,7 @@ class FakeSocialService implements SocialService {
   bool signedIn;
   late final StreamController<String?> _identityController;
   late final StreamController<FriendLocation> _incoming;
+  late final StreamController<DecryptedPushEvent> _incomingPushes;
   final Map<String, FriendLocation> _live = <String, FriendLocation>{};
 
   /// Every broadcast this fake was asked to publish (newest last).
@@ -117,8 +121,20 @@ class FakeSocialService implements SocialService {
   /// The public key [signInWithPrivateKey] was called with.
   String? signedInWithKey;
 
+  /// How many times [resolveProfile] has been called (retry tests).
+  int resolveProfileCalls = 0;
+
+  /// When > 0, the next that-many [resolveProfile] calls return a bare key with
+  /// no name or picture, standing in for a transient relay failure.
+  int resolveProfileEmptyFirst = 0;
+
   /// When set, calls to [publishLiveShare] throw it (tests).
   AppException? publishError;
+
+  /// What [decryptPushEvent] returns; `null` kind disables it.
+  int? decryptPushKind;
+  String decryptPushContent = '';
+  String decryptPushSender = demoUserPubkey;
 
   @override
   bool get isLoggedIn => signedIn;
@@ -202,6 +218,13 @@ class FakeSocialService implements SocialService {
   @override
   Future<Friend> resolveProfile(String pubkey) async {
     final String key = _validatePubkey(pubkey);
+    resolveProfileCalls++;
+    // Exercise the retry path: the first N lookups come back without a name or
+    // picture, as a transient relay failure would.
+    if (resolveProfileEmptyFirst > 0) {
+      resolveProfileEmptyFirst--;
+      return Friend(pubkey: key);
+    }
     for (final Friend friend in _follows) {
       if (friend.pubkey == key) {
         return friend;
@@ -275,6 +298,16 @@ class FakeSocialService implements SocialService {
   }
 
   @override
+  Stream<DecryptedPushEvent> get incomingPushes => _incomingPushes.stream;
+
+  /// Delivers a decrypted gift wrap the app received itself (tests).
+  void emitIncomingPush(DecryptedPushEvent event) {
+    if (!_incomingPushes.isClosed) {
+      _incomingPushes.add(event);
+    }
+  }
+
+  @override
   Future<void> stopWatching() async {}
 
   @override
@@ -296,6 +329,41 @@ class FakeSocialService implements SocialService {
     signedInWithKey = privateKey.trim();
     signedIn = true;
     _identityController.add(currentUserPubkey);
+  }
+
+  @override
+  Future<String?> signEvent({
+    required int kind,
+    required List<List<String>> tags,
+    String content = '',
+  }) async {
+    if (!signedIn) {
+      return null;
+    }
+    // A deterministic stand-in for a real signature, shaped like an event.
+    return jsonEncode(<String, Object?>{
+      'id': 'fake',
+      'pubkey': demoUserPubkey,
+      'kind': kind,
+      'tags': tags,
+      'content': content,
+      'sig': 'fake-signature',
+    });
+  }
+
+  @override
+  Future<DecryptedPushEvent?> decryptPushEvent(
+    String encryptedEventJson,
+  ) async {
+    final int? kind = decryptPushKind;
+    if (!signedIn || kind == null) {
+      return null;
+    }
+    return DecryptedPushEvent(
+      kind: kind,
+      content: decryptPushContent,
+      senderPubkey: decryptPushSender,
+    );
   }
 
   @override
@@ -351,6 +419,9 @@ class FakeSocialService implements SocialService {
     }
     if (!_incoming.isClosed) {
       unawaited(_incoming.close());
+    }
+    if (!_incomingPushes.isClosed) {
+      unawaited(_incomingPushes.close());
     }
   }
 }

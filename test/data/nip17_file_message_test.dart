@@ -56,6 +56,7 @@ void main() {
     final Nip01Event wrap = await senderNdk.giftWrap.toGiftWrap(
       rumor: rumor,
       recipientPubkey: friend.publicKey,
+      createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
     );
 
     final Nip01Event unwrapped = await friendNdk.giftWrap.fromGiftWrap(

@@ -62,6 +62,15 @@ more than 10 photo links are all dropped rather than trusted.
 
 ## Proposal 2 — Live location update (`kind: 20510`, inside a NIP-59 gift wrap)
 
+The same `20510` rumor is carried in one of **two** outer NIP-59 gift wraps:
+
+| Outer kind | Carries | Storage | Forwarded by the push server |
+|---|---|---|---|
+| `1059` (regular gift wrap) | session `start` and `stop` | stored by relays | **yes** — reaches a closed app as a push |
+| `21059` (ephemeral gift wrap) | position `update` (and any in-session refresh) | relays MUST NOT store it | no — live-only, received by a listening app |
+
+Splitting the two keeps the useful, low-volume events (a friend started / stopped sharing) deliverable while the app is closed, and keeps the high-volume position stream out of storage, out of the push fan-out, and free of the "old update surfaces late" problem.
+
 
 
 ### Tags (on the rumor)
@@ -79,14 +88,18 @@ A small, versioned JSON object (schema version `1`):
 | Field | Type | Meaning |
 |---|---|---|
 | `v` | int | Schema version (`1`) |
-| `t` | string | `"update"` or `"stop"` |
+| `t` | string | `"start"` (a session's first payload), `"update"` (a later position), or `"stop"` (the session ended early). A `start`/`stop` goes in a stored `1059` wrap, an `update` in an ephemeral `21059` wrap. |
 | `session` | string | Session id (≤ 64 chars); must match the `d` tag |
 | `at` | int | Unix **seconds** when the position was sampled |
 | `exp` | int | Unix **seconds** when the session ends on its own |
 | `lat`, `lon` | number | Position (float degrees); omitted on a `stop` |
 | `acc` | number | Optional accuracy in metres (`0`–`100000`) |
 | `hdg` | number | Optional heading in degrees (`0`–`360`) |
-| `name` | string | Optional sender display name (≤ 60 chars), so a recipient can label the pin without a profile lookup |
+
+The sender's **name and avatar are not in the payload**: a recipient resolves
+them from the sender's Nostr profile (`kind: 0`), exactly as it does for the
+friends list. The wire stays minimal, and an identity is always a real published
+profile rather than a self-asserted string.
 
 ### Example rumor (position update)
 
@@ -101,7 +114,7 @@ A small, versioned JSON object (schema version `1`):
     ["t", "openmaps-live-location"],
     ["d", "<session-id>"]
   ],
-  "content": "{\"v\":1,\"t\":\"update\",\"session\":\"<session-id>\",\"at\":1730000000,\"exp\":1730001800,\"lat\":52.52,\"lon\":13.405,\"acc\":9,\"hdg\":180,\"name\":\"Ada\"}"
+  "content": "{\"v\":1,\"t\":\"update\",\"session\":\"<session-id>\",\"at\":1730000000,\"exp\":1730001800,\"lat\":52.52,\"lon\":13.405,\"acc\":9,\"hdg\":180}"
 }
 ```
 
@@ -127,7 +140,9 @@ is what authenticates the sender.
 A `stop` may omit `lat`/`lon`; recipients drop the pin immediately instead of
 waiting for `exp`.
 
-### Example wire event (what a relay holds)
+### Example wire events (what a relay holds)
+
+A session **start** or **stop** is a **stored** gift wrap (`kind: 1059`):
 
 ```json
 {
@@ -143,19 +158,43 @@ waiting for `exp`.
 }
 ```
 
+A position **update** is an **ephemeral** gift wrap (`kind: 21059`); a relay
+must not store it, so it exists only for whoever is subscribed at that moment:
+
+```json
+{
+  "id": "<event-id>",
+  "pubkey": "<random-ephemeral-pubkey>",
+  "created_at": 1730000100,
+  "kind": 21059,
+  "tags": [
+    ["p", "<recipient-pubkey-1>"]
+  ],
+  "content": "<encrypted>",
+  "sig": "<signature>"
+}
+```
+
 One wrap is published **per recipient**, each with its own throwaway key, so two
 friends cannot correlate a share by the envelope's author.
 
 ### Subscribing
 
-A recipient subscribes with:
+A recipient subscribes to **both** outer kinds — the stored start/stop and the
+ephemeral updates:
 
 ```json
-{"kinds": [1059], "#p": ["<recipient-pubkey>"]}
+{"kinds": [1059, 21059], "#p": ["<recipient-pubkey>"]}
 ```
 
 and unwraps each result. Anything that is not a `20510` rumor, is not from a
 valid sender pubkey, or fails to decode is ignored.
+
+Separately, the **push server** watches only `1059` (never `21059`) and forwards
+the stored wraps to a registered device while the app is closed, so the app
+still learns a session started or stopped. It then pauses forwarding while the
+app is in the foreground, because the app already receives both kinds on its own
+live subscription.
 
 
 
@@ -172,7 +211,7 @@ These are standard, not proposals:
 | NIP-19 | `npub…`/`nsec…` bech32 keys (QR codes, sign-in) |
 | NIP-51 | **Friends set** — categorized people set `kind: 30000` named `friends`; the keys live in the NIP-44 encrypted content, so relays never learn who your friends are |
 | Profile metadata (`kind: 0`) | Friend names and avatars |
-| NIP-44 + NIP-59 | Encryption and gift wrap used by live share and DMs |
+| NIP-44 + NIP-59 | Encryption and gift wrap used by live share and DMs; the live-share **updates** use the ephemeral gift wrap `kind: 21059`, which relays do not store |
 | NIP-17 | Private, gift-wrapped direct messages between friends (message rumor `kind: 14`, DM relay list `kind: 10050`) |
 | NIP-17 file messages (`kind: 15`, AES-256-GCM) | In-app feedback: the screenshot is encrypted (fresh key + nonce, the Amethyst convention) before it is uploaded to Blossom and sent as a gift-wrapped file message |
 | Blossom (BUD-02) | Photo uploads for reviews; `kind: 24242` auth event |

@@ -97,7 +97,7 @@ void main() {
     expect(state.expiresAt, isNotNull);
 
     expect(social.published, hasLength(1));
-    expect(social.published.single.kind, LiveShareBroadcastKind.update);
+    expect(social.published.single.kind, LiveShareBroadcastKind.start);
     expect(social.published.single.position, berlin.position);
     expect(social.publishedRecipients.single, <String>[friends.first.pubkey]);
 
@@ -340,5 +340,89 @@ void main() {
     await pumpEventQueue();
 
     expect(c.read(friendLocationsProvider), isEmpty);
+  });
+
+  test('a failed profile lookup is retried on the next update', () async {
+    final ProviderContainer c = await build();
+    final ProviderSubscription<List<FriendLocation>> sub = c.listen(
+      friendLocationsProvider,
+      (List<FriendLocation>? _, List<FriendLocation> _) {},
+    );
+    addTearDown(sub.close);
+    await pumpEventQueue();
+
+    // A key that is neither a demo friend, a following, nor the demo user.
+    const String stranger =
+        '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+    final DateTime now = DateTime.now();
+    social.resolveProfileEmptyFirst = 1;
+
+    social.emit(
+      FriendLocation(
+        pubkey: stranger,
+        position: const LatLon(52.52, 13.4),
+        updatedAt: now,
+        expiresAt: now.add(const Duration(minutes: 30)),
+      ),
+    );
+    await pumpEventQueue();
+    expect(
+      c.read(friendLocationsProvider).single.displayName,
+      isNull,
+      reason: 'the first lookup came back empty',
+    );
+
+    // A later update retries and the name resolves.
+    social.emit(
+      FriendLocation(
+        pubkey: stranger,
+        position: const LatLon(52.521, 13.401),
+        updatedAt: now.add(const Duration(seconds: 30)),
+        expiresAt: now.add(const Duration(minutes: 30)),
+      ),
+    );
+    await pumpEventQueue();
+    final FriendLocation resolved = c.read(friendLocationsProvider).single;
+    expect(resolved.displayName, isNotNull);
+    expect(resolved.label, isNot(contains('…')));
+  });
+
+  test('a resolved name survives later position updates', () async {
+    final ProviderContainer c = await build();
+    final ProviderSubscription<List<FriendLocation>> sub = c.listen(
+      friendLocationsProvider,
+      (List<FriendLocation>? _, List<FriendLocation> _) {},
+    );
+    addTearDown(sub.close);
+    await pumpEventQueue();
+
+    const String stranger =
+        '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+    final DateTime now = DateTime.now();
+
+    social.emit(
+      FriendLocation(
+        pubkey: stranger,
+        position: const LatLon(52.52, 13.4),
+        updatedAt: now,
+        expiresAt: now.add(const Duration(minutes: 30)),
+      ),
+    );
+    await pumpEventQueue();
+    expect(c.read(friendLocationsProvider).single.displayName, isNotNull);
+
+    // Even if a later lookup fails, the already-resolved profile must not be
+    // thrown away by the incoming position update.
+    social.resolveProfileEmptyFirst = 5;
+    social.emit(
+      FriendLocation(
+        pubkey: stranger,
+        position: const LatLon(52.53, 13.41),
+        updatedAt: now.add(const Duration(seconds: 30)),
+        expiresAt: now.add(const Duration(minutes: 30)),
+      ),
+    );
+    await pumpEventQueue();
+    expect(c.read(friendLocationsProvider).single.displayName, isNotNull);
   });
 }

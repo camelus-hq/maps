@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:ndk/entities.dart' show RelayBroadcastResponse;
 import 'package:ndk/ndk.dart';
@@ -9,16 +10,24 @@ import '../../core/errors/app_exception.dart';
 import '../../domain/entities/friend.dart';
 import '../../domain/entities/friend_location.dart';
 import '../../domain/entities/live_share.dart';
+import '../../domain/entities/push.dart';
 import '../../domain/ports/social_service.dart';
 import 'live_location_payload.dart';
+import 'live_share_wire.dart';
 
 /// [SocialService] backed by Nostr through the NDK client.
 ///
 /// Live shares are published as NIP-59 gift wraps: the location payload is
-/// sealed (kind 13) under the sender's identity and then wrapped (kind 1059)
-/// with a fresh, throwaway key pair for each recipient. A relay therefore sees
-/// only an opaque envelope addressed to the recipient — the sender, the content
-/// and the coordinates are all encrypted end to end.
+/// sealed (kind 13) under the sender's identity and then wrapped with a fresh,
+/// throwaway key pair for each recipient. A relay therefore sees only an opaque
+/// envelope addressed to the recipient — the sender, the content and the
+/// coordinates are all encrypted end to end.
+///
+/// A session **start** and **stop** are stored wraps (kind 1059) so the push
+/// server can forward them while the app is closed; the recurring position
+/// **updates** are ephemeral wraps (kind 21059) that relays do not store and
+/// the server never forwards — they reach only a listening app. The
+/// wire-level mapping lives in `live_share_wire.dart`.
 class NdkSocialService implements SocialService {
   NdkSocialService({
     required this.ndk,
@@ -51,6 +60,9 @@ class NdkSocialService implements SocialService {
 
   final StreamController<FriendLocation> _incoming =
       StreamController<FriendLocation>.broadcast();
+
+  final StreamController<DecryptedPushEvent> _incomingPushes =
+      StreamController<DecryptedPushEvent>.broadcast();
 
   NdkResponse? _subscription;
   StreamSubscription<Nip01Event>? _subscriptionSub;
@@ -424,6 +436,10 @@ class NdkSocialService implements SocialService {
         final Nip01Event wrap = await ndk.giftWrap.toGiftWrap(
           rumor: rumor,
           recipientPubkey: recipient,
+          // Start/stop are stored wraps (1059) so the push server can forward
+          // them; the position updates are ephemeral (21059) and live-only.
+          ephemeral: isEphemeralLiveShare(broadcast.kind),
+          createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
         );
         final List<RelayBroadcastResponse> responses = await ndk.broadcast
             .broadcast(
@@ -471,6 +487,9 @@ class NdkSocialService implements SocialService {
   }
 
   @override
+  Stream<DecryptedPushEvent> get incomingPushes => _incomingPushes.stream;
+
+  @override
   Future<void> stopWatching() async {
     _subscribedFor = null;
     _closeSubscription();
@@ -500,6 +519,56 @@ class NdkSocialService implements SocialService {
         'messages set up yet.',
         cause: error,
       );
+    }
+  }
+
+  @override
+  Future<String?> signEvent({
+    required int kind,
+    required List<List<String>> tags,
+    String content = '',
+  }) async {
+    final Account? account = ndk.accounts.getLoggedAccount();
+    if (account == null) {
+      return null;
+    }
+    try {
+      final Nip01Event event = Nip01Event(
+        pubKey: account.pubkey,
+        kind: kind,
+        tags: tags,
+        content: content,
+      );
+      final Nip01Event signed = await account.signer.sign(event);
+      return Nip01EventModel.fromEntity(signed).toJsonString();
+    } catch (error) {
+      throw NetworkException('Could not sign the request', cause: error);
+    }
+  }
+
+  @override
+  Future<DecryptedPushEvent?> decryptPushEvent(
+    String encryptedEventJson,
+  ) async {
+    if (!isLoggedIn) {
+      return null;
+    }
+    try {
+      final Object? decoded = jsonDecode(encryptedEventJson);
+      if (decoded is! Map<String, dynamic>) {
+        return null;
+      }
+      final Nip01Event rumor = await ndk.giftWrap.fromGiftWrap(
+        giftWrap: Nip01EventModel.fromJson(decoded),
+      );
+      return DecryptedPushEvent(
+        kind: rumor.kind,
+        content: rumor.content,
+        senderPubkey: rumor.pubKey,
+      );
+    } catch (_) {
+      // A malformed or unrelated wrap is not a notification.
+      return null;
     }
   }
 
@@ -552,6 +621,7 @@ class NdkSocialService implements SocialService {
     _disposed = true;
     _closeSubscription();
     await _incoming.close();
+    await _incomingPushes.close();
   }
 
   void _openSubscription(String me) {
@@ -560,9 +630,11 @@ class NdkSocialService implements SocialService {
     try {
       final NdkResponse response = ndk.requests.subscription(
         name: 'openmaps-live-location',
-        filter: Filter(
-          kinds: <int>[GiftWrap.kGiftWrapEventkind],
-          pTags: <String>[me],
+        // Live-only: see [liveLocationFilter] — a relay must not replay the gift
+        // wraps it has already stored.
+        filter: liveLocationFilter(
+          me,
+          since: (DateTime.now().millisecondsSinceEpoch ~/ 1000) - 1,
         ),
         explicitRelays: _relays.isEmpty ? null : _relays,
         desiredCoverage: _relays.isEmpty ? null : _relays.length,
@@ -603,16 +675,28 @@ class NdkSocialService implements SocialService {
   }
 
   Future<void> _onWrapped(Nip01Event event) async {
-    if (_disposed || event.kind != GiftWrap.kGiftWrapEventkind) {
+    if (_disposed || !GiftWrap.isGiftWrapKind(event.kind)) {
       return;
     }
     try {
       final Nip01Event rumor = await ndk.giftWrap.fromGiftWrap(giftWrap: event);
-      if (rumor.kind != LiveLocationPayload.rumorKind) {
-        return;
-      }
       final String sender = rumor.pubKey.trim().toLowerCase();
       if (!_hexPubkey.hasMatch(sender) || sender == currentUserPubkey) {
+        return;
+      }
+      // The app is receiving this gift wrap itself; surface it so a live-share
+      // start or a direct message can still raise a notification while the
+      // server is paused.
+      if (!_incomingPushes.isClosed) {
+        _incomingPushes.add(
+          DecryptedPushEvent(
+            kind: rumor.kind,
+            content: rumor.content,
+            senderPubkey: sender,
+          ),
+        );
+      }
+      if (rumor.kind != LiveLocationPayload.rumorKind) {
         return;
       }
       final LiveLocationPayload? payload = LiveLocationPayload.decode(
@@ -631,7 +715,6 @@ class NdkSocialService implements SocialService {
             ended: payload.isStop,
             accuracyMeters: payload.accuracyMeters,
             heading: payload.heading,
-            displayName: payload.displayName,
             sessionId: payload.sessionId,
           ),
         );

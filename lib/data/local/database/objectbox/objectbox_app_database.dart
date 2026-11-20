@@ -18,13 +18,22 @@ import 'objectbox_entities.dart';
 /// Pass [directory] to point at a specific store path; `memory:…` opens a
 /// file-less in-memory store (used by tests).
 class ObjectBoxAppDatabase implements AppDatabase {
-  ObjectBoxAppDatabase({this.directory, this.storeName = 'openmaps-db'});
+  ObjectBoxAppDatabase({
+    this.directory,
+    this.storeName = 'openmaps-db',
+    this.attach = false,
+  });
 
   /// Explicit store directory, or `null` to use the app documents directory.
   final String? directory;
 
   /// Subdirectory of the app documents directory when [directory] is `null`.
   final String storeName;
+
+  /// When true, prefer `Store.attach` to the store the UI isolate already has
+  /// open, falling back to a normal open when the app is not running. Used by
+  /// the push background isolate (see `openAppDatabaseAttached`).
+  final bool attach;
 
   Store? _store;
 
@@ -50,7 +59,20 @@ class ObjectBoxAppDatabase implements AppDatabase {
     if (_store != null) {
       return;
     }
-    final Store store = await openStore(directory: await _resolveDirectory());
+    final String path = await _resolveDirectory();
+    if (attach) {
+      // Prefer attaching to the store the UI isolate already has open (the push
+      // background isolate runs while the app is alive). If the app is not
+      // running — a push cold-start — this throws and we open normally instead.
+      try {
+        _store = Store.attach(getObjectBoxModel(), path);
+        // The owning isolate already ran the migrations.
+        return;
+      } catch (_) {
+        // Fall through to a normal open below.
+      }
+    }
+    final Store store = await openStore(directory: path);
     _store = store;
     await runAppDatabaseMigrations(this);
   }

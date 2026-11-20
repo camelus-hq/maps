@@ -10,6 +10,7 @@ import '../../../domain/entities/route.dart';
 import '../../../domain/entities/transit.dart';
 import '../../../domain/entities/travel_mode.dart';
 import '../../../state/commands/commands_provider.dart';
+import '../../../state/ports.dart';
 import '../../../state/route.dart';
 import '../../../state/settings.dart';
 import '../../common/error_text.dart';
@@ -219,6 +220,7 @@ class DirectionsSheet extends ConsumerWidget {
         if (selected == null) {
           return const SizedBox.shrink();
         }
+        final DateTime now = ref.read(nowProvider)();
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
@@ -228,7 +230,7 @@ class DirectionsSheet extends ConsumerWidget {
               style: PlayType.subtitle.copyWith(color: colors.ink),
             ),
             Text(
-              'Arrives ${_arrivalLabel(context, selected.duration)}',
+              'Arrives ${_arrivalLabel(context, selected.duration, now)}',
               style: PlayType.caption.copyWith(color: colors.inkMuted),
             ),
             if (state.routes.length > 1) ...<Widget>[
@@ -299,9 +301,13 @@ class DirectionsSheet extends ConsumerWidget {
       };
 
   /// The projected arrival clock time, localised (respects 12/24-hour setting).
-  static String _arrivalLabel(BuildContext context, Duration duration) {
+  static String _arrivalLabel(
+    BuildContext context,
+    Duration duration,
+    DateTime now,
+  ) {
     return _clockLabel(
-      DateTime.now().add(duration),
+      now.add(duration),
       use24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context),
     );
   }

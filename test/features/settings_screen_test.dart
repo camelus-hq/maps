@@ -10,6 +10,7 @@ import 'package:openmaps/data/fakes/fake_release_source.dart';
 import 'package:openmaps/data/fakes/fake_social_service.dart';
 import 'package:openmaps/domain/entities/app_settings.dart';
 import 'package:openmaps/domain/entities/app_update.dart';
+import 'package:openmaps/domain/entities/push.dart';
 import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/settings/screens/settings_screen.dart';
 import 'package:openmaps/state/ports.dart';
@@ -365,5 +366,34 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('first change'), findsOneWidget);
     expect(find.textContaining('+2 more'), findsOneWidget);
+  });
+
+  testWidgets('the notifications setting offers Firebase and Off only', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: SettingsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      container.read(settingsProvider).pushTransport,
+      PushTransport.firebase,
+    );
+
+    await tester.scrollUntilVisible(find.text('Firebase'), 300);
+    await tester.pumpAndSettle();
+    expect(find.text('Firebase'), findsOneWidget);
+    expect(find.text('UnifiedPush'), findsNothing);
+
+    await tester.tap(find.text('Off').first);
+    await tester.pumpAndSettle();
+    expect(container.read(settingsProvider).pushTransport, PushTransport.off);
   });
 }

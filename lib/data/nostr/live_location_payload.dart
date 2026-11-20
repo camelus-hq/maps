@@ -5,6 +5,16 @@ import '../../domain/entities/live_share.dart';
 
 /// Wire codec for the live-location "rumor" carried inside a NIP-59 gift wrap.
 ///
+/// The rumor kind ([rumorKind]) is the same for every message; the **outer**
+/// wrap differs: a session start/stop travels in a stored wrap (kind `1059`)
+/// the push server forwards, while a position update travels in an ephemeral
+/// wrap (kind `21059`) that relays do not store and the server never forwards.
+///
+/// The payload carries **only the share** — position, timing, heading. The
+/// sender's name and avatar are deliberately **not** in it: a recipient resolves
+/// them from the sender's Nostr profile (`kind: 0`), so the wire stays minimal
+/// and an identity is always a real published profile.
+///
 /// No standard NIP covers live location yet, so this is our own small,
 /// versioned JSON schema. Decoding is **hostile safe**: a truncated, oversized,
 /// mistyped or out-of-range payload returns `null` instead of throwing, so a
@@ -13,13 +23,13 @@ import '../../domain/entities/live_share.dart';
 class LiveLocationPayload {
   const LiveLocationPayload({
     required this.isStop,
+    required this.isStart,
     required this.sessionId,
     required this.position,
     required this.sampledAt,
     required this.expiresAt,
     this.accuracyMeters,
     this.heading,
-    this.displayName,
   });
 
   /// Schema version this codec speaks.
@@ -34,17 +44,21 @@ class LiveLocationPayload {
   /// Tag carrying the session id.
   static const String sessionTag = 'session';
 
+  static const String _typeStart = 'start';
   static const String _typeUpdate = 'update';
   static const String _typeStop = 'stop';
 
   static const int _maxSessionIdLength = 64;
-  static const int _maxNameLength = 60;
   static const double _maxAccuracyMeters = 100000;
   static const Duration _maxLifetime = Duration(hours: 12);
   static const Duration _maxClockSkew = Duration(minutes: 5);
 
   /// Whether this payload ends the session instead of updating it.
   final bool isStop;
+
+  /// Whether this payload is the session's **first** one (a friend just started
+  /// sharing). Only a start is worth a notification.
+  final bool isStart;
 
   /// The share session this payload belongs to.
   final String sessionId;
@@ -60,17 +74,17 @@ class LiveLocationPayload {
 
   final double? accuracyMeters;
   final double? heading;
-  final String? displayName;
 
   /// Encodes [broadcast] for the wire.
   static String encode(LiveShareBroadcast broadcast) {
     final LatLon? position = broadcast.position;
-    final String? name = broadcast.displayName?.trim();
     return jsonEncode(<String, Object?>{
       'v': version,
-      't': broadcast.kind == LiveShareBroadcastKind.stop
-          ? _typeStop
-          : _typeUpdate,
+      't': switch (broadcast.kind) {
+        LiveShareBroadcastKind.stop => _typeStop,
+        LiveShareBroadcastKind.start => _typeStart,
+        LiveShareBroadcastKind.update => _typeUpdate,
+      },
       'session': broadcast.sessionId,
       'at': broadcast.sampledAt.millisecondsSinceEpoch ~/ 1000,
       'exp': broadcast.expiresAt.millisecondsSinceEpoch ~/ 1000,
@@ -78,10 +92,6 @@ class LiveLocationPayload {
       if (position != null) 'lon': position.longitude,
       if (broadcast.accuracyMeters != null) 'acc': broadcast.accuracyMeters,
       if (broadcast.heading != null) 'hdg': broadcast.heading,
-      if (name != null && name.isNotEmpty)
-        'name': name.length > _maxNameLength
-            ? name.substring(0, _maxNameLength)
-            : name,
     });
   }
 
@@ -106,7 +116,8 @@ class LiveLocationPayload {
     }
     final Object? type = decoded['t'];
     final bool isStop = type == _typeStop;
-    if (!isStop && type != _typeUpdate) {
+    final bool isStart = type == _typeStart;
+    if (!isStop && !isStart && type != _typeUpdate) {
       return null;
     }
     final String? sessionId = _asBoundedString(
@@ -151,16 +162,15 @@ class LiveLocationPayload {
       max: _maxAccuracyMeters,
     );
     final double? heading = _asBoundedDouble(decoded['hdg'], min: 0, max: 360);
-    final String? name = _asBoundedString(decoded['name'], _maxNameLength);
     return LiveLocationPayload(
       isStop: isStop,
+      isStart: isStart,
       sessionId: sessionId,
       position: position,
       sampledAt: sampledAt,
       expiresAt: expiresAt,
       accuracyMeters: accuracy,
       heading: heading,
-      displayName: name,
     );
   }
 
@@ -168,13 +178,16 @@ class LiveLocationPayload {
   /// for tests and the fake service).
   LiveShareBroadcast toBroadcast() => LiveShareBroadcast(
     sessionId: sessionId,
-    kind: isStop ? LiveShareBroadcastKind.stop : LiveShareBroadcastKind.update,
+    kind: isStop
+        ? LiveShareBroadcastKind.stop
+        : (isStart
+              ? LiveShareBroadcastKind.start
+              : LiveShareBroadcastKind.update),
     position: position,
     sampledAt: sampledAt,
     expiresAt: expiresAt,
     accuracyMeters: accuracyMeters,
     heading: heading,
-    displayName: displayName,
   );
 
   static int? _asInt(Object? value) => switch (value) {
