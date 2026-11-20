@@ -85,6 +85,19 @@ class PushRelay {
         }
       case 'NOTICE':
         _error.add('relay notice: ${decoded.length > 1 ? decoded[1] : ''}');
+      case 'CLOSED':
+        // A relay refusing the subscription (most often `auth-required` on a
+        // `#p` filter) means it will forward nothing; surface it so the
+        // operator can move the forwarder to a relay it may read.
+        _error.add(
+          'subscription closed by relay: '
+          '${decoded.length > 2 ? decoded[2] : 'no reason given'}',
+        );
+      case 'AUTH':
+        _error.add(
+          'relay demands NIP-42 auth; the forwarder holds no user keys and '
+          'cannot read an auth-gated #p filter here',
+        );
     }
   }
 

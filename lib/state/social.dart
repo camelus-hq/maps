@@ -120,8 +120,18 @@ final Provider<Map<String, Friend>> friendsByPubkeyProvider =
 
 /// The friends currently sharing their live location with us.
 class FriendLocationsController extends Notifier<List<FriendLocation>> {
+  /// Stop retrying a sender that never resolves a profile.
+  static const int _maxMetaAttempts = 5;
+
   final Map<String, FriendLocation> _byPubkey = <String, FriendLocation>{};
-  final Set<String> _metaRequested = <String>{};
+
+  /// How many profile lookups each sender has used, and which resolved `updatedAt`
+  /// was last attempted, so a failed lookup is retried on a later update instead
+  /// of never (the old one-shot behaviour left the pin labelled with the raw
+  /// pubkey for the whole session).
+  final Map<String, int> _metaAttempts = <String, int>{};
+  final Map<String, DateTime> _metaAttemptedUpdatedAt = <String, DateTime>{};
+  final Set<String> _metaInFlight = <String>{};
   StreamSubscription<FriendLocation>? _sub;
   Timer? _prune;
 
@@ -148,8 +158,16 @@ class FriendLocationsController extends Notifier<List<FriendLocation>> {
   void _onLocation(FriendLocation location) {
     if (location.ended) {
       _byPubkey.remove(location.pubkey);
+      _forgetMeta(location.pubkey);
     } else {
-      _byPubkey[location.pubkey] = location;
+      // Preserve a name/avatar already resolved for this sender: a later
+      // position update must not throw the resolved profile away (that would
+      // make the pin flip back to the raw pubkey between updates).
+      final FriendLocation? previous = _byPubkey[location.pubkey];
+      _byPubkey[location.pubkey] = location.copyWithMeta(
+        displayName: location.displayName ?? previous?.displayName,
+        pictureUrl: location.pictureUrl ?? previous?.pictureUrl,
+      );
     }
     _syncPruneTimer();
     _emit();
@@ -158,17 +176,35 @@ class FriendLocationsController extends Notifier<List<FriendLocation>> {
     }
   }
 
-  /// Fetches a sender's profile once per session so their pin shows a name and
-  /// avatar even when they are not in the friends list.
+  /// Fetches a sender's profile so their pin shows a name and avatar even when
+  /// they are not in the friends list.
+  ///
+  /// Retried on each new position update (up to [_maxMetaAttempts]) while the
+  /// name or avatar is still missing, because the first lookup often races the
+  /// relay connection, and a payload from an older client may not carry the
+  /// sender's name at all.
   Future<void> _resolveMeta(String pubkey) async {
-    if (!_metaRequested.add(pubkey)) {
-      return;
-    }
     final FriendLocation? current = _byPubkey[pubkey];
     if (current == null ||
         (current.displayName != null && current.pictureUrl != null)) {
       return;
     }
+    if (_metaInFlight.contains(pubkey)) {
+      return;
+    }
+    // One attempt per distinct position update, so a re-emit of the same sample
+    // does not spend the budget.
+    final DateTime? attempted = _metaAttemptedUpdatedAt[pubkey];
+    if (attempted != null && !current.updatedAt.isAfter(attempted)) {
+      return;
+    }
+    final int attempts = _metaAttempts[pubkey] ?? 0;
+    if (attempts >= _maxMetaAttempts) {
+      return;
+    }
+    _metaInFlight.add(pubkey);
+    _metaAttemptedUpdatedAt[pubkey] = current.updatedAt;
+    _metaAttempts[pubkey] = attempts + 1;
     try {
       final Friend profile = await ref
           .read(socialServiceProvider)
@@ -177,14 +213,28 @@ class FriendLocationsController extends Notifier<List<FriendLocation>> {
       if (latest == null) {
         return;
       }
+      if (profile.displayName == null && profile.pictureUrl == null) {
+        // Nothing resolved (or the sender has no profile); retry on a later
+        // update unless the attempt budget is spent.
+        return;
+      }
       _byPubkey[pubkey] = latest.copyWithMeta(
         displayName: profile.displayName,
         pictureUrl: profile.pictureUrl,
       );
       _emit();
     } catch (_) {
-      // A missing profile just means the pin keeps its key/id.
+      // A missing profile just means the pin keeps its key/id; a later update
+      // retries.
+    } finally {
+      _metaInFlight.remove(pubkey);
     }
+  }
+
+  void _forgetMeta(String pubkey) {
+    _metaAttempts.remove(pubkey);
+    _metaAttemptedUpdatedAt.remove(pubkey);
+    _metaInFlight.remove(pubkey);
   }
 
   /// Expires shares that stop updating even when no new events arrive.
@@ -203,9 +253,17 @@ class FriendLocationsController extends Notifier<List<FriendLocation>> {
   void _pruneNow() {
     final DateTime now = DateTime.now();
     final int before = _byPubkey.length;
-    _byPubkey.removeWhere((String _, FriendLocation location) {
-      return !location.isLiveAt(now);
+    final List<String> removed = <String>[];
+    _byPubkey.removeWhere((String pubkey, FriendLocation location) {
+      final bool stale = !location.isLiveAt(now);
+      if (stale) {
+        removed.add(pubkey);
+      }
+      return stale;
     });
+    for (final String pubkey in removed) {
+      _forgetMeta(pubkey);
+    }
     if (_byPubkey.length != before) {
       _syncPruneTimer();
       _emit();

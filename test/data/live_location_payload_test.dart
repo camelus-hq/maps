@@ -10,20 +10,18 @@ import 'package:openmaps/domain/entities/live_share.dart';
 void main() {
   final DateTime now = DateTime.now();
 
-  LiveShareBroadcast update({LatLon? position, String? name}) =>
-      LiveShareBroadcast(
-        sessionId: 'session-1',
-        kind: LiveShareBroadcastKind.update,
-        position: position ?? const LatLon(52.52, 13.405),
-        sampledAt: now,
-        expiresAt: now.add(const Duration(hours: 1)),
-        accuracyMeters: 12.5,
-        heading: 90,
-        displayName: name,
-      );
+  LiveShareBroadcast update({LatLon? position}) => LiveShareBroadcast(
+    sessionId: 'session-1',
+    kind: LiveShareBroadcastKind.update,
+    position: position ?? const LatLon(52.52, 13.405),
+    sampledAt: now,
+    expiresAt: now.add(const Duration(hours: 1)),
+    accuracyMeters: 12.5,
+    heading: 90,
+  );
 
   test('round-trips an update', () {
-    final String encoded = LiveLocationPayload.encode(update(name: 'Mira'));
+    final String encoded = LiveLocationPayload.encode(update());
     final LiveLocationPayload? decoded = LiveLocationPayload.decode(encoded);
     expect(decoded, isNotNull);
     expect(decoded!.isStop, isFalse);
@@ -31,7 +29,6 @@ void main() {
     expect(decoded.position, const LatLon(52.52, 13.405));
     expect(decoded.accuracyMeters, 12.5);
     expect(decoded.heading, 90);
-    expect(decoded.displayName, 'Mira');
     expect(
       decoded.expiresAt.millisecondsSinceEpoch ~/ 1000,
       (now.add(const Duration(hours: 1))).millisecondsSinceEpoch ~/ 1000,
@@ -193,13 +190,14 @@ void main() {
     raw['session'] = 'x' * 1000;
     expect(LiveLocationPayload.decode(raw), isNull);
 
-    final Map<String, Object?> longName = jsonDecode(
+    // A name/avatar in the payload is no longer part of the schema; schema
+    // drift must still decode (the recipient resolves them from the profile).
+    final Map<String, Object?> legacy = jsonDecode(
       LiveLocationPayload.encode(update()),
     ) as Map<String, Object?>;
-    longName['name'] = 'n' * 500;
-    final LiveLocationPayload? decoded = LiveLocationPayload.decode(longName);
-    expect(decoded, isNotNull);
-    expect(decoded!.displayName, isNull);
+    legacy['name'] = 'n' * 500;
+    legacy['pic'] = 'javascript:alert(1)';
+    expect(LiveLocationPayload.decode(legacy), isNotNull);
 
     final Map<String, Object?> badAccuracy = jsonDecode(
       LiveLocationPayload.encode(update()),
@@ -214,7 +212,7 @@ void main() {
 
   test('a decoded update can be re-encoded (round trip through broadcast)', () {
     final LiveLocationPayload decoded = LiveLocationPayload.decode(
-      LiveLocationPayload.encode(update(name: 'Timo')),
+      LiveLocationPayload.encode(update()),
     )!;
     final LiveLocationPayload again = LiveLocationPayload.decode(
       LiveLocationPayload.encode(decoded.toBroadcast()),
@@ -222,6 +220,5 @@ void main() {
     expect(again.sessionId, decoded.sessionId);
     expect(again.position, decoded.position);
     expect(again.isStop, decoded.isStop);
-    expect(again.displayName, 'Timo');
   });
 }

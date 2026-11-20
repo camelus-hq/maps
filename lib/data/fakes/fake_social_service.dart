@@ -121,6 +121,13 @@ class FakeSocialService implements SocialService {
   /// The public key [signInWithPrivateKey] was called with.
   String? signedInWithKey;
 
+  /// How many times [resolveProfile] has been called (retry tests).
+  int resolveProfileCalls = 0;
+
+  /// When > 0, the next that-many [resolveProfile] calls return a bare key with
+  /// no name or picture, standing in for a transient relay failure.
+  int resolveProfileEmptyFirst = 0;
+
   /// When set, calls to [publishLiveShare] throw it (tests).
   AppException? publishError;
 
@@ -211,6 +218,13 @@ class FakeSocialService implements SocialService {
   @override
   Future<Friend> resolveProfile(String pubkey) async {
     final String key = _validatePubkey(pubkey);
+    resolveProfileCalls++;
+    // Exercise the retry path: the first N lookups come back without a name or
+    // picture, as a transient relay failure would.
+    if (resolveProfileEmptyFirst > 0) {
+      resolveProfileEmptyFirst--;
+      return Friend(pubkey: key);
+    }
     for (final Friend friend in _follows) {
       if (friend.pubkey == key) {
         return friend;

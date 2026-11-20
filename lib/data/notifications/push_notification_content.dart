@@ -52,7 +52,7 @@ class PushNotificationContent {
       }
       return PushNotificationContent(
         id: _id(senderPubkey, kind, share.sessionId),
-        title: _displayName(share.displayName, senderName, senderPubkey),
+        title: _displayName(senderName, senderPubkey),
         body: 'is sharing their location with you',
         payload: jsonEncode(<String, Object?>{
           'kind': kind,
@@ -70,7 +70,7 @@ class PushNotificationContent {
       }
       return PushNotificationContent(
         id: _id(senderPubkey, kind, null),
-        title: _displayName(null, senderName, senderPubkey),
+        title: _displayName(senderName, senderPubkey),
         body: text,
         payload: jsonEncode(<String, Object?>{
           'kind': kind,
@@ -83,16 +83,10 @@ class PushNotificationContent {
     return null;
   }
 
-  static String _displayName(
-    String? fromPayload,
-    String? fromProfile,
-    String pubkey,
-  ) {
-    for (final String? candidate in <String?>[fromPayload, fromProfile]) {
-      final String trimmed = candidate?.trim() ?? '';
-      if (trimmed.isNotEmpty) {
-        return trimmed.length > 40 ? '${trimmed.substring(0, 40)}…' : trimmed;
-      }
+  static String _displayName(String? senderName, String pubkey) {
+    final String trimmed = senderName?.trim() ?? '';
+    if (trimmed.isNotEmpty) {
+      return trimmed.length > 40 ? '${trimmed.substring(0, 40)}…' : trimmed;
     }
     return _shortKey(pubkey);
   }

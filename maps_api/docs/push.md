@@ -20,7 +20,11 @@ message.
 
 * **Listens** on the bootstrap relays plus every relay a client registers on,
   with a `#p` filter for exactly the registered public keys (`buildPushFilters`),
-  so it never receives the relay's whole gift-wrap firehose.
+  so it never receives the relay's whole gift-wrap firehose. The relays must
+  serve `#p`-filtered `1059` reads to an **unauthenticated** client: the
+  forwarder holds no user keys, so a relay that requires the addressee's NIP-42
+  auth (e.g. `relay.map.camelus.app`) closes the subscription with
+  `auth-required` and forwards nothing from there — the forwarder logs that.
 * **Filters** each event by the recipient's registered outer kinds, and drops
   hellthreads (more than `maxPubkeyPerEvent` `p` tags).
 * **Forwards** a gift wrap (`kind 1059`) **unchanged** — the server cannot read

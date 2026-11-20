@@ -9,7 +9,6 @@ const String _sender =
 
 LiveShareBroadcast _share({
   LiveShareBroadcastKind kind = LiveShareBroadcastKind.start,
-  String? name = 'Mira',
 }) {
   final DateTime now = DateTime.now();
   return LiveShareBroadcast(
@@ -18,7 +17,6 @@ LiveShareBroadcast _share({
     position: const LatLon(52.52, 13.405),
     sampledAt: now,
     expiresAt: now.add(const Duration(minutes: 30)),
-    displayName: name,
   );
 }
 
@@ -30,6 +28,7 @@ void main() {
             kind: LiveLocationPayload.rumorKind,
             content: LiveLocationPayload.encode(_share()),
             senderPubkey: _sender,
+            senderName: 'Mira',
           );
 
       expect(content, isNotNull);
@@ -92,7 +91,7 @@ void main() {
       final PushNotificationContent? content =
           PushNotificationContent.fromDecryptedEvent(
             kind: LiveLocationPayload.rumorKind,
-            content: LiveLocationPayload.encode(_share(name: null)),
+            content: LiveLocationPayload.encode(_share()),
             senderPubkey: _sender,
           );
 

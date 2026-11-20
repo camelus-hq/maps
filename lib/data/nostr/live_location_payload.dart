@@ -10,6 +10,11 @@ import '../../domain/entities/live_share.dart';
 /// the push server forwards, while a position update travels in an ephemeral
 /// wrap (kind `21059`) that relays do not store and the server never forwards.
 ///
+/// The payload carries **only the share** — position, timing, heading. The
+/// sender's name and avatar are deliberately **not** in it: a recipient resolves
+/// them from the sender's Nostr profile (`kind: 0`), so the wire stays minimal
+/// and an identity is always a real published profile.
+///
 /// No standard NIP covers live location yet, so this is our own small,
 /// versioned JSON schema. Decoding is **hostile safe**: a truncated, oversized,
 /// mistyped or out-of-range payload returns `null` instead of throwing, so a
@@ -25,7 +30,6 @@ class LiveLocationPayload {
     required this.expiresAt,
     this.accuracyMeters,
     this.heading,
-    this.displayName,
   });
 
   /// Schema version this codec speaks.
@@ -45,7 +49,6 @@ class LiveLocationPayload {
   static const String _typeStop = 'stop';
 
   static const int _maxSessionIdLength = 64;
-  static const int _maxNameLength = 60;
   static const double _maxAccuracyMeters = 100000;
   static const Duration _maxLifetime = Duration(hours: 12);
   static const Duration _maxClockSkew = Duration(minutes: 5);
@@ -71,12 +74,10 @@ class LiveLocationPayload {
 
   final double? accuracyMeters;
   final double? heading;
-  final String? displayName;
 
   /// Encodes [broadcast] for the wire.
   static String encode(LiveShareBroadcast broadcast) {
     final LatLon? position = broadcast.position;
-    final String? name = broadcast.displayName?.trim();
     return jsonEncode(<String, Object?>{
       'v': version,
       't': switch (broadcast.kind) {
@@ -91,10 +92,6 @@ class LiveLocationPayload {
       if (position != null) 'lon': position.longitude,
       if (broadcast.accuracyMeters != null) 'acc': broadcast.accuracyMeters,
       if (broadcast.heading != null) 'hdg': broadcast.heading,
-      if (name != null && name.isNotEmpty)
-        'name': name.length > _maxNameLength
-            ? name.substring(0, _maxNameLength)
-            : name,
     });
   }
 
@@ -165,7 +162,6 @@ class LiveLocationPayload {
       max: _maxAccuracyMeters,
     );
     final double? heading = _asBoundedDouble(decoded['hdg'], min: 0, max: 360);
-    final String? name = _asBoundedString(decoded['name'], _maxNameLength);
     return LiveLocationPayload(
       isStop: isStop,
       isStart: isStart,
@@ -175,7 +171,6 @@ class LiveLocationPayload {
       expiresAt: expiresAt,
       accuracyMeters: accuracy,
       heading: heading,
-      displayName: name,
     );
   }
 
@@ -193,7 +188,6 @@ class LiveLocationPayload {
     expiresAt: expiresAt,
     accuracyMeters: accuracyMeters,
     heading: heading,
-    displayName: displayName,
   );
 
   static int? _asInt(Object? value) => switch (value) {

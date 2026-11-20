@@ -488,6 +488,5 @@ LiveShareBroadcast _broadcast(LiveShareBroadcastKind kind) {
     position: const LatLon(52.52, 13.405),
     sampledAt: now,
     expiresAt: now.add(const Duration(minutes: 30)),
-    displayName: 'Mira',
   );
 }

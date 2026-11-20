@@ -155,6 +155,10 @@ enum LiveShareBroadcastKind {
 }
 
 /// The payload gift-wrap encrypted to each recipient of a live share.
+///
+/// It carries only the share itself — no sender name or avatar. A recipient
+/// resolves those from the sender's Nostr profile (`kind: 0`), so the wire
+/// payload stays minimal and the identity is always the profile.
 class LiveShareBroadcast {
   const LiveShareBroadcast({
     required this.sessionId,
@@ -164,7 +168,6 @@ class LiveShareBroadcast {
     required this.expiresAt,
     this.accuracyMeters,
     this.heading,
-    this.displayName,
   });
 
   final String sessionId;
@@ -181,8 +184,4 @@ class LiveShareBroadcast {
 
   final double? accuracyMeters;
   final double? heading;
-
-  /// The sender's display name, so a recipient can label the pin without an
-  /// extra profile lookup.
-  final String? displayName;
 }

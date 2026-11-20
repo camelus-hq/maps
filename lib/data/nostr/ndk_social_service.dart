@@ -715,7 +715,6 @@ class NdkSocialService implements SocialService {
             ended: payload.isStop,
             accuracyMeters: payload.accuracyMeters,
             heading: payload.heading,
-            displayName: payload.displayName,
             sessionId: payload.sessionId,
           ),
         );

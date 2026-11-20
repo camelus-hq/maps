@@ -152,4 +152,123 @@ void main() {
     // Live-only: never replay stored events.
     expect(filter.limit, 0);
   });
+
+  test('start and stop travel stored (1059); an update is ephemeral (21059)', () async {
+    final Ndk ndk = buildNdk();
+    final KeyPair sender = Bip340.generatePrivateKey();
+    final KeyPair friend = Bip340.generatePrivateKey();
+    signIn(ndk, sender);
+    final String? me = ndk.accounts.getPublicKey();
+
+    Future<Nip01Event> wrapFor(LiveShareBroadcastKind kind) async {
+      final DateTime now = DateTime.now();
+      final LiveShareBroadcast broadcast = LiveShareBroadcast(
+        sessionId: 'session-1',
+        kind: kind,
+        position: kind == LiveShareBroadcastKind.stop
+            ? null
+            : const LatLon(52.52, 13.405),
+        sampledAt: now,
+        expiresAt: now.add(const Duration(minutes: 30)),
+      );
+      final Nip01Event rumor = await ndk.giftWrap.createRumor(
+        customPubkey: me,
+        kind: LiveLocationPayload.rumorKind,
+        content: LiveLocationPayload.encode(broadcast),
+        tags: <List<String>>[
+          <String>['p', friend.publicKey],
+          <String>['t', LiveLocationPayload.featureTag],
+          <String>['d', broadcast.sessionId],
+        ],
+      );
+      // The exact arguments NdkSocialService.publishLiveShare uses: the outer
+      // kind follows the broadcast, and `createdAt` is "now" so a relay does
+      // not reject a stored wrap whose randomized NIP-59 timestamp looks old.
+      return ndk.giftWrap.toGiftWrap(
+        rumor: rumor,
+        recipientPubkey: friend.publicKey,
+        ephemeral: isEphemeralLiveShare(broadcast.kind),
+        createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      );
+    }
+
+    final Nip01Event start = await wrapFor(LiveShareBroadcastKind.start);
+    final Nip01Event stop = await wrapFor(LiveShareBroadcastKind.stop);
+    final Nip01Event update = await wrapFor(LiveShareBroadcastKind.update);
+
+    // The outer kinds: start/stop are stored and therefore forwardable; the
+    // update is ephemeral and never forwarded.
+    expect(start.kind, 1059);
+    expect(stop.kind, 1059);
+    expect(update.kind, 21059);
+
+    // A stored wrap must look current, or a relay drops it as too old and it
+    // is never actually published.
+    final int nowSeconds = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    for (final Nip01Event stored in <Nip01Event>[start, stop]) {
+      expect(
+        (stored.createdAt - nowSeconds).abs() <= 5,
+        isTrue,
+        reason: 'a stored wrap needs a current created_at to be accepted',
+      );
+      // The `#p` tag is what the recipient's client and the push server filter
+      // on, so a stored wrap is only useful if it carries the recipient.
+      expect(
+        stored.tags.any(
+          (List<String> tag) =>
+              tag.length >= 2 && tag[0] == 'p' && tag[1] == friend.publicKey,
+        ),
+        isTrue,
+      );
+    }
+  });
+
+  test('a stored start actually unwraps to the start rumor', () async {
+    final Ndk ndk = buildNdk();
+    final KeyPair sender = Bip340.generatePrivateKey();
+    final KeyPair friend = Bip340.generatePrivateKey();
+    signIn(ndk, sender);
+    final String? me = ndk.accounts.getPublicKey();
+    final DateTime now = DateTime.now();
+
+    final LiveShareBroadcast broadcast = LiveShareBroadcast(
+      sessionId: 'session-9',
+      kind: LiveShareBroadcastKind.start,
+      position: const LatLon(52.52, 13.405),
+      sampledAt: now,
+      expiresAt: now.add(const Duration(minutes: 30)),
+    );
+    final Nip01Event rumor = await ndk.giftWrap.createRumor(
+      customPubkey: me,
+      kind: LiveLocationPayload.rumorKind,
+      content: LiveLocationPayload.encode(broadcast),
+      tags: <List<String>>[
+        <String>['p', friend.publicKey],
+        <String>['t', LiveLocationPayload.featureTag],
+        <String>['d', broadcast.sessionId],
+      ],
+    );
+    final Nip01Event wrap = await ndk.giftWrap.toGiftWrap(
+      rumor: rumor,
+      recipientPubkey: friend.publicKey,
+      ephemeral: isEphemeralLiveShare(broadcast.kind),
+      createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+    );
+    expect(wrap.kind, 1059);
+
+    // The recipient opens the stored wrap and sees a start.
+    ndk.accounts.logout();
+    signIn(ndk, friend);
+    final Nip01Event unwrapped = await ndk.giftWrap.fromGiftWrap(
+      giftWrap: wrap,
+    );
+    expect(unwrapped.kind, LiveLocationPayload.rumorKind);
+    final LiveLocationPayload? payload = LiveLocationPayload.decode(
+      unwrapped.content,
+    );
+    expect(payload, isNotNull);
+    expect(payload!.isStart, isTrue);
+    expect(payload.isStop, isFalse);
+    expect(payload.sessionId, 'session-9');
+  });
 }

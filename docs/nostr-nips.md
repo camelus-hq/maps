@@ -95,7 +95,11 @@ A small, versioned JSON object (schema version `1`):
 | `lat`, `lon` | number | Position (float degrees); omitted on a `stop` |
 | `acc` | number | Optional accuracy in metres (`0`–`100000`) |
 | `hdg` | number | Optional heading in degrees (`0`–`360`) |
-| `name` | string | Optional sender display name (≤ 60 chars), so a recipient can label the pin without a profile lookup |
+
+The sender's **name and avatar are not in the payload**: a recipient resolves
+them from the sender's Nostr profile (`kind: 0`), exactly as it does for the
+friends list. The wire stays minimal, and an identity is always a real published
+profile rather than a self-asserted string.
 
 ### Example rumor (position update)
 
@@ -110,7 +114,7 @@ A small, versioned JSON object (schema version `1`):
     ["t", "openmaps-live-location"],
     ["d", "<session-id>"]
   ],
-  "content": "{\"v\":1,\"t\":\"update\",\"session\":\"<session-id>\",\"at\":1730000000,\"exp\":1730001800,\"lat\":52.52,\"lon\":13.405,\"acc\":9,\"hdg\":180,\"name\":\"Ada\"}"
+  "content": "{\"v\":1,\"t\":\"update\",\"session\":\"<session-id>\",\"at\":1730000000,\"exp\":1730001800,\"lat\":52.52,\"lon\":13.405,\"acc\":9,\"hdg\":180}"
 }
 ```
 
