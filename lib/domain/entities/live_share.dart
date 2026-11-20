@@ -137,6 +137,10 @@ class LiveShareState {
 }
 
 /// What kind of live-location event is being broadcast.
+///
+/// The kind also selects the wire envelope: **start** and **stop** are stored
+/// NIP-59 gift wraps (kind `1059`) the push server forwards; an **update** is an
+/// ephemeral wrap (kind `21059`) that only a listening app receives.
 enum LiveShareBroadcastKind {
   /// The **first** payload of a session: the recipient is told the friend
   /// started sharing. Only this raises a notification, so a stream of position

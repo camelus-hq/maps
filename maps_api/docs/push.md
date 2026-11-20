@@ -7,12 +7,13 @@ gift wrap, so neither FCM/APNs nor the UnifiedPush distributor can read the
 message.
 
 ```
-   sender ──gift wrap──▶ relay ──▶ PushService (this server)
-                                       │  #p filter: only registered keys
-                                       ├─ firebase    ─▶ FCM ─▶ device
-                                       └─ unifiedpush ─▶ ntfy ─▶ device
-                                                              │
-                                          background isolate ─┘ decrypt + notify
+   sender ──gift wrap 1059 (start/stop)──▶ relay ──▶ PushService (this server)
+   sender ──gift wrap 21059 (updates)  ──▶ relay ──▶ (live subscribers only)
+                                                       │  #p filter: only registered keys
+                                        PushService ───┼─ firebase    ─▶ FCM ─▶ device
+                                                       └─ unifiedpush ─▶ ntfy ─▶ device
+                                                                       │
+                                                        background isolate ┘ decrypt + notify
 ```
 
 ## What it does
@@ -25,6 +26,11 @@ message.
 * **Forwards** a gift wrap (`kind 1059`) **unchanged** — the server cannot read
   it. Any other supported kind is gift-wrapped by the server first, so FCM/APNs
   still only ever carry ciphertext.
+* **Never forwards** an ephemeral gift wrap (`kind 21059`): those are live-share
+  **position updates**, which relays do not store and which are useless by the
+  time a push lands. The app reads them on its own live subscription while it is
+  open. The kind is excluded from the watched/forwarded set even if an operator
+  lists it in `PUSH_KINDS`.
 * **Deletes** tokens the transport reports as dead.
 * **Pauses** forwarding to an identity while its app is in the foreground and
   holding a `foreground` stream open: the app is receiving gift wraps on its own
@@ -65,7 +71,7 @@ token uses Firebase, a UnifiedPush endpoint URL uses UnifiedPush.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `PUSH_KINDS` | `1059` | Comma-separated outer kinds to watch/forward. |
+| `PUSH_KINDS` | `1059` | Comma-separated outer kinds to watch/forward. The ephemeral gift wrap `21059` is always excluded. |
 | `PUSH_BOOTSTRAP_RELAY` | `wss://relay.map.camelus.app` | One relay always watched. |
 | `PUSH_RELAYS` | – | Extra relays always watched. |
 

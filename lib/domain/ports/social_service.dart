@@ -57,6 +57,12 @@ abstract interface class SocialService {
   /// Gift-wrap encrypts [broadcast] to each of [recipientPubkeys] and publishes
   /// it. Throws an [AppException] when nobody is signed in, no recipient is
   /// selected, or no relay accepted the event.
+  ///
+  /// A session **start** and **stop** are published as stored gift wraps
+  /// (kind `1059`) so the push server can forward them to a closed app; the
+  /// recurring **updates** are ephemeral gift wraps (kind `21059`) that relays
+  /// do not store and the server never forwards, so they reach only a listening
+  /// app.
   Future<void> publishLiveShare({
     required LiveShareBroadcast broadcast,
     required List<String> recipientPubkeys,

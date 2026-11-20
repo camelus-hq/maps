@@ -5,6 +5,11 @@ import '../../domain/entities/live_share.dart';
 
 /// Wire codec for the live-location "rumor" carried inside a NIP-59 gift wrap.
 ///
+/// The rumor kind ([rumorKind]) is the same for every message; the **outer**
+/// wrap differs: a session start/stop travels in a stored wrap (kind `1059`)
+/// the push server forwards, while a position update travels in an ephemeral
+/// wrap (kind `21059`) that relays do not store and the server never forwards.
+///
 /// No standard NIP covers live location yet, so this is our own small,
 /// versioned JSON schema. Decoding is **hostile safe**: a truncated, oversized,
 /// mistyped or out-of-range payload returns `null` instead of throwing, so a

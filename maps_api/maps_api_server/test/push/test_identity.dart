@@ -1,5 +1,6 @@
-import 'package:ndk/ndk.dart' as ndk;
+import 'package:maps_api_server/src/push/push_config.dart';
 import 'package:maps_api_server/src/push/push_sender.dart';
+import 'package:ndk/ndk.dart' as ndk;
 
 /// A throwaway Nostr identity for tests: generates a key pair, signs events and
 /// builds the signed registrations the endpoint/protocol expect.
@@ -56,6 +57,20 @@ class TestIdentity {
         ndk.Nip01Event(
           pubKey: 'f' * 64,
           kind: ndk.GiftWrap.kGiftWrapEventkind,
+          tags: <List<String>>[
+            <String>['p', recipient],
+          ],
+          content: 'opaque-ciphertext',
+        ),
+      );
+
+  /// A kind-21059 **ephemeral** gift wrap addressed to [recipient], as a
+  /// live-share position update arrives. The server must never forward it.
+  static ndk.Nip01EventModel ephemeralGiftWrap(String recipient) =>
+      ndk.Nip01EventModel.fromEntity(
+        ndk.Nip01Event(
+          pubKey: 'f' * 64,
+          kind: PushConfig.ephemeralGiftWrapKind,
           tags: <List<String>>[
             <String>['p', recipient],
           ],

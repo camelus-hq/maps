@@ -15,11 +15,24 @@ class PushConfig {
   /// Outer event kinds the forwarder subscribes to and can forward.
   ///
   /// `1059` (NIP-59 gift wrap) is the only kind the app's private notifications
-  /// use: a live-share update, a DM or a feedback report all arrive wrapped, so
-  /// the server only ever sees ciphertext. Public kinds (e.g. `1` or `7`) can be
-  /// added and the server will gift-wrap them itself before sending, so FCM/APNs
-  /// never see the plaintext either.
+  /// use: a **live-share start or stop**, a DM or a feedback report all arrive
+  /// wrapped, so the server only ever sees ciphertext. Public kinds (e.g. `1` or
+  /// `7`) can be added and the server will gift-wrap them itself before sending,
+  /// so FCM/APNs never see the plaintext either.
+  ///
+  /// The ephemeral gift-wrap kind ([ephemeralGiftWrapKind]) is **never**
+  /// forwarded and cannot be requested — see that constant.
   static const List<int> defaultKinds = <int>[1059];
+
+  /// Ephemeral NIP-59 gift wrap (kind `21059`), which carries a live-share
+  /// **position update**.
+  ///
+  /// Relays MUST NOT store these, so they are only ever delivered live to a
+  /// subscriber that is connected at the moment the update is published. They
+  /// are always excluded from [availableKinds]: forwarding an update that has
+  /// already expired is pointless, the volume is high, and the app reads them
+  /// on its own live subscription while it is in the foreground.
+  static const int ephemeralGiftWrapKind = 21059;
 
   /// A relay that is always watched, so an identity that registers only
   /// unreachable custom relays can still be reached.
@@ -58,7 +71,13 @@ class PushConfig {
       for (final String part in raw.split(','))
         if (int.tryParse(part.trim()) != null) int.parse(part.trim()),
     ];
-    return parsed.isEmpty ? defaultKinds : parsed;
+    // Even when an operator asks for it, the ephemeral gift wrap is never
+    // watched or forwarded: it is a live-only position update (see
+    // [ephemeralGiftWrapKind]).
+    final List<int> kinds = parsed
+        .where((int kind) => kind != ephemeralGiftWrapKind)
+        .toList(growable: false);
+    return kinds.isEmpty ? defaultKinds : kinds;
   }
 
   /// Every relay always watched: the bootstrap relay plus `PUSH_RELAYS`.

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:maps_api_server/src/push/push_config.dart';
 import 'package:maps_api_server/src/push/push_registration.dart';
 import 'package:test/test.dart';
 
@@ -55,6 +56,21 @@ void main() {
         await me.registration(token: 'tok', kinds: <int>[1]),
       );
 
+      expect(registration.kinds, contains(1059));
+    });
+
+    test('never accepts the ephemeral gift-wrap kind', () async {
+      final TestIdentity me = TestIdentity.generate();
+      final PushRegistration registration = await PushRegistration.parse(
+        await me.registration(
+          token: 'tok',
+          kinds: <int>[PushConfig.ephemeralGiftWrapKind],
+        ),
+      );
+
+      // The only requested kind is not forwardable, so it falls back to the
+      // default kinds and never carries 21059.
+      expect(registration.kinds, isNot(contains(21059)));
       expect(registration.kinds, contains(1059));
     });
 

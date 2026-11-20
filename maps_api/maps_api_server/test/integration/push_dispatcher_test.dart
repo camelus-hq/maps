@@ -48,6 +48,32 @@ void main() {
       );
     });
 
+    test('never forwards an ephemeral gift wrap (live-share update)', () async {
+      final TestIdentity me = TestIdentity.generate();
+      await endpoints.push.register(
+        sessionBuilder,
+        await me.registration(token: 'fcm-token-1'),
+      );
+
+      final RecordingSender sender = RecordingSender('firebase');
+      final PushDispatcher dispatcher = PushDispatcher(
+        repository: const PushRepository(),
+        senders: PushSenderRegistry(<PushSender>[sender]),
+        presence: PushPresence(),
+      );
+
+      await dispatcher.dispatch(
+        sessionBuilder.build(),
+        TestIdentity.ephemeralGiftWrap(me.pubKey),
+      );
+
+      expect(
+        sender.sent,
+        isEmpty,
+        reason: 'position updates are live-only and must not be pushed',
+      );
+    });
+
     test('ignores an event addressed to an unregistered identity', () async {
       final TestIdentity registered = TestIdentity.generate();
       final TestIdentity other = TestIdentity.generate();

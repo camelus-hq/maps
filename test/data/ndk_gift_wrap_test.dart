@@ -3,6 +3,7 @@ import 'package:ndk/ndk.dart';
 import 'package:ndk/shared/nips/nip01/bip340.dart';
 import 'package:ndk/shared/nips/nip01/key_pair.dart';
 import 'package:openmaps/data/nostr/live_location_payload.dart';
+import 'package:openmaps/data/nostr/live_share_wire.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/live_share.dart';
 
@@ -55,13 +56,16 @@ void main() {
         <String>['d', broadcast.sessionId],
       ],
     );
+    // A position update is ephemeral: it travels in a kind-21059 wrap.
     final Nip01Event wrap = await ndk.giftWrap.toGiftWrap(
       rumor: rumor,
       recipientPubkey: friend.publicKey,
+      ephemeral: isEphemeralLiveShare(broadcast.kind),
+      createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
     );
 
     // The relay-visible envelope is opaque: no coordinates, no sender.
-    expect(wrap.kind, 1059);
+    expect(wrap.kind, 21059);
     expect(wrap.content.contains('52.52'), isFalse);
     expect(wrap.pubKey, isNot(sender.publicKey));
     expect(
@@ -116,6 +120,7 @@ void main() {
     final Nip01Event wrap = await ndk.giftWrap.toGiftWrap(
       rumor: rumor,
       recipientPubkey: friend.publicKey,
+      createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
     );
 
     ndk.accounts.logout();
@@ -124,5 +129,27 @@ void main() {
       ndk.giftWrap.fromGiftWrap(giftWrap: wrap),
       throwsA(anything),
     );
+  });
+
+  test('only a position update is ephemeral; start and stop are stored', () {
+    expect(isEphemeralLiveShare(LiveShareBroadcastKind.update), isTrue);
+    expect(isEphemeralLiveShare(LiveShareBroadcastKind.start), isFalse);
+    expect(isEphemeralLiveShare(LiveShareBroadcastKind.stop), isFalse);
+  });
+
+  test('the live subscription watches both the stored and ephemeral wrap', () {
+    final Filter filter = liveLocationFilter('a' * 64, since: 100);
+
+    expect(
+      filter.kinds,
+      containsAll(<int>[
+        GiftWrap.kGiftWrapEventkind,
+        GiftWrap.kEphemeralGiftWrapEventKind,
+      ]),
+    );
+    expect(filter.kinds, hasLength(2));
+    expect(filter.pTags, <String>['a' * 64]);
+    // Live-only: never replay stored events.
+    expect(filter.limit, 0);
   });
 }

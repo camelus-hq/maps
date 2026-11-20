@@ -17,7 +17,9 @@ import 'push_sender.dart';
 ///    kind — so the server never sprays unrequested notifications.
 /// 3. A gift wrap (`1059`) is forwarded **as-is**: the server cannot read it,
 ///    and neither can FCM. Any other supported kind is gift-wrapped by the
-///    server first, so the transport still only carries ciphertext.
+///    server first, so the transport still only carries ciphertext. The
+///    ephemeral gift wrap (`21059`) is never forwarded at all — it is a live
+///    position update, not a notification (see [PushConfig.ephemeralGiftWrapKind]).
 /// 4. The wrapped payload goes to every token the recipient registered, on the
 ///    transport that token declares. Dead tokens are deleted.
 class PushDispatcher {
@@ -35,6 +37,15 @@ class PushDispatcher {
 
   /// Forwards [event] to its recipient, if the recipient asked for it.
   Future<void> dispatch(Session session, ndk.Nip01Event event) async {
+    session.log('Dispatching push for event ${event.id} (kind ${event.kind})');
+
+    // An ephemeral gift wrap (21059) is a live-share **position update**:
+    // relays do not store it, it goes stale immediately, and the volume is
+    // high. The server never forwards it — the app reads it on its own live
+    // subscription while it is in the foreground.
+    if (event.kind == PushConfig.ephemeralGiftWrapKind) {
+      return;
+    }
     final List<String> recipients = <String>[
       for (final List<String> tag in event.tags)
         if (tag.length >= 2 && tag[0] == 'p' && tag[1].trim().isNotEmpty)

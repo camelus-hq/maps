@@ -13,34 +13,21 @@ import '../../domain/entities/live_share.dart';
 import '../../domain/entities/push.dart';
 import '../../domain/ports/social_service.dart';
 import 'live_location_payload.dart';
-
-/// The relay `REQ` filter for the gift wraps addressed to [pubKey].
-///
-/// **Live-only**: `limit: 0` asks a relay for no stored events, and [since]
-/// (seconds, the moment the subscription opened) bounds it, so a relay never
-/// replays the gift wraps it already has — an old DM or share would otherwise
-/// surface, and raise a notification, on every (re)subscribe or reconnect.
-/// `since` is fixed for the life of the subscription, so a reconnect still
-/// catches what arrived while the socket was down.
-///
-/// Exposed (rather than inlined) so the live-only contract has a regression
-/// test.
-Filter liveLocationFilter(String pubKey, {required int since}) => Filter(
-  kinds: <int>[GiftWrap.kGiftWrapEventkind],
-  pTags: <String>[pubKey],
-
-  /// somehow with since filter it does not work (may be a relay or ndk issue?)
-  //since: since,
-  limit: 0,
-);
+import 'live_share_wire.dart';
 
 /// [SocialService] backed by Nostr through the NDK client.
 ///
 /// Live shares are published as NIP-59 gift wraps: the location payload is
-/// sealed (kind 13) under the sender's identity and then wrapped (kind 1059)
-/// with a fresh, throwaway key pair for each recipient. A relay therefore sees
-/// only an opaque envelope addressed to the recipient — the sender, the content
-/// and the coordinates are all encrypted end to end.
+/// sealed (kind 13) under the sender's identity and then wrapped with a fresh,
+/// throwaway key pair for each recipient. A relay therefore sees only an opaque
+/// envelope addressed to the recipient — the sender, the content and the
+/// coordinates are all encrypted end to end.
+///
+/// A session **start** and **stop** are stored wraps (kind 1059) so the push
+/// server can forward them while the app is closed; the recurring position
+/// **updates** are ephemeral wraps (kind 21059) that relays do not store and
+/// the server never forwards — they reach only a listening app. The
+/// wire-level mapping lives in `live_share_wire.dart`.
 class NdkSocialService implements SocialService {
   NdkSocialService({
     required this.ndk,
@@ -449,6 +436,10 @@ class NdkSocialService implements SocialService {
         final Nip01Event wrap = await ndk.giftWrap.toGiftWrap(
           rumor: rumor,
           recipientPubkey: recipient,
+          // Start/stop are stored wraps (1059) so the push server can forward
+          // them; the position updates are ephemeral (21059) and live-only.
+          ephemeral: isEphemeralLiveShare(broadcast.kind),
+          createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
         );
         final List<RelayBroadcastResponse> responses = await ndk.broadcast
             .broadcast(
@@ -684,7 +675,7 @@ class NdkSocialService implements SocialService {
   }
 
   Future<void> _onWrapped(Nip01Event event) async {
-    if (_disposed || event.kind != GiftWrap.kGiftWrapEventkind) {
+    if (_disposed || !GiftWrap.isGiftWrapKind(event.kind)) {
       return;
     }
     try {

@@ -221,10 +221,10 @@ packages:
     dependency: transitive
     description:
       name: code_assets
-      sha256: bf394f466ba9205f1812a0433b392d6af280f155f56651eda7c18cc32ed493b8
+      sha256: "1ef22a0be3af9370bd9481ac76db114db92bfe75d5ca2b2d7bc911764478a4d9"
       url: "https://pub.dev"
     source: hosted
-    version: "1.2.1"
+    version: "2.2.0"
   collection:
     dependency: transitive
     description:
@@ -317,18 +317,18 @@ packages:
     dependency: transitive
     description:
       name: elliptic
-      sha256: "67931d408faa353bdebac9f7a1df0c3f6f828f4e8439cdf084573cd1601a2f4b"
+      sha256: "03a7c29e3b7c952cf4612fec0496188e9ae686bd00195f784568aefc24894d99"
       url: "https://pub.dev"
     source: hosted
-    version: "0.3.12"
+    version: "0.4.0"
   equatable:
     dependency: transitive
     description:
       name: equatable
-      sha256: "3bce007a596ff8b3119c45d68aaef631272537c03d30e5d4534dd24bf4c5eaa2"
+      sha256: ea36e500cbf0ec18361deabca755434f73e42fe53c5130021c7e2d6b5ebe1702
       url: "https://pub.dev"
     source: hosted
-    version: "2.1.0"
+    version: "3.0.0"
   fake_async:
     dependency: transitive
     description:
@@ -757,14 +757,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.1.2"
-  idb_shim:
-    dependency: transitive
-    description:
-      name: idb_shim
-      sha256: "507d8f3154fa4e41165941c5aa8509c6bf155bb30f76ba25a00d1e7ba1dd64c9"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.11.3"
   image:
     dependency: transitive
     description:
@@ -1024,34 +1016,36 @@ packages:
     dependency: transitive
     description:
       name: native_toolchain_c
-      sha256: a1c26117c48cebe5677b0cf0e33a980a79a7c5577effc86f52e5a0d309cdcb60
+      sha256: "120b6fc66acd8a5ddeaeb1e59b78836bb3ec9919bd9d9dfb1e2401985710c2c0"
       url: "https://pub.dev"
     source: hosted
-    version: "0.19.3"
+    version: "0.19.6"
   native_toolchain_rust:
     dependency: transitive
     description:
       name: native_toolchain_rust
-      sha256: "8469a0e32a47a5c84b7fd300de9fd0e8082aac76c37922986324f5082a58350d"
+      sha256: "17d083e9d2375d9371b7e23f950746d3dfacc512431f4418a5aa953a73af69a8"
       url: "https://pub.dev"
     source: hosted
-    version: "1.0.6"
+    version: "1.1.1"
   ndk:
     dependency: "direct main"
     description:
-      name: ndk
-      sha256: "446c29cfe0e5e8ac66cc047c4b2977b08bfa692c2f1018bafbe4b77d5973dfaa"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.10.1"
+      path: "packages/ndk"
+      ref: "091bd38574d90148afc1170d05cfb8fbaab16f37"
+      resolved-ref: "091bd38574d90148afc1170d05cfb8fbaab16f37"
+      url: "https://github.com/relaystr/ndk.git"
+    source: git
+    version: "0.11.0-dev.2"
   ndk_flutter:
     dependency: "direct main"
     description:
-      name: ndk_flutter
-      sha256: "5c93e8daf8b11946cb6e2cf5f2e4c48fef334cdcaacee85f53da786bc5a4ffa4"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.10.1"
+      path: "packages/ndk_flutter"
+      ref: "091bd38574d90148afc1170d05cfb8fbaab16f37"
+      resolved-ref: "091bd38574d90148afc1170d05cfb8fbaab16f37"
+      url: "https://github.com/relaystr/ndk.git"
+    source: git
+    version: "0.10.3-dev.2"
   objectbox:
     dependency: "direct main"
     description:
@@ -1080,10 +1074,10 @@ packages:
     dependency: transitive
     description:
       name: objective_c
-      sha256: b7fb95a6d9a4f009edd63dc5ac69f07420b23a16161c6dd8660290b59c602e8e
+      sha256: c965d264fd4b0b4dd402dce9d049b70656bf98d3ca108b9bc55d2544ceadbe5e
       url: "https://pub.dev"
     source: hosted
-    version: "9.5.0"
+    version: "9.6.4"
   openmaps_notifications:
     dependency: "direct main"
     description:
@@ -1179,14 +1173,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.0"
-  pausable_timer:
-    dependency: transitive
-    description:
-      name: pausable_timer
-      sha256: "6ef1a95441ec3439de6fb63f39a011b67e693198e7dae14e20675c3c00e86074"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.1.0+3"
   petitparser:
     dependency: transitive
     description:
@@ -1243,14 +1229,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.5.4"
-  pretty_qr_code:
+  process:
     dependency: transitive
     description:
-      name: pretty_qr_code
-      sha256: "474f8a4512113fba06f14a6ec9bbf42353b4e651d7a520e3096f2a9b6bbe7a8a"
+      name: process
+      sha256: "4242ba3508d37e01808bdf71ad1d5bb93a8d671bf2e7450e6b1b353fb0808891"
       url: "https://pub.dev"
     source: hosted
-    version: "3.6.0"
+    version: "5.0.6"
   pub_semver:
     dependency: transitive
     description:
@@ -1271,10 +1257,10 @@ packages:
     dependency: "direct main"
     description:
       name: qr
-      sha256: "2c0189dca64a3ab08dda7acd7911c89af2374f08eb4eaded3e8ef4609f3b9c8b"
+      sha256: f9461594b257c2ec882159fb8100db28408f6aacdba5b21f109708bce2e482b6
       url: "https://pub.dev"
     source: hosted
-    version: "3.0.3"
+    version: "4.0.1"
   rbush:
     dependency: transitive
     description:
@@ -1315,22 +1301,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.28.0"
-  sembast:
-    dependency: transitive
-    description:
-      name: sembast
-      sha256: "4f71f8c95105918fa207065429c913f38d0fb05fec9f3a745bbf4c113f5d482b"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.10.1"
-  sembast_web:
-    dependency: transitive
-    description:
-      name: sembast_web
-      sha256: "46e3a5512d0e53f5a01d15b0ba199260273de7b00d646d6c7012ef999a5201e2"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.4.7"
   serverpod_auth_core_client:
     dependency: transitive
     description:
@@ -1520,14 +1490,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.0.4"
-  synchronized:
-    dependency: transitive
-    description:
-      name: synchronized
-      sha256: a77637ebe1460f3b48cac89a790d2eb634f0a8593cab0d3f340c6db174ba9b94
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.6.1+1"
   term_glyph:
     dependency: transitive
     description:
@@ -1544,14 +1506,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.14"
-  toastification:
-    dependency: transitive
-    description:
-      name: toastification
-      sha256: e06b82a66dffb866af2923cc04012f52ae96ec50ab9215efa07be8d6ec6486fb
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.2.2"
   toml:
     dependency: transitive
     description:

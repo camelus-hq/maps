@@ -43,9 +43,9 @@ class AppConfig {
   /// alone is not enough for two friends to meet. Override with
   /// `--dart-define=LIVE_SHARE_RELAYS=wss://a,wss://b`.
   static const List<String> defaultLiveShareRelays = <String>[
-    'wss://relay.primal.net',
-    'wss://relay.snort.social',
-    'wss://relay.camelus.app',
+    // 'wss://relay.primal.net',
+    // 'wss://relay.snort.social',
+    // 'wss://relay.camelus.app',
     'wss://relay.map.camelus.app',
   ];
 
@@ -60,9 +60,9 @@ class AppConfig {
   /// `relay.nos.social` answers `blocked: kind not allowed`, so it is not in
   /// the default set.
   static const List<String> defaultReviewRelays = <String>[
-    'wss://relay.primal.net',
-    'wss://relay.snort.social',
-    'wss://nostr.mom',
+    // 'wss://relay.primal.net',
+    // 'wss://relay.snort.social',
+    // 'wss://nostr.mom',
     'wss://relay.map.camelus.app',
   ];
 
