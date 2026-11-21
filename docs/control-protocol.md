@@ -92,6 +92,7 @@ adb forward tcp:7981 tcp:7981
 | `nav.notification` | — | the ongoing trip notification `{visible, title, body, progress, statusChip, mode}` |
 | `trips.list` | — | array of recorded trips `{id, startedAt, endedAt, mode, distanceMeters, durationSeconds, origin, destination, points}` — newest first |
 | `trips.get` | `{id}` | one recorded trip |
+| `trips.open` | `{id?}` | `true`/the id — opens the trips list, or one trip's page |
 | `trips.export` | `{id, path?}` | `{id, path, gpx}` — writes a GPX file when the platform can (path `null` on failure; the `gpx` text is always returned) |
 | `trips.delete` | `{id}` | `true` |
 | `trips.clear` | — | `true` |
@@ -256,6 +257,7 @@ sync test fails if it drifts from the registry.
 | `trips.export` | Export one recorded trip as GPX (params: {id, path?}). Writes the file when the platform can and returns the GPX text with the written path (or null when the write failed). |
 | `trips.get` | Return one recorded trip (params: {id}). |
 | `trips.list` | List the recorded trips (the breadcrumb paths travelled during guidance), newest first — id, times, mode, distance, labels and point count. |
+| `trips.open` | Open the recorded-trips list, or one trip's page (params: {id?}). |
 | `ui.back` | Synthesise the system back gesture. |
 | `ui.screenshot` | Capture the app window to a PNG file (params: path?). |
 | `ui.scroll` | Synthesise a scroll gesture by (dx, dy) from (x, y) (params: {x, y, dx, dy}). |

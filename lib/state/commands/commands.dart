@@ -1657,6 +1657,25 @@ List<Command> buildCommands(Ref ref) {
           _tripJson(_requiredTrip(ref, request)),
     ),
     Command(
+      id: 'trips.open',
+      description:
+          'Open the recorded-trips list, or one trip\'s page (params: {id?}).',
+      handler: (CommandRequest request) async {
+        final BuildContext? context = rootNavigatorKey.currentContext;
+        if (context == null) {
+          throw const CommandException('no_view', 'App view is not mounted');
+        }
+        final Object? id = request.params['id'];
+        if (id is String && id.isNotEmpty) {
+          _requiredTrip(ref, request);
+          unawaited(context.push('/trips/$id'));
+          return id;
+        }
+        unawaited(context.push('/trips'));
+        return true;
+      },
+    ),
+    Command(
       id: 'trips.export',
       description:
           'Export one recorded trip as GPX (params: {id, path?}). Writes the '
