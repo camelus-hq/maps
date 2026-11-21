@@ -71,6 +71,11 @@ class HomeFeedSheet extends ConsumerWidget {
       onTap: () => context.push('/search'),
     ),
     PlayRow(
+      icon: PlayIcons.route,
+      label: 'Recent trips',
+      onTap: () => context.push('/trips'),
+    ),
+    PlayRow(
       icon: PlayIcons.saved,
       label: 'Saved',
       onTap: () => context.push('/saved'),
