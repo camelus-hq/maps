@@ -147,6 +147,26 @@ class SettingsScreen extends ConsumerWidget {
               showChevron: false,
             ),
           ),
+          const _Section('Recent trips'),
+          const PlayRow(
+            icon: PlayIcons.route,
+            label: 'Trips to keep',
+            subtitle: 'The oldest recorded trips are deleted automatically',
+            showChevron: false,
+          ),
+          Padding(
+            padding: pad,
+            child: PlaySegmented<int>(
+              selected: settings.recentTripsLimit,
+              onChanged: (int limit) => unawaited(
+                ref.read(settingsProvider.notifier).setRecentTripsLimit(limit),
+              ),
+              segments: <PlaySegment<int>>[
+                for (final int limit in recentTripsLimits)
+                  PlaySegment<int>(value: limit, label: '$limit'),
+              ],
+            ),
+          ),
           const _Section('Developer'),
           PlayRow(
             icon: PlayIcons.code,

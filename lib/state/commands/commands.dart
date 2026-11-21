@@ -43,9 +43,11 @@ import '../../domain/entities/route_line.dart';
 import '../../domain/entities/transit.dart';
 import '../../domain/entities/transit_stop_marker.dart';
 import '../../domain/entities/travel_mode.dart';
+import '../../domain/entities/trip.dart';
 import '../../domain/ports/app_database.dart';
 import '../../domain/ports/map_service.dart';
 import '../../domain/ports/settings_repository.dart';
+import '../../domain/usecases/trip_gpx.dart';
 import '../config.dart';
 import '../deep_link.dart';
 import '../feedback.dart';
@@ -68,6 +70,7 @@ import '../settings.dart';
 import '../social.dart';
 import '../transit_departures.dart';
 import '../transit_stop_board.dart';
+import '../trips.dart';
 import '../update.dart';
 import '../usecases.dart';
 import 'command.dart';
@@ -216,6 +219,7 @@ List<Command> buildCommands(Ref ref) {
           'showOsmTags': settings.showOsmTags,
           'searchBackend': settings.searchBackend.name,
           'pinnedCategories': settings.pinnedCategoryIds,
+          'recentTripsLimit': settings.recentTripsLimit,
         };
       },
     ),
@@ -224,7 +228,7 @@ List<Command> buildCommands(Ref ref) {
       description:
           'Update app settings (params: {unit?: metric|imperial, theme?: '
           'system|light|dark, showOsmTags?: bool, searchBackend?: '
-          'mapbox|openstreetmap|camelus}).',
+          'mapbox|openstreetmap|camelus, recentTripsLimit?: 10|20|50}).',
       handler: (CommandRequest request) async {
         final Object? rawUnit = request.params['unit'];
         if (rawUnit != null) {
@@ -285,6 +289,22 @@ List<Command> buildCommands(Ref ref) {
           }
           await ref.read(settingsProvider.notifier).setSearchBackend(backend);
         }
+        final Object? rawTripsLimit = request.params['recentTripsLimit'];
+        if (rawTripsLimit != null) {
+          final int? limit = switch (rawTripsLimit) {
+            final int value => value,
+            final double value => value.toInt(),
+            final String value => int.tryParse(value),
+            _ => null,
+          };
+          if (limit == null || !recentTripsLimits.contains(limit)) {
+            throw const CommandException(
+              'bad_params',
+              '"recentTripsLimit" must be 10, 20 or 50',
+            );
+          }
+          await ref.read(settingsProvider.notifier).setRecentTripsLimit(limit);
+        }
         final AppSettings settings = ref.read(settingsProvider);
         return <String, Object?>{
           'unit': settings.unit.name,
@@ -292,6 +312,7 @@ List<Command> buildCommands(Ref ref) {
           'showOsmTags': settings.showOsmTags,
           'searchBackend': settings.searchBackend.name,
           'pinnedCategories': settings.pinnedCategoryIds,
+          'recentTripsLimit': settings.recentTripsLimit,
         };
       },
     ),
@@ -1618,6 +1639,90 @@ List<Command> buildCommands(Ref ref) {
       handler: (CommandRequest request) async {
         ref.read(navigationControllerProvider.notifier).resumeTracking();
         return _navJson(ref.read(navigationControllerProvider));
+      },
+    ),
+    Command(
+      id: 'trips.list',
+      description:
+          'List the recorded trips (the breadcrumb paths travelled during '
+          'guidance), newest first — id, times, mode, distance, labels and '
+          'point count.',
+      handler: (CommandRequest request) async =>
+          ref.read(recentTripsProvider).map(_tripJson).toList(growable: false),
+    ),
+    Command(
+      id: 'trips.get',
+      description: 'Return one recorded trip (params: {id}).',
+      handler: (CommandRequest request) async =>
+          _tripJson(_requiredTrip(ref, request)),
+    ),
+    Command(
+      id: 'trips.open',
+      description:
+          'Open the recorded-trips list, or one trip\'s page (params: {id?}).',
+      handler: (CommandRequest request) async {
+        final BuildContext? context = rootNavigatorKey.currentContext;
+        if (context == null) {
+          throw const CommandException('no_view', 'App view is not mounted');
+        }
+        final Object? id = request.params['id'];
+        if (id is String && id.isNotEmpty) {
+          _requiredTrip(ref, request);
+          unawaited(context.push('/trips/$id'));
+          return id;
+        }
+        unawaited(context.push('/trips'));
+        return true;
+      },
+    ),
+    Command(
+      id: 'trips.export',
+      description:
+          'Export one recorded trip as GPX (params: {id, path?}). Writes the '
+          'file when the platform can and returns the GPX text with the written '
+          'path (or null when the write failed).',
+      handler: (CommandRequest request) async {
+        final Trip trip = _requiredTrip(ref, request);
+        final String gpx = TripGpx.encode(trip);
+        final Object? rawPath = request.params['path'];
+        final String path = rawPath is String && rawPath.trim().isNotEmpty
+            ? rawPath.trim()
+            : '${Directory.systemTemp.path}/openmaps-trip-${trip.id}.gpx';
+        try {
+          final File file = File(path);
+          await file.parent.create(recursive: true);
+          await file.writeAsString(gpx, flush: true);
+          return <String, Object?>{
+            'id': trip.id,
+            'path': file.path,
+            'gpx': gpx,
+          };
+        } on FileSystemException catch (error) {
+          // The GPX text is still returned so the caller can save it elsewhere.
+          return <String, Object?>{
+            'id': trip.id,
+            'path': null,
+            'gpx': gpx,
+            'error': error.message,
+          };
+        }
+      },
+    ),
+    Command(
+      id: 'trips.delete',
+      description: 'Delete one recorded trip (params: {id}).',
+      handler: (CommandRequest request) async {
+        final Trip trip = _requiredTrip(ref, request);
+        await ref.read(recentTripsProvider.notifier).delete(trip.id);
+        return true;
+      },
+    ),
+    Command(
+      id: 'trips.clear',
+      description: 'Delete every recorded trip.',
+      handler: (CommandRequest request) async {
+        await ref.read(recentTripsProvider.notifier).clear();
+        return true;
       },
     ),
     Command(
@@ -3400,6 +3505,42 @@ Map<String, Object?> _navJson(NavState nav) {
             'lat': position.latitude,
             'lon': position.longitude,
           },
+  };
+}
+
+/// Resolves the recorded trip named by a command's `id` param, or throws a
+/// typed error (never a null dereference).
+Trip _requiredTrip(Ref ref, CommandRequest request) {
+  final Object? id = request.params['id'];
+  if (id is! String || id.isEmpty) {
+    throw const CommandException('bad_params', '"id" is required');
+  }
+  final Trip? trip = ref.read(recentTripsProvider.notifier).byId(id);
+  if (trip == null) {
+    throw NotFoundException('Trip not found: $id');
+  }
+  return trip;
+}
+
+Map<String, Object?> _tripJson(Trip trip) {
+  final LatLon? start = trip.start;
+  final LatLon? end = trip.end;
+  return <String, Object?>{
+    'id': trip.id,
+    'startedAt': trip.startedAt.toUtc().toIso8601String(),
+    'endedAt': trip.endedAt.toUtc().toIso8601String(),
+    'mode': trip.mode.name,
+    'distanceMeters': trip.distanceMeters,
+    'durationSeconds': trip.duration.inSeconds,
+    'origin': trip.originName,
+    'destination': trip.destinationName,
+    'points': trip.track.length,
+    'start': start == null
+        ? null
+        : <String, Object?>{'lat': start.latitude, 'lon': start.longitude},
+    'end': end == null
+        ? null
+        : <String, Object?>{'lat': end.latitude, 'lon': end.longitude},
   };
 }
 

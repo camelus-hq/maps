@@ -90,6 +90,12 @@ adb forward tcp:7981 tcp:7981
 | `nav.overview` | — | the guidance state (fit whole route vs tracking) |
 | `nav.mode` | `{mode: drive\|walk\|cycle\|transit}` | the guidance state — re-skins the navigation UI |
 | `nav.notification` | — | the ongoing trip notification `{visible, title, body, progress, statusChip, mode}` |
+| `trips.list` | — | array of recorded trips `{id, startedAt, endedAt, mode, distanceMeters, durationSeconds, origin, destination, points}` — newest first |
+| `trips.get` | `{id}` | one recorded trip |
+| `trips.open` | `{id?}` | `true`/the id — opens the trips list, or one trip's page |
+| `trips.export` | `{id, path?}` | `{id, path, gpx}` — writes a GPX file when the platform can (path `null` on failure; the `gpx` text is always returned) |
+| `trips.delete` | `{id}` | `true` |
+| `trips.clear` | — | `true` |
 | `ui.tap` | `{x, y}` | `true` — synthetic tap at logical coordinates |
 | `ui.swipe` | `{fromX, fromY, toX, toY}` | `true` — synthetic drag |
 | `ui.scroll` | `{x, y, dx, dy}` | `true` — synthetic scroll by (dx, dy) |
@@ -127,7 +133,7 @@ sync test fails if it drifts from the registry.
 | `app.pushStatus` | Return the push registration status (params: {refresh?: bool}); "refresh" re-runs the registration sync. |
 | `app.ready` | Return true once the app is running. |
 | `app.settings` | Return app settings (distance unit, theme, search provider, developer options). |
-| `app.settings.set` | Update app settings (params: {unit?: metric\|imperial, theme?: system\|light\|dark, showOsmTags?: bool, searchBackend?: mapbox\|openstreetmap\|camelus}). |
+| `app.settings.set` | Update app settings (params: {unit?: metric\|imperial, theme?: system\|light\|dark, showOsmTags?: bool, searchBackend?: mapbox\|openstreetmap\|camelus, recentTripsLimit?: 10\|20\|50}). |
 | `app.state` | Dump serialisable app state. |
 | `app.tab` | Select the map-home bottom-nav tab (params: {tab: explore\|you\|contribute}). |
 | `app.update.check` | Check the update manifest for a newer release; returns the state. |
@@ -246,6 +252,12 @@ sync test fails if it drifts from the registry.
 | `transit.stop.trip` | Open one train's detail (its whole stop list) and show only that line on the map (params: {tripId}). Returns the board state. |
 | `transit.stop.trip.close` | Close the train detail and restore the stop's lines on the map. |
 | `transit.time` | Set when the transit journey departs or arrives (params: {mode: now\|depart\|arrive, time? (ISO-8601)}); re-plans. |
+| `trips.clear` | Delete every recorded trip. |
+| `trips.delete` | Delete one recorded trip (params: {id}). |
+| `trips.export` | Export one recorded trip as GPX (params: {id, path?}). Writes the file when the platform can and returns the GPX text with the written path (or null when the write failed). |
+| `trips.get` | Return one recorded trip (params: {id}). |
+| `trips.list` | List the recorded trips (the breadcrumb paths travelled during guidance), newest first — id, times, mode, distance, labels and point count. |
+| `trips.open` | Open the recorded-trips list, or one trip's page (params: {id?}). |
 | `ui.back` | Synthesise the system back gesture. |
 | `ui.screenshot` | Capture the app window to a PNG file (params: path?). |
 | `ui.scroll` | Synthesise a scroll gesture by (dx, dy) from (x, y) (params: {x, y, dx, dy}). |

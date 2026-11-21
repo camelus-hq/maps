@@ -22,6 +22,7 @@ import '../data/fakes/fake_search_service.dart';
 import '../data/fakes/fake_settings_repository.dart';
 import '../data/fakes/fake_social_service.dart';
 import '../data/fakes/fake_transit_routing_service.dart';
+import '../data/fakes/fake_trips_repository.dart';
 import '../data/fakes/in_memory_app_database.dart';
 import '../data/notifications/push_registrar.dart';
 import '../domain/ports/anonymous_identity.dart';
@@ -46,6 +47,7 @@ import '../domain/ports/search_service.dart';
 import '../domain/ports/settings_repository.dart';
 import '../domain/ports/social_service.dart';
 import '../domain/ports/transit_routing_service.dart';
+import '../domain/ports/trips_repository.dart';
 
 /// Port providers.
 ///
@@ -82,6 +84,12 @@ final Provider<LocationService> locationServiceProvider =
 
 final Provider<PlacesRepository> placesRepositoryProvider =
     Provider<PlacesRepository>((Ref ref) => FakePlacesRepository());
+
+/// Recorded trips (the breadcrumb paths travelled during guidance). The keyless
+/// default keeps them in memory; `lib/app/di.dart` swaps in the database-backed
+/// adapter once the app database is open.
+final Provider<TripsRepository> tripsRepositoryProvider =
+    Provider<TripsRepository>((Ref ref) => FakeTripsRepository());
 
 final Provider<SettingsRepository> settingsRepositoryProvider =
     Provider<SettingsRepository>((Ref ref) => FakeSettingsRepository());

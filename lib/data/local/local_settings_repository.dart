@@ -41,6 +41,7 @@ class LocalSettingsRepository implements SettingsRepository {
   static const String _searchBackendKey = 'settings.searchBackend';
   static const String _pinnedCategoriesKey = 'settings.pinnedCategories';
   static const String _pushTransportKey = 'settings.pushTransport';
+  static const String _recentTripsLimitKey = 'settings.recentTripsLimit';
   static const String _migratedFromPrefsKey = 'settings.migratedFromPrefs';
 
   Future<SharedPreferences>? _prefs;
@@ -79,6 +80,9 @@ class LocalSettingsRepository implements SettingsRepository {
       pinnedCategoryIds: await _pinnedCategories(),
       pushTransport: PushTransport.fromStorage(
         await database.readString(_pushTransportKey),
+      ),
+      recentTripsLimit: sanitizeRecentTripsLimit(
+        await database.readInt(_recentTripsLimitKey),
       ),
     );
   }
@@ -119,6 +123,10 @@ class LocalSettingsRepository implements SettingsRepository {
       settings.pinnedCategoryIds,
     );
     await database.writeString(_pushTransportKey, settings.pushTransport.wire);
+    await database.writeInt(
+      _recentTripsLimitKey,
+      sanitizeRecentTripsLimit(settings.recentTripsLimit),
+    );
     final SharedPreferences prefs = await _instance();
     await prefs.setString(_themeKey, settings.theme.name);
   }
