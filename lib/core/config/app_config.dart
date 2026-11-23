@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// Compile-time configuration supplied via `--dart-define`
 /// (or `--dart-define-from-file`).
 ///
@@ -65,6 +67,9 @@ class AppConfig {
     // 'wss://nostr.mom',
     'wss://relay.map.camelus.app',
   ];
+
+  /// Local relay used by both relay channels in debug builds.
+  static const List<String> debugRelays = <String>['ws://192.168.0.21:10547'];
 
   /// Blossom servers review photos upload to (BUD-02). Public, free hosts by
   /// default; override with `--dart-define=BLOSSOM_SERVERS=https://a`.
@@ -231,7 +236,10 @@ class AppConfig {
 
   /// True for a release/AOT product build — the pure-Dart equivalent of
   /// Flutter's `kReleaseMode`, so `core/` stays free of Flutter imports.
-  static const bool isProductBuild = bool.fromEnvironment('dart.vm.product');
+  static const bool isProductBuild = kReleaseMode;
+
+  /// True only in debug builds, excluding both profile and product builds.
+  static const bool isDebugBuild = kDebugMode;
 
   /// The automatic sign-in key to keep: [raw] in a development build, `''` in a
   /// release build. Pure so the "debug only" rule is unit-testable.
@@ -260,12 +268,13 @@ class AppConfig {
       'MAP_STYLE_URL',
       defaultValue: defaultMapStyleUrl,
     ),
-    liveShareRelays: _parseRelays(
+    liveShareRelays: _parseRelayList(
       const String.fromEnvironment('LIVE_SHARE_RELAYS'),
+      isDebugBuild ? debugRelays : defaultLiveShareRelays,
     ),
     reviewRelays: _parseRelayList(
       const String.fromEnvironment('REVIEW_RELAYS'),
-      defaultReviewRelays,
+      isDebugBuild ? debugRelays : defaultReviewRelays,
     ),
     blossomServers: _parseBlossomServers(
       const String.fromEnvironment('BLOSSOM_SERVERS'),
@@ -325,16 +334,6 @@ class AppConfig {
       raw: const String.fromEnvironment('NOSTR_NSEC'),
     ),
   );
-
-  /// Splits a comma-separated relay list; empty means outbox routing.
-  static List<String> _parseRelays(String raw) {
-    final List<String> relays = <String>[
-      for (final String part in raw.split(','))
-        if (part.trim().startsWith('wss://') || part.trim().startsWith('ws://'))
-          part.trim(),
-    ];
-    return relays.isEmpty ? defaultLiveShareRelays : relays;
-  }
 
   /// Splits a comma-separated relay list, falling back to [fallback].
   static List<String> _parseRelayList(String raw, List<String> fallback) {

@@ -38,6 +38,7 @@ void main() {
         isTrue,
       );
       expect(AppConfig.empty.reviewRelays, AppConfig.defaultReviewRelays);
+      expect(AppConfig.empty.liveShareRelays, AppConfig.defaultLiveShareRelays);
       expect(AppConfig.empty.blossomServers, AppConfig.defaultBlossomServers);
     });
 
