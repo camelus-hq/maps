@@ -16,25 +16,7 @@ relay for one coarse cell (`#g: ["u33d"]`) and receive every review inside it in
 a single round trip, at any zoom level.
 
 ### Price
-
-`price` is **optional on the wire**: a review without it is still valid, and a
-client that does not understand it must ignore it. It is the per-person amount
-the reviewer paid, in the ISO-4217 `currency` on the same event — a real value
-(`18` `EUR`), not a tier, so any client can format or aggregate it. A paid
-`price` without a usable `currency` is dropped rather than guessed; a free price
-is written as `0` with no `currency` and always counts.
-
-This app asks for the price in the composer (as amount bands, `≤ €10`,
-`€10–25`, …) and publishes each band's representative amount in the **place's
-own region currency** — not the reader's locale. For display it maps the amount
-back to a band: the place sheet averages the reported amounts into a single band
-(`€€€`) with a long-press **tooltip** explaining it (`€€€ · about €25–50 per
-person`). When reviewers reported **different currencies**, the average is
-computed in the **majority currency** and the others are dropped, so a stray
-dollar review cannot skew a euro place. It only asks where a per-person charge
-makes sense (food, drink, ticketed attractions) and never for free landmarks;
-for those categories the app requires an answer (`0` "Free of charge" is a valid
-one) before it will publish.
+Price is per currency, and apps can choose to display them in respective price bands €,€€,€€€
 
 
 
