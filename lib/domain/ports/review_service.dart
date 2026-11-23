@@ -28,8 +28,13 @@ abstract interface class ReviewService {
   /// Reviews for a single place (the place sheet), newest first.
   Future<List<Review>> reviewsForPlace(String placeKey);
 
-  /// Reviews whose geohash falls inside [bounds] — the map only ever asks for
-  /// what is on screen. Malformed events are dropped, never thrown.
+  /// The reviews under the geohash cells that cover [bounds] — a **bounded
+  /// superset** of what is on screen, never the whole world.
+  ///
+  /// The map only ever asks for the cells covering the visible rectangle; it
+  /// caches the result and clips to the exact viewport itself, so a pan inside
+  /// the same cells needs no new relay query. Malformed events are dropped,
+  /// never thrown.
   Future<List<Review>> reviewsInBounds(ReviewBounds bounds);
 
   /// Uploads [photos] to Blossom and returns their public URLs, in order.

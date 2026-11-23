@@ -25,6 +25,13 @@ void main() {
   late ProviderContainer container;
   final String coffee = ReviewPlace.keyFor('sample-harbour-coffee');
 
+  /// The map controller debounces camera queries by 150 ms; let that timer fire
+  /// and the service's futures settle before asserting.
+  Future<void> settleMap() async {
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    await pumpEventQueue();
+  }
+
   const Place harbourCoffee = Place(
     id: 'sample-harbour-coffee',
     name: 'Harbour Coffee',
@@ -159,7 +166,7 @@ void main() {
             const Camera(target: LatLon(52.52, 13.405), zoom: 16),
             const Size(400, 800),
           );
-      await pumpEventQueue();
+      await settleMap();
       final List<ReviewMarker> markers = container.read(reviewMarkersProvider);
       expect(markers, isNotEmpty);
       final ReviewMarker coffeeMarker = markers.firstWhere(
@@ -180,7 +187,7 @@ void main() {
         const Camera(target: LatLon(52.52, 13.405), zoom: 16),
         const Size(400, 800),
       );
-      await pumpEventQueue();
+      await settleMap();
       final int all = container.read(reviewMarkersProvider).length;
       controller.setFriendOnly(true);
       final List<ReviewMarker> friends = container.read(reviewMarkersProvider);
@@ -195,7 +202,7 @@ void main() {
             const Camera(target: LatLon(0, 0), zoom: 16),
             const Size(400, 800),
           );
-      await pumpEventQueue();
+      await settleMap();
       expect(container.read(reviewMarkersProvider), isEmpty);
     });
 
@@ -208,14 +215,14 @@ void main() {
         const Camera(target: LatLon(52.52, 13.405), zoom: 16),
         const Size(400, 800),
       );
-      await pumpEventQueue();
+      await settleMap();
       expect(container.read(reviewMarkersProvider), isNotEmpty);
 
       controller.update(
         const Camera(target: LatLon(52.52, 13.405), zoom: 11),
         const Size(400, 800),
       );
-      await pumpEventQueue();
+      await settleMap();
       expect(container.read(reviewMarkersProvider), isEmpty);
       expect(container.read(mapServiceProvider).reviewMarkers, isEmpty);
     });
@@ -259,11 +266,64 @@ void main() {
       local
           .read(reviewMarkersProvider.notifier)
           .update(const Camera(target: spot, zoom: 16), const Size(400, 800));
-      await pumpEventQueue();
+      await settleMap();
       final List<ReviewMarker> markers = local.read(reviewMarkersProvider);
       expect(markers, hasLength(1));
       expect(markers.single.placeKey, ReviewPlace.keyFor('sample-willow-park'));
       expect(markers.single.hasFriendReview, isTrue);
+    });
+
+    test('only queries the relay when the geohash filter changes', () async {
+      await container.read(friendsProvider.future);
+      final ReviewMarkersController controller = container.read(
+        reviewMarkersProvider.notifier,
+      );
+      // Two updates for the same camera: the 150 ms debounce coalesces them and
+      // the filter is unchanged, so exactly one read reaches the service.
+      controller.update(
+        const Camera(target: LatLon(52.52, 13.405), zoom: 16),
+        const Size(400, 800),
+      );
+      controller.update(
+        const Camera(target: LatLon(52.52, 13.405), zoom: 16),
+        const Size(400, 800),
+      );
+      await settleMap();
+      expect(reviews.boundsQueries, 1);
+      expect(container.read(reviewMarkersProvider), isNotEmpty);
+
+      // A tiny pan still lands in the same geohash cells: no new query.
+      controller.update(
+        const Camera(target: LatLon(52.5201, 13.4051), zoom: 16),
+        const Size(400, 800),
+      );
+      await settleMap();
+      expect(reviews.boundsQueries, 1);
+
+      // Moving to another city changes the filter: one new query.
+      controller.update(
+        const Camera(target: LatLon(48.1372, 11.5756), zoom: 16),
+        const Size(400, 800),
+      );
+      await settleMap();
+      expect(reviews.boundsQueries, 2);
+    });
+
+    test('a refresh re-queries even when the filter is unchanged', () async {
+      await container.read(friendsProvider.future);
+      final ReviewMarkersController controller = container.read(
+        reviewMarkersProvider.notifier,
+      );
+      controller.update(
+        const Camera(target: LatLon(52.52, 13.405), zoom: 16),
+        const Size(400, 800),
+      );
+      await settleMap();
+      expect(reviews.boundsQueries, 1);
+
+      await controller.refresh();
+      await pumpEventQueue();
+      expect(reviews.boundsQueries, 2);
     });
   });
 }

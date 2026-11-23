@@ -73,6 +73,9 @@ void main() {
     // Location services turn off → the button shows the alert state but follow
     // stays on, so the last known location is still shown greyed out.
     location.setAvailability(false);
+    // The availability event is delivered in a microtask, so the first pump
+    // only hands it to the tracker; the second draws the rebuilt control.
+    await tester.pump();
     await tester.pump();
     expect(find.byIcon(PlayIcons.locationLost), findsOneWidget);
     expect(find.byIcon(PlayIcons.locate), findsNothing);

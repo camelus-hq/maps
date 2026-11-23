@@ -13,6 +13,7 @@ import '../domain/entities/place.dart';
 import '../domain/entities/price_range.dart';
 import '../domain/entities/review.dart';
 import '../domain/entities/review_bounds.dart';
+import '../domain/entities/review_bounds_cover.dart';
 import '../domain/entities/review_draft.dart';
 import '../domain/entities/review_marker.dart';
 import '../domain/entities/review_place.dart';
@@ -191,20 +192,30 @@ Review decorateWithFriend(Review review, Map<String, Friend> friends) {
 /// The reviews on screen, as one badge per reviewed place.
 ///
 /// The map home drives this through [ReviewMapLayer]: whenever the camera
-/// settles it asks for the reviews inside the visible rectangle (geohash query
-/// behind [reviewServiceProvider]) and paints one badge per place. A badge for a
-/// place a friend has reviewed is highlighted.
+/// settles it asks for the reviews under the geohash cells covering the visible
+/// rectangle (behind [reviewServiceProvider]) and paints one badge per place. A
+/// badge for a place a friend has reviewed is highlighted.
 ///
-/// Two map problems are handled here, in one place, because both need the
-/// camera and the viewport:
+/// Three map problems are handled here, in one place, because all of them need
+/// the camera and the viewport:
 /// - **Zoomed out**, badges would blanket the map and never be readable, so
 ///   nothing is drawn ([minZoom]) and no query is made.
 /// - **Overlapping** badges (places close together) are collapsed to the most
 ///   relevant one — **a friend's review always wins** ([_dropOverlaps]).
+/// - **Repeat queries** are avoided: the camera updates on every frame, so the
+///   relay is only asked once the camera rests ([_queryDebounce]) **and** only
+///   when the derived `#g` filter actually changes. A pan inside the same cells
+///   is served from the cached answers by re-clipping locally.
 class ReviewMarkersController extends Notifier<List<ReviewMarker>> {
   /// Badges are hidden below this zoom. At city scale they would cover the map
   /// (and each other) and none would be readable.
   static const double minZoom = 14;
+
+  /// How long the camera rests before the visible rectangle is queried.
+  ///
+  /// The camera updates on every frame; without this a single drag would queue a
+  /// relay query per frame.
+  static const Duration _queryDebounce = Duration(milliseconds: 150);
 
   /// Estimated size of a composed badge **as drawn on the map**, used for the
   /// overlap test: the composer's own geometry scaled by
@@ -221,8 +232,12 @@ class ReviewMarkersController extends Notifier<List<ReviewMarker>> {
   int _requestSeq = 0;
   bool _loading = false;
   bool _pending = false;
+  Timer? _debounce;
   ReviewBounds? _lastBounds;
-  ReviewBounds? _lastLoadedBounds;
+
+  /// The `#g` filter the cached [_raw] reviews belong to. A camera move that
+  /// keeps the same cover needs no new query.
+  String? _loadedKey;
   Camera? _camera;
   Size? _viewport;
   List<Review> _raw = const <Review>[];
@@ -234,6 +249,7 @@ class ReviewMarkersController extends Notifier<List<ReviewMarker>> {
 
   @override
   List<ReviewMarker> build() {
+    ref.onDispose(() => _debounce?.cancel());
     // The friend graph often arrives after the first query; recompose the
     // badges (highlighting friends) as soon as it does.
     ref.listen<Map<String, Friend>>(friendsByPubkeyProvider, (
@@ -243,17 +259,20 @@ class ReviewMarkersController extends Notifier<List<ReviewMarker>> {
       if (_raw.isEmpty) {
         return;
       }
-      _all = _compose(_raw);
-      _emit();
+      _apply();
     });
     return const <ReviewMarker>[];
   }
 
-  /// Records the camera + viewport and (re)queries the visible rectangle.
+  /// Records the camera + viewport and (re)queries the visible rectangle once
+  /// the camera has rested for [_queryDebounce].
   ///
-  /// Queries coalesce: while one is in flight the newest bounds are remembered
-  /// and run once it finishes, so a pan cannot queue up a storm of queries (and
-  /// no timer is ever left behind).
+  /// A relay query runs only when the derived `#g` filter (the geohash cells
+  /// covering the viewport) actually changes, so a pan inside the same cells is
+  /// served from the cached reviews by clipping locally. Queries also coalesce:
+  /// while one is in flight the newest camera is remembered and the filter
+  /// re-checked once it finishes, so a pan cannot queue up a storm of queries
+  /// (and no timer is ever left behind).
   void update(Camera camera, Size viewport) {
     if (!viewport.width.isFinite || !viewport.height.isFinite) {
       return;
@@ -262,30 +281,23 @@ class ReviewMarkersController extends Notifier<List<ReviewMarker>> {
     _viewport = viewport;
     if (camera.zoom < minZoom) {
       // Too far out to show anything (and not worth a query).
+      _debounce?.cancel();
       _lastBounds = null;
-      _lastLoadedBounds = null;
+      _loadedKey = null;
       _raw = const <Review>[];
-      _all = const <ReviewMarker>[];
-      if (state.isNotEmpty) {
+      if (_all.isNotEmpty) {
+        _all = const <ReviewMarker>[];
         _emit();
       }
       return;
     }
-    final ReviewBounds bounds = ReviewBounds.fromCamera(
+    _lastBounds = ReviewBounds.fromCamera(
       camera,
       widthPx: viewport.width,
       heightPx: viewport.height,
     );
-    _lastBounds = bounds;
-    final ReviewBounds? lastLoaded = _lastLoadedBounds;
-    if (lastLoaded != null && _sameBounds(lastLoaded, bounds)) {
-      return;
-    }
-    if (_loading) {
-      _pending = true;
-      return;
-    }
-    unawaited(_drain());
+    _debounce?.cancel();
+    _debounce = Timer(_queryDebounce, () => unawaited(_drain()));
   }
 
   /// Re-queries the last known viewport (after publishing, say).
@@ -294,7 +306,8 @@ class ReviewMarkersController extends Notifier<List<ReviewMarker>> {
     if (bounds == null) {
       return;
     }
-    _lastLoadedBounds = null;
+    _debounce?.cancel();
+    _loadedKey = null; // Force a fresh relay read.
     await _drain();
   }
 
@@ -306,6 +319,11 @@ class ReviewMarkersController extends Notifier<List<ReviewMarker>> {
     _friendOnly = value;
     _emit();
   }
+
+  /// The `#g` filter identity of [bounds]: equal keys mean the same relay query
+  /// ([ReviewBoundsCover.kindOnlyKey] when the viewport is too wide to cover).
+  static String _keyFor(ReviewBounds bounds) =>
+      ReviewBoundsCover.of(bounds)?.key ?? ReviewBoundsCover.kindOnlyKey;
 
   Future<void> _drain() async {
     if (_loading) {
@@ -320,41 +338,64 @@ class ReviewMarkersController extends Notifier<List<ReviewMarker>> {
         if (bounds == null) {
           break;
         }
-        await _load(bounds);
+        final String key = _keyFor(bounds);
+        if (key != _loadedKey && !await _load(bounds, key)) {
+          // Keep the badges we already have; the next camera move retries.
+          break;
+        }
+        _apply();
       } while (_pending && ref.mounted);
     } finally {
       _loading = false;
     }
   }
 
-  Future<void> _load(ReviewBounds bounds) async {
+  /// Fetches and enriches the reviews for the `#g` filter of [bounds], returning
+  /// whether they were applied. Nothing is queried when [key] is already loaded.
+  Future<bool> _load(ReviewBounds bounds, String key) async {
     final int seq = ++_requestSeq;
     final List<Review> reviews;
     try {
       final LoadVisibleReviews load = ref.read(loadVisibleReviewsProvider);
       reviews = await load(bounds);
     } on AppException {
-      // Keep the badges we already have; the next camera move retries.
-      return;
+      return false;
     }
     if (!ref.mounted || seq != _requestSeq) {
-      return;
+      return false;
     }
     final List<Review> enriched = await enrichReviews(ref, reviews);
     if (!ref.mounted || seq != _requestSeq) {
-      return;
+      return false;
     }
-    _lastLoadedBounds = bounds;
+    _loadedKey = key;
     _raw = enriched;
-    _all = _compose(enriched);
+    return true;
+  }
+
+  /// Clips the cached reviews to the current viewport and repaints the badges.
+  ///
+  /// Pure local work — it never queries, so a camera move that keeps the same
+  /// cells stays responsive. The clip also drops off-screen pins when a relay
+  /// answered with more than the `#g` filter asked for.
+  void _apply() {
+    _all = _compose(_visible(_raw));
     _emit();
   }
 
-  /// Whether two viewports are close enough that a re-query is pointless.
-  bool _sameBounds(ReviewBounds a, ReviewBounds b) {
-    return (a.latSpan - b.latSpan).abs() < 1e-6 &&
-        (a.lonSpan - b.lonSpan).abs() < 1e-6 &&
-        a.center.distanceTo(b.center) < 25;
+  List<Review> _visible(List<Review> reviews) {
+    final ReviewBounds? bounds = _lastBounds;
+    if (bounds == null) {
+      return reviews;
+    }
+    return <Review>[
+      for (final Review review in reviews)
+        if (bounds.contains(
+          review.position,
+          marginDegrees: LoadVisibleReviews.edgeMarginDegrees,
+        ))
+          review,
+    ];
   }
 
   /// Groups reviews by place, produces one badge each, then drops the badges
