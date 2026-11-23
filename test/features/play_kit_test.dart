@@ -293,6 +293,37 @@ void main() {
     },
   );
 
+  testWidgets('a tooltip shows on long press and hides itself', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _harness(
+        Overlay(
+          initialEntries: <OverlayEntry>[
+            OverlayEntry(
+              builder: (BuildContext context) => Align(
+                alignment: Alignment.topLeft,
+                child: PlayTooltip(
+                  message: 'about €10–25 per person',
+                  child: const PlayTag(label: '€€'),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    const String message = 'about €10–25 per person';
+    expect(find.text(message), findsNothing);
+
+    await tester.longPress(find.text('€€'));
+    await tester.pump();
+    expect(find.text(message), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 4));
+    expect(find.text(message), findsNothing);
+  });
+
   testWidgets('a popup menu near the edge is clamped on screen', (
     WidgetTester tester,
   ) async {

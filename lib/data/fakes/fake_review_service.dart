@@ -70,6 +70,8 @@ class FakeReviewService implements ReviewService {
       required LatLon position,
       required Duration ago,
       String? name,
+      double? priceAmount,
+      String? priceCurrency,
     }) {
       seq++;
       return Review(
@@ -81,6 +83,8 @@ class FakeReviewService implements ReviewService {
         position: position,
         createdAt: base.subtract(ago),
         authorName: name,
+        priceAmount: priceAmount,
+        priceCurrency: priceCurrency,
       );
     }
 
@@ -95,6 +99,8 @@ class FakeReviewService implements ReviewService {
         position: const LatLon(52.5210, 13.4075),
         ago: const Duration(days: 2, hours: 3),
         name: FakeSocialService.demoFriends[0].displayName,
+        priceAmount: 8,
+        priceCurrency: 'EUR',
       ),
       make(
         placeKey: coffee,
@@ -104,6 +110,8 @@ class FakeReviewService implements ReviewService {
         position: const LatLon(52.52105, 13.40755),
         ago: const Duration(days: 6),
         name: FakeSocialService.demoFriends[1].displayName,
+        priceAmount: 18,
+        priceCurrency: 'EUR',
       ),
       make(
         placeKey: coffee,
@@ -123,6 +131,8 @@ class FakeReviewService implements ReviewService {
         position: const LatLon(52.5180, 13.4020),
         ago: const Duration(days: 1, hours: 5),
         name: FakeSocialService.demoFriends[2].displayName,
+        priceAmount: 7,
+        priceCurrency: 'EUR',
       ),
       make(
         placeKey: kitchen,
@@ -133,6 +143,8 @@ class FakeReviewService implements ReviewService {
         position: const LatLon(52.5230, 13.4100),
         ago: const Duration(days: 4),
         name: 'Priya',
+        priceAmount: 20,
+        priceCurrency: 'EUR',
       ),
       make(
         placeKey: kitchen,
@@ -143,6 +155,8 @@ class FakeReviewService implements ReviewService {
         position: const LatLon(52.52304, 13.41006),
         ago: const Duration(days: 9),
         name: 'Marko',
+        priceAmount: 45,
+        priceCurrency: 'EUR',
       ),
     ];
   }
@@ -182,6 +196,8 @@ class FakeReviewService implements ReviewService {
         createdAt: _clock().toUtc(),
         photos: allPhotos,
         authorName: 'You',
+        priceAmount: draft.priceAmount,
+        priceCurrency: draft.priceCurrency,
       ),
     );
     published.add(draft);

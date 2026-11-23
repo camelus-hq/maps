@@ -2,8 +2,10 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openmaps/core/errors/app_exception.dart';
+import 'package:openmaps/core/utils/currency.dart';
 import 'package:openmaps/data/fakes/fake_review_service.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
+import 'package:openmaps/domain/entities/price_range.dart';
 import 'package:openmaps/domain/entities/review.dart';
 import 'package:openmaps/domain/entities/review_bounds.dart';
 import 'package:openmaps/domain/entities/review_draft.dart';
@@ -54,6 +56,8 @@ void main() {
         position: const LatLon(52.5210, 13.4075),
         rating: 1.0,
         text: 'Changed my mind',
+        priceAmount: 18,
+        priceCurrency: 'EUR',
       ),
     );
     final List<Review> mine = (await service.reviewsForPlace(coffee))
@@ -62,6 +66,12 @@ void main() {
     expect(mine, hasLength(1));
     expect(mine.single.rating, 1.0);
     expect(mine.single.content, 'Changed my mind');
+    expect(mine.single.priceAmount, 18);
+    expect(mine.single.priceCurrency, 'EUR');
+    expect(
+      mine.single.priceBand(const CurrencyInfo('EUR', '€')),
+      PriceRange.moderate,
+    );
     expect(service.published, hasLength(2));
   });
 

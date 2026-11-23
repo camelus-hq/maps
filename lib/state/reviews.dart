@@ -5,10 +5,12 @@ import 'dart:ui' show Offset, Rect, Size;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/errors/app_exception.dart';
+import '../core/utils/currency.dart';
 import '../data/fakes/fake_review_service.dart';
 import '../domain/entities/camera.dart';
 import '../domain/entities/friend.dart';
 import '../domain/entities/place.dart';
+import '../domain/entities/price_range.dart';
 import '../domain/entities/review.dart';
 import '../domain/entities/review_bounds.dart';
 import '../domain/entities/review_draft.dart';
@@ -540,14 +542,20 @@ class ReviewComposerController extends Notifier<ReviewComposerState> {
 
   /// Opens the composer for [place], optionally prefilled with [initial].
   void open(Place place, {ReviewDraft? initial}) {
+    final bool priceApplies = priceRangeAppliesToCategory(place.category);
+    final ReviewDraft base =
+        initial ??
+        ReviewDraft(
+          placeKey: ReviewPlace.keyFor(place.id),
+          position: place.position,
+        );
     state = ReviewComposerState(
       place: place,
-      draft:
-          initial ??
-          ReviewDraft(
-            placeKey: ReviewPlace.keyFor(place.id),
-            position: place.position,
-          ),
+      // The category decides whether the price question is asked, whatever
+      // draft was passed in.
+      draft: base.priceApplies == priceApplies
+          ? base
+          : base.copyWith(priceApplies: priceApplies),
     );
   }
 
@@ -579,6 +587,41 @@ class ReviewComposerController extends Notifier<ReviewComposerState> {
 
   void setVisibility(ReviewVisibility visibility) {
     _updateDraft((ReviewDraft draft) => draft.copyWith(visibility: visibility));
+  }
+
+  /// Sets the per-person price from a band, converting it to the amount and
+  /// currency written to the wire (in the place's own currency). `null` clears.
+  void setPrice(PriceRange? price) {
+    if (price == null) {
+      _updateDraft((ReviewDraft draft) => draft.copyWith(clearPrice: true));
+      return;
+    }
+    final CurrencyInfo currency = currencyForRegion(state.place?.regionCode);
+    _updateDraft(
+      (ReviewDraft draft) => draft.copyWith(
+        priceAmount: price.representativeAmount(currency),
+        priceCurrency: price.isFree ? null : currency.code,
+        clearPrice: false,
+      ),
+    );
+  }
+
+  /// Sets an explicit per-person [amount] (the wire value) and its [currency]
+  /// (the place's currency when omitted). `null` clears.
+  void setPriceAmount(double? amount, {String? currency}) {
+    if (amount == null) {
+      _updateDraft((ReviewDraft draft) => draft.copyWith(clearPrice: true));
+      return;
+    }
+    final CurrencyInfo place = currencyForRegion(state.place?.regionCode);
+    final String? code = amount <= 0 ? null : (currency ?? place.code);
+    _updateDraft(
+      (ReviewDraft draft) => draft.copyWith(
+        priceAmount: amount,
+        priceCurrency: code,
+        clearPrice: false,
+      ),
+    );
   }
 
   void addPhotos(List<ReviewPhoto> photos) {

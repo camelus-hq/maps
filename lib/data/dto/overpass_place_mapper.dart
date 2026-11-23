@@ -88,7 +88,21 @@ abstract final class OverpassPlaceMapper {
       wheelchairAccessible: _wheelchair(tags),
       openingHours: _contact(tags, const <String>['opening_hours'], 200),
       osmTags: tags,
+      countryCode: _country(tags),
     );
+  }
+
+  /// The element's country from an `addr:country` / `is_in:country_code` tag,
+  /// when it is a two-letter ISO code.
+  static String? _country(Map<String, String> tags) =>
+      _alpha2(tags['addr:country']) ?? _alpha2(tags['is_in:country_code']);
+
+  static String? _alpha2(String? raw) {
+    if (raw == null) {
+      return null;
+    }
+    final String value = raw.trim().toUpperCase();
+    return RegExp(r'^[A-Z]{2}$').hasMatch(value) ? value : null;
   }
 
   /// `node`s carry `lat`/`lon`; `way`s and `relation`s carry a `center` object

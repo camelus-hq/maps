@@ -25,6 +25,7 @@ void main() {
     position: LatLon(52.5210, 13.4075),
     category: 'Cafe',
     address: '1 Lantern Way',
+    countryCode: 'DE',
   );
 
   late ProviderContainer container;

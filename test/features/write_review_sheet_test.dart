@@ -20,6 +20,7 @@ void main() {
     position: LatLon(52.5210, 13.4075),
     category: 'Opera house',
     address: 'Mitte, Berlin',
+    countryCode: 'DE',
   );
 
   late FakeReviewService reviews;
@@ -64,8 +65,41 @@ void main() {
     expect(find.text('Your review'), findsOneWidget);
     expect(find.text('Add photos'), findsOneWidget);
     expect(find.text('Public review'), findsOneWidget);
+    // An opera house charges per person, so the price question is asked.
+    expect(find.text('Price per person'), findsOneWidget);
+    expect(find.text('Free of charge'), findsOneWidget);
     expect(find.text('Publish review'), findsOneWidget);
     expect(find.text('You can edit your review anytime.'), findsOneWidget);
+  });
+
+  testWidgets('hides the price question for a place that does not charge', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(420, 1100);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    container
+        .read(reviewComposerProvider.notifier)
+        .open(
+          const Place(
+            id: 'sample-willow-park',
+            name: 'Willow Park',
+            position: LatLon(52.5150, 13.4030),
+            category: 'Park',
+          ),
+        );
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          home: const Scaffold(body: WriteReviewSheet()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Price per person'), findsNothing);
   });
 
   testWidgets('tapping a star sets the rating and its label', (
@@ -102,6 +136,10 @@ void main() {
     );
     await tester.pump();
 
+    // The opera charges, so publishing waits for a price; free is an answer.
+    await tester.tap(find.text('Free of charge'));
+    await tester.pump();
+
     final PlayButton button = tester.widget<PlayButton>(
       find.widgetWithText(PlayButton, 'Publish review'),
     );
@@ -112,6 +150,8 @@ void main() {
 
     expect(reviews.published, hasLength(1));
     expect(reviews.published.single.text, contains('unforgettable'));
+    expect(reviews.published.single.priceAmount, 0);
+    expect(reviews.published.single.priceCurrency, isNull);
     expect(container.read(reviewComposerProvider).isOpen, isFalse);
     expect(find.text('Review published'), findsOneWidget);
   });

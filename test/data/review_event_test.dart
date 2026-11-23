@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ndk/entities.dart' show Nip01Event;
+import 'package:openmaps/core/utils/currency.dart';
 import 'package:openmaps/core/utils/geohash.dart';
 import 'package:openmaps/data/nostr/review_event.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
+import 'package:openmaps/domain/entities/price_range.dart';
 import 'package:openmaps/domain/entities/review.dart';
 import 'package:openmaps/domain/entities/review_place.dart';
 
@@ -98,6 +100,83 @@ void main() {
       expect(geohashes.length, full.length);
     });
 
+    test('omits the price tag unless an amount is given', () {
+      expect(
+        tagsFor().any((List<String> tag) => tag.first == 'price'),
+        isFalse,
+      );
+      final List<List<String>> paid = ReviewEvent.buildTags(
+        placeKey: placeKey,
+        rating: 0.8,
+        position: berlin,
+        priceAmount: 18,
+        priceCurrency: 'eur',
+      );
+      expect(
+        paid.firstWhere((List<String> tag) => tag.first == 'price'),
+        <String>['price', '18'],
+      );
+      expect(
+        paid.firstWhere((List<String> tag) => tag.first == 'currency'),
+        <String>['currency', 'EUR'],
+      );
+
+      // A free price is written as zero with no currency.
+      final List<List<String>> free = ReviewEvent.buildTags(
+        placeKey: placeKey,
+        rating: 0.8,
+        position: berlin,
+        priceAmount: 0,
+        priceCurrency: 'EUR',
+      );
+      expect(
+        free.firstWhere((List<String> tag) => tag.first == 'price'),
+        <String>['price', '0'],
+      );
+      expect(free.any((List<String> tag) => tag.first == 'currency'), isFalse);
+
+      // A paid amount with an unrecognised currency carries no currency tag.
+      final List<List<String>> unknown = ReviewEvent.buildTags(
+        placeKey: placeKey,
+        rating: 0.8,
+        position: berlin,
+        priceAmount: 18,
+        priceCurrency: 'ZZZ',
+      );
+      expect(
+        unknown.any((List<String> tag) => tag.first == 'currency'),
+        isFalse,
+      );
+    });
+
+    test('formatAmount keeps a compact numeric string', () {
+      expect(ReviewEvent.formatAmount(18), '18');
+      expect(ReviewEvent.formatAmount(17.5), '17.5');
+      expect(ReviewEvent.formatAmount(17.50), '17.5');
+      expect(ReviewEvent.formatAmount(0), '0');
+      expect(ReviewEvent.formatAmount(-3), '0');
+      expect(ReviewEvent.formatAmount(double.nan), '0');
+    });
+
+    test('parseAmount rejects junk, negatives and absurd values', () {
+      expect(ReviewEvent.parseAmount('18'), 18);
+      expect(ReviewEvent.parseAmount('17.5'), 17.5);
+      expect(ReviewEvent.parseAmount(0), 0);
+      expect(ReviewEvent.parseAmount('-1'), isNull);
+      expect(ReviewEvent.parseAmount('nope'), isNull);
+      expect(ReviewEvent.parseAmount(null), isNull);
+      expect(ReviewEvent.parseAmount(double.infinity), isNull);
+      expect(ReviewEvent.parseAmount(ReviewEvent.maxPriceAmount + 1), isNull);
+    });
+
+    test('parseCurrency accepts a known 3-letter code only', () {
+      expect(ReviewEvent.parseCurrency('eur'), 'EUR');
+      expect(ReviewEvent.parseCurrency('USD'), 'USD');
+      expect(ReviewEvent.parseCurrency('ZZZ'), isNull);
+      expect(ReviewEvent.parseCurrency('EU'), isNull);
+      expect(ReviewEvent.parseCurrency(null), isNull);
+    });
+
     test('formatRating keeps a compact numeric string', () {
       expect(ReviewEvent.formatRating(0.8), '0.8');
       expect(ReviewEvent.formatRating(1), '1');
@@ -165,6 +244,70 @@ void main() {
       expect(review.position.latitude, closeTo(berlin.latitude, 0.0001));
       expect(review.photos, isEmpty);
       expect(review.createdAt.millisecondsSinceEpoch, 1700000000000);
+    });
+
+    test('reads a paid amount and currency, dropping unusable ones', () {
+      final Review? priced = ReviewEvent.fromEvent(
+        event(
+          tags: <List<String>>[
+            ...tagsFor(),
+            <String>['price', '18'],
+            <String>['currency', 'eur'],
+          ],
+        ),
+      );
+      expect(priced, isNotNull);
+      expect(priced!.priceAmount, 18);
+      expect(priced.priceCurrency, 'EUR');
+      expect(
+        priced.priceBand(const CurrencyInfo('EUR', '€')),
+        PriceRange.moderate,
+      );
+
+      // A paid amount with no currency cannot be interpreted: dropped.
+      final Review? noCurrency = ReviewEvent.fromEvent(
+        event(
+          tags: <List<String>>[
+            ...tagsFor(),
+            <String>['price', '18'],
+          ],
+        ),
+      );
+      expect(noCurrency, isNotNull);
+      expect(noCurrency!.priceAmount, isNull);
+
+      // A free price is currency-agnostic and always kept.
+      final Review? free = ReviewEvent.fromEvent(
+        event(
+          tags: <List<String>>[
+            ...tagsFor(),
+            <String>['price', '0'],
+          ],
+        ),
+      );
+      expect(free, isNotNull);
+      expect(free!.priceAmount, 0);
+      expect(free.priceCurrency, isNull);
+      expect(free.priceBand(null), PriceRange.free);
+
+      // Malformed amount: the review stays valid, the price is dropped.
+      final Review? bad = ReviewEvent.fromEvent(
+        event(
+          tags: <List<String>>[
+            ...tagsFor(),
+            <String>['price', 'nope'],
+            <String>['currency', 'EUR'],
+          ],
+        ),
+      );
+      expect(bad, isNotNull);
+      expect(bad!.priceAmount, isNull);
+
+      // Absent: no price, still a valid review.
+      expect(
+        ReviewEvent.fromEvent(event(tags: tagsFor()))!.priceAmount,
+        isNull,
+      );
     });
 
     test('separates photo links from the body text', () {

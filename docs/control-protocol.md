@@ -59,7 +59,7 @@ adb forward tcp:7981 tcp:7981
 | `place.copyAddress` | `{id?}` (defaults to the selected place) | `{id, address}` — also copied to the clipboard |
 | `review.compose` | `{id?}` (defaults to the selected place) | the review draft state |
 | `review.compose.close` | — | `true` |
-| `review.draft.set` | `{rating?: 0..1, stars?: 1..5, text?, visibility?: public\|friends}` | the review draft state |
+| `review.draft.set` | `{rating?: 0..1, stars?: 1..5, text?, visibility?: public\|friends, price?: 0..5\|"free"\|null, priceAmount?\|null, currency?}` | the review draft state |
 | `review.photo.add` | `{path}` or `{base64, mimeType?}` | the review draft state |
 | `review.publish` | — | the review draft state (publishes kind 31987) |
 | `review.list` | `{id?}` (defaults to the selected place) | the place review summary |
@@ -192,13 +192,13 @@ sync test fails if it drifts from the registry.
 | `review.compose` | Open the "Write a review" sheet for a place (params: {id?}; defaults to the selected place). Returns the draft state. |
 | `review.compose.close` | Close the "Write a review" sheet. |
 | `review.copy` | Copy review text to the clipboard (params: {text}); returns the text. Used by the "Share review" action. |
-| `review.draft.set` | Update the review draft (params: {rating?: 0..1, stars?: 1..5, text?, visibility?: public\|friends}). Returns the draft state. |
+| `review.draft.set` | Update the review draft (params: {rating?: 0..1, stars?: 1..5, text?, visibility?: public\|friends, price?: 0..5 ("free" for 0) or null, or priceAmount?: number with an optional currency? (ISO-4217, default the place currency)}). Returns the draft state. |
 | `review.helpful` | Mark a review "Helpful" (params: {id, helpful?}); returns the new state. Session-local. |
 | `review.list` | List the reviews for a place (params: {id?}; defaults to the selected place). Returns the summary with the average rating and friends. |
 | `review.open` | Open the place sheet for a review badge (params: {placeKey?} or {id?}; focus?: default true moves the camera to it). An OSM element we do not already know is looked up so the sheet shows its real name. |
 | `review.photo.add` | Attach a photo to the review draft (params: {path} for a local file, or {base64, mimeType?}; mimeType? also used with path). Returns the draft state. |
-| `review.publish` | Publish the current review draft as a Nostr kind-31987 event (photos uploaded to Blossom, links appended to the content). Returns the draft state. |
-| `review.simulate.add` | Demo/debug only: inject a synthetic review so the map badge and the place sheet can be driven without relays (params: {id? (place id), pubkey?, name?, rating?, text?, lat?, lon?, friend?}). Works only on the keyless fake backend. |
+| `review.publish` | Publish the current review draft as a Nostr kind-31987 event (the rating, the optional per-person price amount and currency, photos uploaded to Blossom, links appended to the content). Returns the draft state. |
+| `review.simulate.add` | Demo/debug only: inject a synthetic review so the map badge and the place sheet can be driven without relays (params: {id? (place id), pubkey?, name?, rating?, text?, lat?, lon?, friend?, price? (0..5), priceAmount?, currency?}). Works only on the keyless fake backend. |
 | `route.addStop` | Add a stop before the destination (params: {id}). |
 | `route.clear` | Clear the current route. |
 | `route.cycle` | Tune bicycle routing options and re-plan (params: {bicycle_type?: road\|hybrid\|cross\|mountain, use_hills?: 0..1, avoid_bad_surfaces?: 0..1, cycling_speed?: km/h, use_roads?: 0..1, avoid_edges?: bool}). Omitted options keep their current value. |

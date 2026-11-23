@@ -78,6 +78,8 @@ class NdkReviewService implements ReviewService {
         placeKey: draft.placeKey,
         rating: draft.rating,
         position: draft.position,
+        priceAmount: draft.priceAmount,
+        priceCurrency: draft.priceCurrency,
       ),
       content: content,
     );

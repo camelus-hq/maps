@@ -6,12 +6,17 @@
 |---|---|---|
 | `d` | required | Place key, e.g. `openstreetmap:way/123456789` (≤ 256 chars of id) |
 | `rating` | required | Normalised rating `0`–`1`, written without trailing zeros (`"0.8"`, `"1"`, `"0.96"`) — multiply by 5 for stars |
+| `price` | optional | Per-person price **amount** as a decimal number in `currency` (`"18"`, `"17.5"`, `"0"`). `0` means free. Omitted for places that do not charge per person (landmarks, parks) and for reviews written before the tag existed |
+| `currency` | optional | ISO-4217 code of `price` (`EUR`, `USD`, …). Required when `price` is greater than `0`; **omit** it for a free price, which is currency-agnostic |
 | `client` | recommended | `maps`; marks events this app produced |
 | `g` | required | Geohash of the place at **every precision from 9 down to 1** (full point plus all enclosing prefixes) |
 
 The stack of `g` tags is what makes viewport queries cheap: a client can ask a
 relay for one coarse cell (`#g: ["u33d"]`) and receive every review inside it in
 a single round trip, at any zoom level.
+
+### Price
+Price is per currency, and apps can choose to display them in respective price bands €,€€,€€€
 
 
 
@@ -26,6 +31,8 @@ a single round trip, at any zoom level.
   "tags": [
     ["d", "openstreetmap:way/123456789"],
     ["rating", "0.8"],
+    ["price", "18"],
+    ["currency", "EUR"],
     ["client", "openmaps"],
     ["g", "u33dbtq4w"],
     ["g", "u33dbtq4"],
@@ -53,7 +60,9 @@ a single round trip, at any zoom level.
 ### Robustness (hostile input)
 
 Wrong kinds, missing/oversized `d`/`g`/`rating`, out-of-range ratings,
-non-finite numbers, unknown or malformed geohashes, content over 8000 chars and
+malformed/negative/absurd `price` amounts, a paid `price` with an unknown or
+missing `currency` (the price is dropped, the review kept), non-finite numbers,
+unknown or malformed geohashes, content over 8000 chars and
 more than 10 photo links are all dropped rather than trusted.
 
 

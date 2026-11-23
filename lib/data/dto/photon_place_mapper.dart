@@ -41,7 +41,18 @@ abstract final class PhotonPlaceMapper {
           _string(properties['osm_value'], 60) ??
           _string(properties['osm_key'], 60),
       address: _address(properties),
+      countryCode: _alpha2(properties['countrycode']),
     );
+  }
+
+  /// A two-letter ISO country code from Photon's `countrycode`, uppercased, or
+  /// `null` when it is not a code.
+  static String? _alpha2(Object? raw) {
+    if (raw is! String) {
+      return null;
+    }
+    final String value = raw.trim().toUpperCase();
+    return RegExp(r'^[A-Z]{2}$').hasMatch(value) ? value : null;
   }
 
   /// Photon's `osm_type` is `N`/`W`/`R`; combine it with `osm_id` into our

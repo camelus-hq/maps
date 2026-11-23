@@ -10,6 +10,7 @@ import 'package:openmaps/data/fakes/fake_social_service.dart';
 import 'package:openmaps/domain/entities/camera.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/place.dart';
+import 'package:openmaps/domain/entities/price_range.dart';
 import 'package:openmaps/domain/entities/review.dart';
 import 'package:openmaps/domain/entities/review_draft.dart';
 import 'package:openmaps/domain/entities/review_marker.dart';
@@ -84,6 +85,8 @@ void main() {
 
       composer.setStars(4);
       composer.setText('Great flat white');
+      // The cafe charges, so it also needs a price before it can publish.
+      composer.setPrice(PriceRange.moderate);
       expect(container.read(reviewComposerProvider).stars, 4);
       expect(container.read(reviewComposerProvider).draft!.canPublish, isTrue);
 
@@ -94,6 +97,8 @@ void main() {
       );
       expect(reviews.published, hasLength(1));
       expect(reviews.published.single.rating, 0.8);
+      expect(reviews.published.single.priceAmount, 18);
+      expect(reviews.published.single.priceCurrency, 'EUR');
     });
 
     test('refuses to publish a friends-only review', () async {
@@ -137,6 +142,7 @@ void main() {
       );
       composer.open(harbourCoffee);
       composer.setStars(5);
+      composer.setPrice(PriceRange.free);
       await composer.publish();
       final ReviewComposerState state = container.read(reviewComposerProvider);
       expect(state.status, ReviewComposerStatus.error);

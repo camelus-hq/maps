@@ -19,6 +19,36 @@ void main() {
       expect(place?.address, 'Harbour Coffee, 1 Lantern Way, Berlin');
     });
 
+    test('reads the country from the context list or its own short_code', () {
+      final Place? fromContext = MapboxGeocodingMapper.fromFeature(
+        <String, Object?>{
+          'id': 'poi.1',
+          'text': 'X',
+          'center': <Object?>[13.4, 52.5],
+          'properties': <String, Object?>{
+            'context': <Object?>[
+              <String, Object?>{
+                'id': 'country.de',
+                'text': 'Germany',
+                'short_code': 'de',
+              },
+            ],
+          },
+        },
+      );
+      expect(fromContext?.regionCode, 'DE');
+
+      final Place? country = MapboxGeocodingMapper.fromFeature(
+        <String, Object?>{
+          'id': 'country.us',
+          'text': 'United States',
+          'center': <Object?>[-98, 39],
+          'properties': <String, Object?>{'short_code': 'us'},
+        },
+      );
+      expect(country?.regionCode, 'US');
+    });
+
     test('falls back to place_name and the categories list', () {
       final Place? place = MapboxGeocodingMapper.fromFeature(<String, Object?>{
         'id': 'b',

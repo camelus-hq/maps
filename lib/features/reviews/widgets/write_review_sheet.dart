@@ -7,7 +7,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/utils/currency.dart';
 import '../../../domain/entities/place.dart';
+import '../../../domain/entities/price_range.dart';
 import '../../../domain/entities/review.dart';
 import '../../../domain/entities/review_draft.dart';
 import '../../../state/reviews.dart';
@@ -101,6 +103,7 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
                 _header(context, place),
                 const SizedBox(height: AppSpacing.lg),
                 _rating(context, composer),
+                _priceSection(context, composer),
                 const SizedBox(height: AppSpacing.lg),
                 _reviewField(context, composer),
                 const SizedBox(height: AppSpacing.md),
@@ -204,6 +207,43 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
                     style: PlayType.caption.copyWith(color: colors.inkMuted),
                   ),
                 ],
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _priceSection(BuildContext context, ReviewComposerState composer) {
+    final ReviewDraft? draft = composer.draft;
+    if (draft == null || !draft.priceApplies) {
+      return const SizedBox.shrink();
+    }
+    final PlayColors colors = PlayColors.of(context);
+    final CurrencyInfo currency = currencyForRegion(composer.place?.regionCode);
+    final PriceRange? selected = draft.priceBand(currency);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const SizedBox(height: AppSpacing.lg),
+        Text(
+          'Price per person',
+          style: PlayType.title.copyWith(color: colors.ink),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: <Widget>[
+            for (final PriceRange range in PriceRange.values)
+              PlayChip(
+                label: range.valueLabel(currency),
+                selected: selected == range,
+                onTap: composer.isPublishing
+                    ? null
+                    : () => ref
+                          .read(reviewComposerProvider.notifier)
+                          .setPrice(range),
               ),
           ],
         ),
@@ -426,10 +466,25 @@ class _WriteReviewSheetState extends ConsumerState<WriteReviewSheet> {
     final ReviewDraft? draft = composer.draft;
     final bool canPublish = draft?.canPublish ?? false;
     final bool friendsOnly = draft?.visibility == ReviewVisibility.friends;
+    final bool needsPrice =
+        draft != null &&
+        draft.priceApplies &&
+        draft.priceAmount == null &&
+        draft.rating > 0 &&
+        !(draft.text.trim().isEmpty && draft.photoCount == 0);
     final String? error = composer.error;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        if (needsPrice)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: Text(
+              'Choose a price range to publish.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colors.coral, fontSize: 12),
+            ),
+          ),
         if (friendsOnly)
           Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.sm),

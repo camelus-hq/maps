@@ -22,6 +22,7 @@ void main() {
           'postcode': '10179',
           'city': 'Berlin',
           'country': 'Deutschland',
+          'countrycode': 'de',
         },
       });
 
@@ -32,6 +33,7 @@ void main() {
       expect(place.position.longitude, 13.405);
       expect(place.category, 'cafe');
       expect(place.address, '7 Grunerstraße, 10179 Berlin, Deutschland');
+      expect(place.regionCode, 'DE');
     });
 
     test('maps W/R osm_type to way/relation references', () {

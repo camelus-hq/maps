@@ -107,6 +107,29 @@ void main() {
     expect(c.read(reviewComposerProvider).place?.id, unreviewed.id);
   });
 
+  testWidgets('shows the average price band and explains it in a tooltip', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer c = container();
+    addTearDown(c.dispose);
+    await pump(tester, c, reviewed);
+
+    // The demo café's priced reviews average to the "moderate" band.
+    final Finder tag = find.widgetWithText(PlayTag, '€€');
+    expect(tag, findsOneWidget);
+
+    const String message = '€€ · about €10–25 per person';
+    expect(find.text(message), findsNothing);
+
+    await tester.longPress(tag);
+    await tester.pump();
+    expect(find.text(message), findsOneWidget);
+
+    // Let the tooltip's auto-hide fire so no timer outlives the test.
+    await tester.pump(const Duration(seconds: 4));
+    expect(find.text(message), findsNothing);
+  });
+
   testWidgets('the peek shows the same summary, folded below the actions', (
     WidgetTester tester,
   ) async {

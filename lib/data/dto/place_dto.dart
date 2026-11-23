@@ -18,6 +18,7 @@ abstract final class PlaceDto {
     if (place.wheelchairAccessible != null)
       'wheelchair': place.wheelchairAccessible,
     if (place.openingHours != null) 'openingHours': place.openingHours,
+    if (place.countryCode != null) 'country': place.countryCode,
     if (place.osmTags.isNotEmpty) 'osmTags': place.osmTags,
   };
 
@@ -49,8 +50,19 @@ abstract final class PlaceDto {
       website: _bounded(raw['website'], 300),
       wheelchairAccessible: wheelchair is bool ? wheelchair : null,
       openingHours: _bounded(raw['openingHours'], 200),
+      countryCode: _alpha2(raw['country']),
       osmTags: _tags(raw['osmTags']),
     );
+  }
+
+  /// A persisted two-letter ISO country code, uppercased, or `null`. The whole
+  /// value must be two letters — never truncate ("Germany" is not a code).
+  static String? _alpha2(Object? raw) {
+    if (raw is! String) {
+      return null;
+    }
+    final String upper = raw.trim().toUpperCase();
+    return RegExp(r'^[A-Z]{2}$').hasMatch(upper) ? upper : null;
   }
 
   /// The persisted OSM tag map, filtered to bounded string entries (prefs are

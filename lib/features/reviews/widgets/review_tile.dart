@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/utils/currency.dart';
 import '../../../core/utils/format.dart';
+import '../../../domain/entities/price_range.dart';
 import '../../../domain/entities/review.dart';
 import '../../../state/commands/commands_provider.dart';
 import '../../../state/reviews.dart';
@@ -23,11 +25,15 @@ class ReviewTile extends ConsumerStatefulWidget {
   const ReviewTile({
     super.key,
     required this.review,
+    required this.currency,
     this.headline = false,
     this.onEdit,
   });
 
   final Review review;
+
+  /// The place's currency, so the price chips read in the right region.
+  final CurrencyInfo currency;
 
   /// Draws the review as the headline: bigger, quoted text.
   final bool headline;
@@ -50,6 +56,9 @@ class _ReviewTileState extends ConsumerState<ReviewTile> {
     final Review review = widget.review;
     final String name = review.authorName ?? _shorten(review.authorPubkey);
     final String text = review.bodyText;
+    final CurrencyInfo reviewCurrency =
+        currencyInfoForCode(review.priceCurrency) ?? widget.currency;
+    final PriceRange? priceBand = review.priceBand(widget.currency);
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Column(
@@ -89,6 +98,15 @@ class _ReviewTileState extends ConsumerState<ReviewTile> {
                     Row(
                       children: <Widget>[
                         StarRating(value: review.stars, size: 14),
+                        if (priceBand != null) ...<Widget>[
+                          const SizedBox(width: AppSpacing.xs),
+                          Text(
+                            priceBand.shortLabel(reviewCurrency.symbol),
+                            style: PlayType.caption.copyWith(
+                              color: colors.inkMuted,
+                            ),
+                          ),
+                        ],
                         const SizedBox(width: AppSpacing.xs),
                         Text(
                           formatTimeAgo(review.createdAt),
