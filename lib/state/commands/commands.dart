@@ -228,7 +228,8 @@ List<Command> buildCommands(Ref ref) {
       description:
           'Update app settings (params: {unit?: metric|imperial, theme?: '
           'system|light|dark, showOsmTags?: bool, searchBackend?: '
-          'mapbox|openstreetmap|camelus, recentTripsLimit?: 10|20|50}).',
+          'mapbox|openstreetmap|camelus, recentTripsLimit?: 0|10|20|50} — 0 '
+          'turns trip recording off).',
       handler: (CommandRequest request) async {
         final Object? rawUnit = request.params['unit'];
         if (rawUnit != null) {
@@ -300,7 +301,7 @@ List<Command> buildCommands(Ref ref) {
           if (limit == null || !recentTripsLimits.contains(limit)) {
             throw const CommandException(
               'bad_params',
-              '"recentTripsLimit" must be 10, 20 or 50',
+              '"recentTripsLimit" must be 0, 10, 20 or 50',
             );
           }
           await ref.read(settingsProvider.notifier).setRecentTripsLimit(limit);
@@ -1723,6 +1724,17 @@ List<Command> buildCommands(Ref ref) {
       handler: (CommandRequest request) async {
         await ref.read(recentTripsProvider.notifier).clear();
         return true;
+      },
+    ),
+    Command(
+      id: 'trips.recording.enable',
+      description:
+          'Turn recorded-trip capture back on after "Trips to keep" was set to '
+          '0, restoring the default keep-limit ($defaultRecentTripsLimit). '
+          'Returns the new keep-limit; a no-op when recording is already on.',
+      handler: (CommandRequest request) async {
+        await ref.read(settingsProvider.notifier).enableTripRecording();
+        return ref.read(settingsProvider).recentTripsLimit;
       },
     ),
     Command(

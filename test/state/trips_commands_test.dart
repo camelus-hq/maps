@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:openmaps/core/errors/app_exception.dart';
+import 'package:openmaps/domain/entities/app_settings.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/travel_mode.dart';
 import 'package:openmaps/domain/entities/trip.dart';
@@ -99,6 +100,27 @@ void main() {
     await expectLater(
       dispatch('app.settings.set', <String, Object?>{'recentTripsLimit': 7}),
       throwsA(isA<CommandException>()),
+    );
+  });
+
+  test('recording can be turned off (0) and back on again', () async {
+    final Map<String, Object?> off = await dispatch(
+      'app.settings.set',
+      <String, Object?>{'recentTripsLimit': 0},
+    ) as Map<String, Object?>;
+    expect(off['recentTripsLimit'], 0);
+    expect(container.read(settingsProvider).tripRecordingEnabled, isFalse);
+
+    // Recording-off means a finished trip is not stored.
+    await container.read(recentTripsProvider.notifier).record(trip('a'));
+    expect(container.read(recentTripsProvider), isEmpty);
+
+    final Object? enabled = await dispatch('trips.recording.enable');
+    expect(enabled, defaultRecentTripsLimit);
+    expect(container.read(settingsProvider).tripRecordingEnabled, isTrue);
+    expect(
+      container.read(settingsProvider).recentTripsLimit,
+      defaultRecentTripsLimit,
     );
   });
 }

@@ -396,4 +396,38 @@ void main() {
     await tester.pumpAndSettle();
     expect(container.read(settingsProvider).pushTransport, PushTransport.off);
   });
+
+  testWidgets('the trips-to-keep control can turn recording off', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: SettingsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(container.read(settingsProvider).tripRecordingEnabled, isTrue);
+
+    // The "Off" inside the recent-trips segmented control (not the push one).
+    // Scroll it into view first: the ListView builds lazily, so the control
+    // does not exist until its section is near the viewport.
+    await tester.scrollUntilVisible(find.text('Trips to keep'), 300);
+    await tester.pumpAndSettle();
+
+    final Finder off = find.descendant(
+      of: find.byType(PlaySegmented<int>),
+      matching: find.text('Off'),
+    );
+    await tester.ensureVisible(off);
+    await tester.pumpAndSettle();
+    await tester.tap(off);
+    await tester.pumpAndSettle();
+
+    expect(container.read(settingsProvider).recentTripsLimit, 0);
+    expect(container.read(settingsProvider).tripRecordingEnabled, isFalse);
+  });
 }

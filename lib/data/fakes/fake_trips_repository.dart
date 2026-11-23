@@ -13,6 +13,11 @@ class FakeTripsRepository implements TripsRepository {
 
   @override
   Future<void> recordTrip(Trip trip, {required int maxTrips}) async {
+    // A non-positive limit means recording is off: store nothing (and leave
+    // whatever is already there untouched).
+    if (maxTrips <= 0) {
+      return;
+    }
     _trips.removeWhere((Trip candidate) => candidate.id == trip.id);
     _trips.insert(0, trip);
     final int limit = maxTrips.clamp(1, hardMaxTrips);

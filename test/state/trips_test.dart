@@ -70,4 +70,27 @@ void main() {
     await controller.clear();
     expect(container.read(recentTripsProvider), isEmpty);
   });
+
+  test(
+    'a zero keep-limit turns recording off but keeps existing trips',
+    () async {
+      final ProviderContainer container = ProviderContainer();
+      addTearDown(container.dispose);
+      final RecentTripsController controller = container.read(
+        recentTripsProvider.notifier,
+      );
+      await controller.record(trip('a'));
+      expect(container.read(recentTripsProvider), hasLength(1));
+
+      await container.read(settingsProvider.notifier).setRecentTripsLimit(0);
+      expect(container.read(settingsProvider).tripRecordingEnabled, isFalse);
+
+      await controller.record(trip('b'));
+      // The new trip is dropped; the existing one survives.
+      expect(
+        container.read(recentTripsProvider).map((Trip t) => t.id),
+        <String>['a'],
+      );
+    },
+  );
 }

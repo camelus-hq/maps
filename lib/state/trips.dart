@@ -32,8 +32,14 @@ class RecentTripsController extends Notifier<List<Trip>> {
 
   /// Records a finished trip at the top of the list, trimming the oldest so at
   /// most the configured number are kept.
+  ///
+  /// When the keep-limit is `0` (recording off) nothing is stored — the
+  /// breadcrumb is dropped rather than saved.
   Future<void> record(Trip trip) async {
     final int limit = ref.read(settingsProvider).recentTripsLimit;
+    if (limit <= 0) {
+      return;
+    }
     await ref.read(tripsRepositoryProvider).recordTrip(trip, maxTrips: limit);
     await _load();
   }

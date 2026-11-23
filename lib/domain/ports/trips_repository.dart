@@ -10,7 +10,8 @@ abstract interface class TripsRepository {
   Future<List<Trip>> trips();
 
   /// Records [trip] at the top of the list and drops the oldest entries so at
-  /// most [maxTrips] are kept. De-duplicated by [Trip.id].
+  /// most [maxTrips] are kept. De-duplicated by [Trip.id]. A [maxTrips] of
+  /// zero (or less) stores nothing — recording is off.
   Future<void> recordTrip(Trip trip, {required int maxTrips});
 
   /// Removes the trip with [id], if present.

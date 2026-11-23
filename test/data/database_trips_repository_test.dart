@@ -43,6 +43,13 @@ void main() {
     expect(trips.last.id, 't7');
   });
 
+  test('a zero limit stores nothing and keeps existing trips', () async {
+    final repo = DatabaseTripsRepository(database: InMemoryAppDatabase());
+    await repo.recordTrip(trip('a'), maxTrips: 10);
+    await repo.recordTrip(trip('b'), maxTrips: 0);
+    expect((await repo.trips()).map((Trip t) => t.id), <String>['a']);
+  });
+
   test('deleteTrip and clearTrips remove trips', () async {
     final repo = DatabaseTripsRepository(database: InMemoryAppDatabase());
     await repo.recordTrip(trip('a'), maxTrips: 10);

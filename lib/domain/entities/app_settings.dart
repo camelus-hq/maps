@@ -6,9 +6,13 @@ enum DistanceUnit { metric, imperial }
 
 /// The choices offered for "how many recent trips to keep" (the oldest are
 /// dropped automatically once the limit is reached).
-const List<int> recentTripsLimits = <int>[10, 20, 50];
+///
+/// `0` means **off**: nothing new is recorded. Existing trips are kept, so the
+/// user can turn recording back on without losing their history.
+const List<int> recentTripsLimits = <int>[0, 10, 20, 50];
 
-/// The default keep-limit when the setting has never been written.
+/// The default keep-limit when the setting has never been written. Also the
+/// value the "turn recording back on" action restores.
 const int defaultRecentTripsLimit = 20;
 
 /// Snaps an arbitrary limit to one of [recentTripsLimits], so a hand-edited
@@ -67,10 +71,14 @@ class AppSettings {
   final PushTransport pushTransport;
 
   /// How many recorded trips to keep; the oldest are deleted when the limit is
-  /// reached. One of [recentTripsLimits].
+  /// reached. One of [recentTripsLimits]; `0` disables recording entirely.
   final int recentTripsLimit;
 
   bool get imperial => unit == DistanceUnit.imperial;
+
+  /// Whether trip recording is on (a keep-limit above zero). At `0` new trips
+  /// are not stored and the trips page offers to turn recording back on.
+  bool get tripRecordingEnabled => recentTripsLimit > 0;
 
   AppSettings copyWith({
     DistanceUnit? unit,

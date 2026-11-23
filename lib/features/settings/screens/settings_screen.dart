@@ -148,10 +148,12 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const _Section('Recent trips'),
-          const PlayRow(
+          PlayRow(
             icon: PlayIcons.route,
             label: 'Trips to keep',
-            subtitle: 'The oldest recorded trips are deleted automatically',
+            subtitle: settings.tripRecordingEnabled
+                ? 'The oldest recorded trips are deleted automatically'
+                : 'Recording is off — new trips are not saved',
             showChevron: false,
           ),
           Padding(
@@ -163,7 +165,10 @@ class SettingsScreen extends ConsumerWidget {
               ),
               segments: <PlaySegment<int>>[
                 for (final int limit in recentTripsLimits)
-                  PlaySegment<int>(value: limit, label: '$limit'),
+                  PlaySegment<int>(
+                    value: limit,
+                    label: limit == 0 ? 'Off' : '$limit',
+                  ),
               ],
             ),
           ),

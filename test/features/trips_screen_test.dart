@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/data/fakes/fake_trips_repository.dart';
+import 'package:openmaps/domain/entities/app_settings.dart';
 import 'package:openmaps/domain/entities/lat_lon.dart';
 import 'package:openmaps/domain/entities/travel_mode.dart';
 import 'package:openmaps/domain/entities/trip.dart';
 import 'package:openmaps/features/trips/screens/trip_detail_screen.dart';
 import 'package:openmaps/features/trips/screens/trips_screen.dart';
 import 'package:openmaps/state/ports.dart';
+import 'package:openmaps/state/settings.dart';
 
 void main() {
   Trip trip({String destination = 'Office'}) => Trip(
@@ -53,6 +55,43 @@ void main() {
   ) async {
     await pump(tester, FakeTripsRepository());
 
+    expect(
+      find.textContaining('No trips yet. Start navigation'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('offers to turn recording on when the keep-limit is 0', (
+    WidgetTester tester,
+  ) async {
+    final ProviderContainer container = ProviderContainer(
+      overrides: <Override>[
+        tripsRepositoryProvider.overrideWithValue(FakeTripsRepository()),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(settingsProvider.notifier).setRecentTripsLimit(0);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: TripsScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Trip recording is off'), findsOneWidget);
+    final Finder button = find.text('Turn on trip recording');
+    expect(button, findsOneWidget);
+
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+
+    expect(
+      container.read(settingsProvider).recentTripsLimit,
+      defaultRecentTripsLimit,
+    );
+    expect(find.text('Trip recording is off'), findsNothing);
     expect(
       find.textContaining('No trips yet. Start navigation'),
       findsOneWidget,

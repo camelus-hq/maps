@@ -96,6 +96,7 @@ adb forward tcp:7981 tcp:7981
 | `trips.export` | `{id, path?}` | `{id, path, gpx}` — writes a GPX file when the platform can (path `null` on failure; the `gpx` text is always returned) |
 | `trips.delete` | `{id}` | `true` |
 | `trips.clear` | — | `true` |
+| `trips.recording.enable` | — | the new keep-limit — turns recording back on after it was set to 0 |
 | `ui.tap` | `{x, y}` | `true` — synthetic tap at logical coordinates |
 | `ui.swipe` | `{fromX, fromY, toX, toY}` | `true` — synthetic drag |
 | `ui.scroll` | `{x, y, dx, dy}` | `true` — synthetic scroll by (dx, dy) |
@@ -133,7 +134,7 @@ sync test fails if it drifts from the registry.
 | `app.pushStatus` | Return the push registration status (params: {refresh?: bool}); "refresh" re-runs the registration sync. |
 | `app.ready` | Return true once the app is running. |
 | `app.settings` | Return app settings (distance unit, theme, search provider, developer options). |
-| `app.settings.set` | Update app settings (params: {unit?: metric\|imperial, theme?: system\|light\|dark, showOsmTags?: bool, searchBackend?: mapbox\|openstreetmap\|camelus, recentTripsLimit?: 10\|20\|50}). |
+| `app.settings.set` | Update app settings (params: {unit?: metric\|imperial, theme?: system\|light\|dark, showOsmTags?: bool, searchBackend?: mapbox\|openstreetmap\|camelus, recentTripsLimit?: 0\|10\|20\|50} — 0 turns trip recording off). |
 | `app.state` | Dump serialisable app state. |
 | `app.tab` | Select the map-home bottom-nav tab (params: {tab: explore\|you\|contribute}). |
 | `app.update.check` | Check the update manifest for a newer release; returns the state. |
@@ -258,6 +259,7 @@ sync test fails if it drifts from the registry.
 | `trips.get` | Return one recorded trip (params: {id}). |
 | `trips.list` | List the recorded trips (the breadcrumb paths travelled during guidance), newest first — id, times, mode, distance, labels and point count. |
 | `trips.open` | Open the recorded-trips list, or one trip's page (params: {id?}). |
+| `trips.recording.enable` | Turn recorded-trip capture back on after "Trips to keep" was set to 0, restoring the default keep-limit (20). Returns the new keep-limit; a no-op when recording is already on. |
 | `ui.back` | Synthesise the system back gesture. |
 | `ui.screenshot` | Capture the app window to a PNG file (params: path?). |
 | `ui.scroll` | Synthesise a scroll gesture by (dx, dy) from (x, y) (params: {x, y, dx, dy}). |

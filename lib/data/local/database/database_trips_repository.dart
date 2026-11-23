@@ -20,7 +20,8 @@ class DatabaseTripsRepository implements TripsRepository {
   static const String _key = 'trips.recent';
 
   /// Hard cap on stored trips, whatever the caller asks for. The settings only
-  /// offer 10/20/50; this is the absolute ceiling the store enforces.
+  /// offer 0/10/20/50 (0 = off); this is the absolute ceiling the store
+  /// enforces.
   static const int hardMaxTrips = 200;
 
   @override
@@ -30,6 +31,11 @@ class DatabaseTripsRepository implements TripsRepository {
 
   @override
   Future<void> recordTrip(Trip trip, {required int maxTrips}) async {
+    // A non-positive limit means recording is off: store nothing (and leave
+    // whatever is already there untouched).
+    if (maxTrips <= 0) {
+      return;
+    }
     final List<Trip> current = TripDto.decodeList(
       await database.readSetting(_key),
     ).toList();
