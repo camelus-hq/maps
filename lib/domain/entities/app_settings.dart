@@ -4,6 +4,28 @@ import 'push.dart';
 /// User-selectable app settings (our own options; persisted locally).
 enum DistanceUnit { metric, imperial }
 
+/// The choices offered for "how many recent trips to keep" (the oldest are
+/// dropped automatically once the limit is reached).
+///
+/// `0` means **off**: nothing new is recorded. Existing trips are kept, so the
+/// user can turn recording back on without losing their history.
+const List<int> recentTripsLimits = <int>[0, 10, 20, 50];
+
+/// The default keep-limit when the setting has never been written. Also the
+/// value the "turn recording back on" action restores.
+const int defaultRecentTripsLimit = 20;
+
+/// Snaps an arbitrary limit to one of [recentTripsLimits], so a hand-edited
+/// store or a renamed value can never leave the setting out of range.
+int sanitizeRecentTripsLimit(int? value) {
+  for (final int allowed in recentTripsLimits) {
+    if (allowed == value) {
+      return allowed;
+    }
+  }
+  return defaultRecentTripsLimit;
+}
+
 /// Theme preference, mapped to Flutter's `ThemeMode` in the app layer.
 enum AppThemeMode { system, light, dark }
 
@@ -29,6 +51,7 @@ class AppSettings {
     this.searchBackend = SearchBackend.mapbox,
     this.pinnedCategoryIds = defaultPinnedCategoryIds,
     this.pushTransport = PushTransport.firebase,
+    this.recentTripsLimit = defaultRecentTripsLimit,
   });
 
   final DistanceUnit unit;
@@ -47,7 +70,15 @@ class AppSettings {
   /// disables push).
   final PushTransport pushTransport;
 
+  /// How many recorded trips to keep; the oldest are deleted when the limit is
+  /// reached. One of [recentTripsLimits]; `0` disables recording entirely.
+  final int recentTripsLimit;
+
   bool get imperial => unit == DistanceUnit.imperial;
+
+  /// Whether trip recording is on (a keep-limit above zero). At `0` new trips
+  /// are not stored and the trips page offers to turn recording back on.
+  bool get tripRecordingEnabled => recentTripsLimit > 0;
 
   AppSettings copyWith({
     DistanceUnit? unit,
@@ -56,6 +87,7 @@ class AppSettings {
     SearchBackend? searchBackend,
     List<String>? pinnedCategoryIds,
     PushTransport? pushTransport,
+    int? recentTripsLimit,
   }) => AppSettings(
     unit: unit ?? this.unit,
     theme: theme ?? this.theme,
@@ -63,6 +95,7 @@ class AppSettings {
     searchBackend: searchBackend ?? this.searchBackend,
     pinnedCategoryIds: pinnedCategoryIds ?? this.pinnedCategoryIds,
     pushTransport: pushTransport ?? this.pushTransport,
+    recentTripsLimit: recentTripsLimit ?? this.recentTripsLimit,
   );
 
   @override
@@ -73,6 +106,7 @@ class AppSettings {
       other.showOsmTags == showOsmTags &&
       other.searchBackend == searchBackend &&
       other.pushTransport == pushTransport &&
+      other.recentTripsLimit == recentTripsLimit &&
       _sameList(other.pinnedCategoryIds, pinnedCategoryIds);
 
   @override
@@ -82,6 +116,7 @@ class AppSettings {
     showOsmTags,
     searchBackend,
     pushTransport,
+    recentTripsLimit,
     Object.hashAll(pinnedCategoryIds),
   );
 }

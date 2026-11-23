@@ -73,6 +73,30 @@ class SettingsController extends Notifier<AppSettings> {
     await ref.read(settingsRepositoryProvider).save(state);
   }
 
+  /// Sets how many recorded trips to keep (one of [recentTripsLimits]). `0`
+  /// turns recording off; existing trips are kept. Anything else is ignored, so
+  /// a bad caller cannot store an out-of-range value. Existing trips beyond the
+  /// new limit are trimmed lazily on the next recording.
+  Future<void> setRecentTripsLimit(int limit) async {
+    final int sanitized = sanitizeRecentTripsLimit(limit);
+    if (state.recentTripsLimit == sanitized) {
+      return;
+    }
+    _modified = true;
+    state = state.copyWith(recentTripsLimit: sanitized);
+    await ref.read(settingsRepositoryProvider).save(state);
+  }
+
+  /// Turns recorded-trip capture back on after it was set to `0`, restoring the
+  /// default keep-limit ([defaultRecentTripsLimit]). A no-op when recording is
+  /// already on, so tapping the trips page's button twice is harmless.
+  Future<void> enableTripRecording() async {
+    if (state.tripRecordingEnabled) {
+      return;
+    }
+    await setRecentTripsLimit(defaultRecentTripsLimit);
+  }
+
   /// Pins the category with [id] (idempotent). Returns `false` when the pin
   /// limit is already reached, so the caller can tell the user.
   Future<bool> pinCategory(String id) async {

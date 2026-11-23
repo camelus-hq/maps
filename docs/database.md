@@ -42,12 +42,12 @@ is caught, logged, and replaced by an in-memory store — a database problem nev
 stops the app from starting. The result is provided through
 `appDatabaseProvider` (default: in-memory) and wired into `lib/app/di.dart`.
 
-`AppSettings` (unit, developer options, search provider, pinned chips) lives in
-the database; the **theme**, the **onboarding flag** and the **skipped-update
-version** stay in `shared_preferences` because they are read before the database
-is needed. `LocalSettingsRepository` reads the first set from the database and
-the second from prefs, and copies any pre-database (`shared_preferences`) values
-into the database once.
+`AppSettings` (unit, developer options, search provider, pinned chips, the
+recent-trips keep-limit) lives in the database; the **theme**, the **onboarding
+flag** and the **skipped-update version** stay in `shared_preferences` because
+they are read before the database is needed. `LocalSettingsRepository` reads the
+first set from the database and the second from prefs, and copies any
+pre-database (`shared_preferences`) values into the database once.
 
 The **places** store (`DatabasePlacesRepository`) also lives in the database:
 the recent searches (opened/navigated-to places and submitted queries), the saved
@@ -55,6 +55,16 @@ the recent searches (opened/navigated-to places and submitted queries), the save
 keys, so a new entry needs no schema change. It copies the pre-database
 `openmaps.recent_queries` / `openmaps.bookmarks` values in once, the same way the
 settings do.
+
+The **recorded trips** (`DatabaseTripsRepository`) live in the database too:
+while guidance runs, `NavigationController` keeps the travelled breadcrumb, and
+when the trip ends (arrival or an explicit stop) it is written as a JSON value
+under the `trips.recent` key — id, times, travel mode, distance, the planned
+origin/destination labels and the track points. The list is newest-first and
+bounded: recording drops the oldest trips beyond the user's **"Trips to keep"**
+setting (`AppSettings.recentTripsLimit`, one of 10/20/50, default 20), so the
+oldest trips are deleted automatically. Trips are local-only and can be exported
+as GPX (`trips.export`).
 
 The **persistent anonymous Nostr identity** (see
 [`docs/nostr-nips.md`](nostr-nips.md)) is a JSON value under the
@@ -147,3 +157,7 @@ The server must send `Content-Type: application/wasm` for `sqlite3.wasm`
   `lib/` (e.g. `lib/libobjectbox.so`; git-ignored) to run it locally.
 - `test/data/local_settings_repository_test.dart` — the settings split between
   the database and `shared_preferences`, including the legacy migration.
+- `test/data/database_trips_repository_test.dart` — the trips store (newest
+  first, the keep-limit, delete/clear, corrupt-value tolerance).
+- `test/data/trip_dto_test.dart` — the trip codec's hostile-input handling and
+  `test/domain/trip_gpx_test.dart` — the GPX serialiser.

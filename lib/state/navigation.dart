@@ -12,11 +12,13 @@ import '../domain/entities/navigation_camera.dart';
 import '../domain/entities/route.dart';
 import '../domain/entities/transit.dart';
 import '../domain/entities/travel_mode.dart';
+import '../domain/entities/trip.dart';
 import '../domain/ports/map_service.dart';
 import 'follow.dart';
 import 'location.dart';
 import 'ports.dart';
 import 'route.dart';
+import 'trips.dart';
 import 'usecases.dart';
 
 enum NavStatus { idle, navigating, rerouting, arrived }
@@ -220,6 +222,10 @@ class NavigationController extends Notifier<NavState> {
   /// Cap on recorded trail points (a bounded list: guidance can run for hours).
   static const int _trailMaxPoints = 4000;
 
+  /// Whether the current session's trip has already been persisted, so arrival
+  /// and an explicit stop never record it twice.
+  bool _tripRecorded = false;
+
   @override
   NavState build() {
     // A user gesture (drag/pinch/rotate/tilt) stops the guidance camera from
@@ -265,6 +271,7 @@ class NavigationController extends Notifier<NavState> {
     _speedMps = null;
     _lastFixPosition = null;
     _lastFixAt = null;
+    _tripRecorded = false;
     _loadRoute(route, transit: transit);
     // Navigation owns the camera; stop follow mode so the two don't fight.
     ref.read(followModeProvider.notifier).disable();
@@ -361,6 +368,7 @@ class NavigationController extends Notifier<NavState> {
         transitProgress: state.transit == null ? null : TransitProgress.arrived,
       );
       _timer?.cancel();
+      _recordTrip();
       return;
     }
     _apply(
@@ -412,6 +420,8 @@ class NavigationController extends Notifier<NavState> {
     _fittedRideLeg = null;
     _driftStreak = 0;
     _lastReplanAt = null;
+    // Persist the trip before clearing the breadcrumb it is built from.
+    _recordTrip();
     _tripTraveledBase = 0;
     _trail.clear();
     _speedMps = null;
@@ -512,6 +522,7 @@ class NavigationController extends Notifier<NavState> {
         clearNotice: true,
         transitProgress: state.transit == null ? null : TransitProgress.arrived,
       );
+      _recordTrip();
       return;
     }
     final (LatLon, double?) at = _positionAndBearing(routedTraveled);
@@ -797,6 +808,49 @@ class NavigationController extends Notifier<NavState> {
           .read(mapServiceProvider)
           .setTraveledPath(List<LatLon>.unmodifiable(_trail)),
     );
+  }
+
+  /// Persists the finished trip — its breadcrumb trail and statistics — to the
+  /// local trips store so it can be reviewed and exported as GPX later.
+  ///
+  /// Called on arrival and on an explicit stop; recorded at most once per
+  /// session. A session that never moved (fewer than two trail points) stores
+  /// nothing, and a storage failure is swallowed by the notifier so ending
+  /// guidance can never crash.
+  void _recordTrip() {
+    if (_tripRecorded) {
+      return;
+    }
+    final DateTime? startedAt = state.startedAt;
+    if (startedAt == null || _trail.length < 2) {
+      return;
+    }
+    _tripRecorded = true;
+    final RouteState routeState = ref.read(routeControllerProvider);
+    final double distance = state.tripTraveledMeters > 0
+        ? state.tripTraveledMeters
+        : _trailDistance();
+    final Trip trip = Trip(
+      id: 'trip-${startedAt.microsecondsSinceEpoch}',
+      startedAt: startedAt,
+      endedAt: DateTime.now(),
+      mode: state.mode,
+      distanceMeters: distance,
+      originName: routeState.origin?.name,
+      destinationName: routeState.destination?.name,
+      track: List<LatLon>.unmodifiable(_trail),
+    );
+    unawaited(ref.read(recentTripsProvider.notifier).record(trip));
+  }
+
+  /// The straight-line length of the recorded trail, used only as a fallback
+  /// when the session never tracked a distance.
+  double _trailDistance() {
+    double total = 0;
+    for (int i = 1; i < _trail.length; i++) {
+      total += _trail[i - 1].distanceTo(_trail[i]);
+    }
+    return total;
   }
 
   /// The initial fly to the navigation camera pose. On foot this is a short

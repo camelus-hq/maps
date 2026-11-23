@@ -13,6 +13,7 @@ import 'package:ndk_flutter/ndk_flutter.dart';
 import '../core/config/app_config.dart';
 import '../data/http/api_key_client.dart';
 import '../data/local/database/database_places_repository.dart';
+import '../data/local/database/database_trips_repository.dart';
 import '../data/local/local_settings_repository.dart';
 import '../data/local/prefs_live_share_store.dart';
 import '../data/location/geolocator_location_service.dart';
@@ -80,6 +81,12 @@ List<Override> buildAppOverrides(
     placesRepositoryProvider.overrideWith(
       (Ref ref) =>
           DatabasePlacesRepository(database: ref.watch(appDatabaseProvider)),
+    ),
+    // Recorded trips share the same local database, under the `trips.recent`
+    // key.
+    tripsRepositoryProvider.overrideWith(
+      (Ref ref) =>
+          DatabaseTripsRepository(database: ref.watch(appDatabaseProvider)),
     ),
     settingsRepositoryProvider.overrideWith(
       (Ref ref) =>

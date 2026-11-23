@@ -18,6 +18,8 @@ import '../features/social/screens/add_friend_screen.dart';
 import '../features/social/screens/friends_screen.dart';
 import '../features/social/screens/manage_friends_screen.dart';
 import '../features/social/screens/profile_screen.dart';
+import '../features/trips/screens/trip_detail_screen.dart';
+import '../features/trips/screens/trips_screen.dart';
 import '../state/navigation_keys.dart';
 import '../state/place.dart';
 import '../state/route.dart';
@@ -293,6 +295,20 @@ GoRouter buildAppRouter() {
             path: 'add',
             pageBuilder: (BuildContext context, GoRouterState state) =>
                 _page(state, const AddFriendScreen()),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/trips',
+        pageBuilder: (BuildContext context, GoRouterState state) =>
+            _page(state, const TripsScreen()),
+        routes: <RouteBase>[
+          GoRoute(
+            path: ':id',
+            pageBuilder: (BuildContext context, GoRouterState state) => _page(
+              state,
+              TripDetailScreen(tripId: state.pathParameters['id'] ?? ''),
+            ),
           ),
         ],
       ),
