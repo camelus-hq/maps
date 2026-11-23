@@ -26,6 +26,9 @@ class PublishReview {
         'Friends-only reviews are not available yet',
       );
     }
+    if (draft.priceApplies && draft.priceAmount == null) {
+      throw const ValidationException('Choose a price range before publishing');
+    }
     if (draft.text.trim().length > ReviewDraft.maxTextLength) {
       throw const ValidationException('Your review is too long');
     }

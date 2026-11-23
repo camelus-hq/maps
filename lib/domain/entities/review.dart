@@ -1,4 +1,6 @@
+import '../../core/utils/currency.dart';
 import 'lat_lon.dart';
+import 'price_range.dart';
 
 /// Who a review is published for.
 ///
@@ -26,6 +28,8 @@ class Review {
     this.authorName,
     this.authorPicture,
     this.isFriend = false,
+    this.priceAmount,
+    this.priceCurrency,
   });
 
   /// The Nostr event id (stable identity of the review).
@@ -65,6 +69,31 @@ class Review {
   /// state layer; a review event itself carries no such flag.
   final bool isFriend;
 
+  /// The per-person price amount the reviewer reported, from the event's
+  /// `price` tag (in [priceCurrency]). `null` means the review said nothing
+  /// about price. `0` means free.
+  final double? priceAmount;
+
+  /// The ISO-4217 currency of [priceAmount] (e.g. `EUR`). `null` for a free
+  /// price, which is currency-agnostic.
+  final String? priceCurrency;
+
+  /// The price band this review's amount falls in, using its own currency when
+  /// known and [fallback] otherwise, or `null` when it reported no usable price.
+  PriceRange? priceBand(CurrencyInfo? fallback) {
+    final double? amount = priceAmount;
+    if (amount == null) {
+      return null;
+    }
+    if (amount <= 0) {
+      return PriceRange.free;
+    }
+    return PriceRange.fromValue(
+      amount,
+      currencyInfoForCode(priceCurrency) ?? fallback,
+    );
+  }
+
   /// The rating on the familiar 0–5 star scale (may be fractional, e.g. 4.8).
   double get stars => rating * 5;
 
@@ -88,6 +117,8 @@ class Review {
     String? authorName,
     String? authorPicture,
     bool? isFriend,
+    double? priceAmount,
+    String? priceCurrency,
   }) => Review(
     id: id,
     authorPubkey: authorPubkey,
@@ -100,6 +131,8 @@ class Review {
     authorName: authorName ?? this.authorName,
     authorPicture: authorPicture ?? this.authorPicture,
     isFriend: isFriend ?? this.isFriend,
+    priceAmount: priceAmount ?? this.priceAmount,
+    priceCurrency: priceCurrency ?? this.priceCurrency,
   );
 
   @override
@@ -111,6 +144,8 @@ class Review {
       other.content == content &&
       other.authorName == authorName &&
       other.authorPicture == authorPicture &&
+      other.priceAmount == priceAmount &&
+      other.priceCurrency == priceCurrency &&
       other.createdAt == createdAt;
 
   @override
@@ -121,6 +156,8 @@ class Review {
     content,
     authorName,
     authorPicture,
+    priceAmount,
+    priceCurrency,
     createdAt,
   );
 

@@ -30,7 +30,29 @@ abstract final class MapboxSearchBoxMapper {
       position: position,
       category: _category(properties),
       address: _address(properties),
+      countryCode: _countryCode(properties),
     );
+  }
+
+  /// Search Box `properties.context.country.country_code` is the ISO alpha-2
+  /// code.
+  static String? _countryCode(Map<String, Object?> properties) {
+    final Object? context = properties['context'];
+    if (context is Map<String, Object?>) {
+      final Object? country = context['country'];
+      if (country is Map<String, Object?>) {
+        return _alpha2(country['country_code']);
+      }
+    }
+    return null;
+  }
+
+  static String? _alpha2(Object? raw) {
+    if (raw is! String) {
+      return null;
+    }
+    final String value = raw.trim().toUpperCase();
+    return RegExp(r'^[A-Z]{2}$').hasMatch(value) ? value : null;
   }
 
   static LatLon? _coordinates(

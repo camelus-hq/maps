@@ -17,6 +17,7 @@ void main() {
           'addr:housenumber': '7',
           'addr:postcode': '10179',
           'addr:city': 'Berlin',
+          'addr:country': 'de',
         },
       });
 
@@ -25,6 +26,7 @@ void main() {
       expect(place.name, 'Café X');
       expect(place.category, 'cafe');
       expect(place.address, '7 Grunerstraße, 10179 Berlin');
+      expect(place.regionCode, 'DE');
     });
 
     test('reads the center of a way and a relation', () {

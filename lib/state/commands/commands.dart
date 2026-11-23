@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/config/app_config.dart';
 import '../../core/errors/app_exception.dart';
 import '../../core/errors/result.dart';
+import '../../core/utils/currency.dart';
 import '../../core/utils/osm_payments.dart';
 import '../../core/utils/osm_ref.dart';
 import '../../data/fakes/fake_review_service.dart';
@@ -31,6 +32,7 @@ import '../../domain/entities/marker.dart';
 import '../../domain/entities/metric_event.dart';
 import '../../domain/entities/place.dart';
 import '../../domain/entities/place_category.dart';
+import '../../domain/entities/price_range.dart';
 import '../../domain/entities/push.dart';
 import '../../domain/entities/recent_search.dart';
 import '../../domain/entities/review.dart';
@@ -2286,7 +2288,9 @@ List<Command> buildCommands(Ref ref) {
       id: 'review.draft.set',
       description:
           'Update the review draft (params: {rating?: 0..1, stars?: 1..5, '
-          'text?, visibility?: public|friends}). Returns the draft state.',
+          'text?, visibility?: public|friends, price?: 0..5 ("free" for 0) or '
+          'null, or priceAmount?: number with an optional currency? (ISO-4217, '
+          'default the place currency)}). Returns the draft state.',
       handler: (CommandRequest request) async {
         final ReviewComposerController composer = ref.read(
           reviewComposerProvider.notifier,
@@ -2324,6 +2328,39 @@ List<Command> buildCommands(Ref ref) {
             );
           }
           composer.setVisibility(visibility);
+        }
+        if (request.params.containsKey('price')) {
+          final Object? rawPrice = request.params['price'];
+          if (rawPrice == null) {
+            composer.setPrice(null);
+          } else {
+            final PriceRange? price = switch (rawPrice) {
+              'free' => PriceRange.free,
+              _ => PriceRange.fromLevel(rawPrice),
+            };
+            if (price == null) {
+              throw const CommandException(
+                'bad_params',
+                '"price" must be 0..5 ("free") or null',
+              );
+            }
+            composer.setPrice(price);
+          }
+        } else if (request.params.containsKey('priceAmount')) {
+          final Object? rawAmount = request.params['priceAmount'];
+          if (rawAmount == null) {
+            composer.setPrice(null);
+          } else {
+            final double? amount = _toDouble(rawAmount);
+            if (amount == null || amount < 0) {
+              throw const CommandException(
+                'bad_params',
+                '"priceAmount" must be a non-negative number or null',
+              );
+            }
+            final String? currency = _stringParam(request, 'currency');
+            composer.setPriceAmount(amount, currency: currency);
+          }
         }
         return _reviewComposerJson(ref.read(reviewComposerProvider));
       },
@@ -2383,9 +2420,10 @@ List<Command> buildCommands(Ref ref) {
     Command(
       id: 'review.publish',
       description:
-          'Publish the current review draft as a Nostr kind-31987 event '
-          '(photos uploaded to Blossom, links appended to the content). '
-          'Returns the draft state.',
+          'Publish the current review draft as a Nostr kind-31987 event (the '
+          'rating, the optional per-person price amount and currency, photos '
+          'uploaded to Blossom, links appended to the content). Returns the '
+          'draft state.',
       handler: (CommandRequest request) async {
         await ref.read(reviewComposerProvider.notifier).publish();
         final ReviewComposerState state = ref.read(reviewComposerProvider);
@@ -2520,8 +2558,8 @@ List<Command> buildCommands(Ref ref) {
       description:
           'Demo/debug only: inject a synthetic review so the map badge and the '
           'place sheet can be driven without relays (params: {id? (place id), '
-          'pubkey?, name?, rating?, text?, lat?, lon?, friend?}). Works only on '
-          'the keyless fake backend.',
+          'pubkey?, name?, rating?, text?, lat?, lon?, friend?, price? (0..5), '
+          'priceAmount?, currency?}). Works only on the keyless fake backend.',
       handler: (CommandRequest request) async {
         final FakeReviewService? demo = ref.read(demoReviewServiceProvider);
         if (demo == null) {
@@ -2554,6 +2592,13 @@ List<Command> buildCommands(Ref ref) {
             ? rawText.trim()
             : 'A lovely spot — worth a detour.';
         final Object? rawName = request.params['name'];
+        final double? priceAmount =
+            _toDouble(request.params['priceAmount']) ??
+            _bandAmount(request.params['price'], place);
+        final String? priceCurrency = priceAmount == null || priceAmount <= 0
+            ? null
+            : (_stringParam(request, 'currency')?.toUpperCase() ??
+                  currencyForRegion(place?.regionCode).code);
         final Review review = Review(
           id: 'sim-${DateTime.now().microsecondsSinceEpoch}',
           authorPubkey: pubkey,
@@ -2563,6 +2608,8 @@ List<Command> buildCommands(Ref ref) {
           position: position,
           createdAt: DateTime.now().toUtc(),
           authorName: rawName is String && rawName.isNotEmpty ? rawName : null,
+          priceAmount: priceAmount,
+          priceCurrency: priceCurrency,
         );
         demo.seed(review);
         ref.invalidate(placeReviewsProvider(review.placeKey));
@@ -2837,6 +2884,8 @@ Map<String, Object?> _placeJson(Place place) => <String, Object?>{
   if (place.wheelchairAccessible != null)
     'wheelchairAccessible': place.wheelchairAccessible,
   if (place.openingHours != null) 'openingHours': place.openingHours,
+  if (place.countryCode != null) 'countryCode': place.countryCode,
+  if (place.regionCode != null) 'region': place.regionCode,
   if (place.osmTags.isNotEmpty) 'osmTags': place.osmTags,
   if (place.imageUrls.isNotEmpty) 'images': place.imageUrls,
   if (place.paymentMethods.isNotEmpty)
@@ -3114,6 +3163,18 @@ Future<Place?> _resolvePlace(
   return place.withOsmDetails(await _lookupOsmPlace(ref, place.id));
 }
 
+/// The representative amount for a price-band parameter (`0`..`5` or `"free"`)
+/// in [place]'s currency, or `null` when no band was given.
+double? _bandAmount(Object? raw, Place? place) {
+  if (raw == null) {
+    return null;
+  }
+  final PriceRange? band = raw == 'free'
+      ? PriceRange.free
+      : PriceRange.fromLevel(raw);
+  return band?.representativeAmount(currencyForRegion(place?.regionCode));
+}
+
 /// A trimmed, non-empty string parameter, or `null`.
 String? _stringParam(CommandRequest request, String name) {
   final Object? raw = request.params[name];
@@ -3177,6 +3238,9 @@ ReviewDraft? _draftFromSummary(Ref ref, Place place) {
         rating: review.rating,
         text: review.bodyText,
         photoUrls: review.photos,
+        priceAmount: review.priceAmount,
+        priceCurrency: review.priceCurrency,
+        priceApplies: priceRangeAppliesToCategory(place.category),
       );
     }
   }
@@ -3194,6 +3258,8 @@ Map<String, Object?> _reviewJson(Review review) => <String, Object?>{
   'content': review.content,
   'photos': review.photos,
   'friend': review.isFriend,
+  'priceAmount': review.priceAmount,
+  'priceCurrency': review.priceCurrency,
   'lat': review.position.latitude,
   'lon': review.position.longitude,
   'createdAt': review.createdAt.toIso8601String(),
@@ -3206,6 +3272,10 @@ Map<String, Object?> _reviewSummaryJson(ReviewSummary summary) =>
       'friends': summary.friendCount,
       'averageRating': summary.averageRating,
       'stars': summary.stars,
+      'averagePrice': summary.averagePrice?.level,
+      'averagePriceAmount': summary.averagePriceAmount,
+      'averagePriceCurrency': summary.averagePriceCurrency?.code,
+      'hasPrice': summary.hasPrice,
       'reviews': summary.reviews.map(_reviewJson).toList(growable: false),
     };
 
@@ -3223,6 +3293,11 @@ Map<String, Object?> _reviewMarkerJson(ReviewMarker marker) =>
 
 Map<String, Object?> _reviewComposerJson(ReviewComposerState state) {
   final ReviewDraft? draft = state.draft;
+  final CurrencyInfo currency = currencyForRegion(state.place?.regionCode);
+  final CurrencyInfo? reviewCurrency = currencyInfoForCode(
+    draft?.priceCurrency,
+  );
+  final PriceRange? band = draft?.priceBand(currency);
   return <String, Object?>{
     'open': state.isOpen,
     'status': state.status.name,
@@ -3235,6 +3310,14 @@ Map<String, Object?> _reviewComposerJson(ReviewComposerState state) {
       'visibility': draft.visibility.name,
       'localPhotos': draft.photos.length,
       'photoUrls': draft.photoUrls,
+      'priceApplies': draft.priceApplies,
+      'priceAmount': draft.priceAmount,
+      'priceCurrency': draft.priceCurrency,
+      'price': band?.level,
+      'priceLabel': band?.valueLabel(reviewCurrency ?? currency),
+      'currency': currency.code,
+      'currencySymbol': currency.symbol,
+      'region': state.place?.regionCode,
       'canPublish': draft.canPublish,
     },
     'error': state.error,

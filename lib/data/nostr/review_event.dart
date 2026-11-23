@@ -1,5 +1,6 @@
 import 'package:ndk/entities.dart' show Nip01Event;
 
+import '../../core/utils/currency.dart';
 import '../../core/utils/geohash.dart';
 import '../../domain/entities/lat_lon.dart';
 import '../../domain/entities/review.dart';
@@ -18,6 +19,8 @@ import '../../domain/entities/review_place.dart';
 ///   "tags": [
 ///     ["d", "openstreetmap:way/123456"],
 ///     ["rating", "0.8"],
+///     ["price", "18"],           // optional per-person amount …
+///     ["currency", "EUR"],       // … and its ISO-4217 currency (omitted when free)
 ///     ["client", "openmaps"],
 ///     ["g", "u33dbtq4w"],        // full precision
 ///     ["g", "u33dbtq4"],         // one character less …
@@ -48,6 +51,9 @@ abstract final class ReviewEvent {
   static const int maxContentLength = 8000;
   static const int maxPlaceKeyLength = ReviewPlace.maxIdLength;
   static const int maxPhotoLinks = 10;
+
+  /// The largest per-person price we will believe from a `price` tag.
+  static const double maxPriceAmount = 1000000000;
 
   /// The `d` tag value for a place id, normalising any known prefix.
   static String placeKeyFor(String placeId) => ReviewPlace.keyFor(placeId);
@@ -89,21 +95,71 @@ abstract final class ReviewEvent {
     return value.clamp(0.0, 1.0);
   }
 
-  /// Builds the tags for a review: place key, rating, client marker, then the
-  /// full geohash and every one of its prefixes.
+  /// The canonical `price` tag string for a per-person amount: `18` → `"18"`,
+  /// `17.5` → `"17.5"`, `0` → `"0"`. Never negative or non-finite.
+  static String formatAmount(double amount) {
+    if (!amount.isFinite || amount <= 0) {
+      return '0';
+    }
+    final double bounded = amount > maxPriceAmount ? maxPriceAmount : amount;
+    final String fixed = bounded.toStringAsFixed(2);
+    final String trimmed = fixed.replaceFirst(RegExp(r'0+$'), '');
+    return trimmed.endsWith('.')
+        ? trimmed.substring(0, trimmed.length - 1)
+        : trimmed;
+  }
+
+  /// Parses a `price` tag value into a non-negative amount, or `null` when it
+  /// is missing, malformed, negative or absurd.
+  static double? parseAmount(Object? raw) {
+    final double? value = switch (raw) {
+      final double v => v,
+      final int v => v.toDouble(),
+      final String v => double.tryParse(v.trim()),
+      _ => null,
+    };
+    if (value == null || !value.isFinite || value < 0) {
+      return null;
+    }
+    return value > maxPriceAmount ? null : value;
+  }
+
+  /// A 3-letter ISO-4217 currency code we recognise, uppercased, or `null`.
+  static String? parseCurrency(Object? raw) {
+    if (raw is! String) {
+      return null;
+    }
+    final String code = raw.trim().toUpperCase();
+    if (code.length != 3 || currencyInfoForCode(code) == null) {
+      return null;
+    }
+    return code;
+  }
+
+  /// Builds the tags for a review: place key, rating, the optional per-person
+  /// price amount and its currency, the client marker, then the full geohash and
+  /// every one of its prefixes.
   static List<List<String>> buildTags({
     required String placeKey,
     required double rating,
     required LatLon position,
+    double? priceAmount,
+    String? priceCurrency,
   }) {
     final String hash = Geohash.encode(
       position.latitude,
       position.longitude,
       precision: fullGeohashPrecision,
     );
+    final double? price = priceAmount;
+    final String? currency = parseCurrency(priceCurrency);
     return <List<String>>[
       <String>['d', placeKey],
       <String>['rating', formatRating(rating)],
+      if (price != null) <String>['price', formatAmount(price)],
+      // A free price is currency-agnostic, so only a paid one carries a currency.
+      if (price != null && price > 0 && currency != null)
+        <String>['currency', currency],
       <String>['client', clientName],
       for (final String prefix in Geohash.prefixes(
         hash,
@@ -166,6 +222,8 @@ abstract final class ReviewEvent {
 
     String? placeKey;
     double? rating;
+    double? priceAmount;
+    String? priceCurrency;
     final List<String> geohashes = <String>[];
     for (final List<String> tag in event.tags) {
       if (tag.length < 2) {
@@ -180,6 +238,10 @@ abstract final class ReviewEvent {
           }
         case 'rating':
           rating ??= parseRating(value);
+        case 'price':
+          priceAmount ??= parseAmount(value);
+        case 'currency':
+          priceCurrency ??= parseCurrency(value);
         case 'g':
           if (value.isNotEmpty &&
               value.length <= Geohash.maxPrecision &&
@@ -193,6 +255,17 @@ abstract final class ReviewEvent {
     if (key == null || normalized == null || geohashes.isEmpty) {
       return null;
     }
+
+    // A paid price is only usable with a currency we can interpret; a free one
+    // is currency-agnostic. Drop anything we cannot read.
+    final double? amount = priceAmount;
+    final bool freePrice = amount != null && amount <= 0;
+    final String? currency = freePrice ? null : priceCurrency;
+    final double? usablePrice = amount == null
+        ? null
+        : freePrice || currency != null
+        ? amount
+        : null;
 
     // The longest valid geohash is the most precise point we can recover.
     geohashes.sort((String a, String b) => b.length.compareTo(a.length));
@@ -224,6 +297,8 @@ abstract final class ReviewEvent {
         isUtc: true,
       ),
       photos: photosIn(rawContent),
+      priceAmount: usablePrice,
+      priceCurrency: currency,
     );
   }
 

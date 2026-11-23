@@ -69,13 +69,50 @@ void main() {
     expect(draft['rating'], closeTo(0.8, 1e-9));
     expect(draft['text'], 'Great coffee');
     expect(draft['visibility'], 'public');
-    expect(draft['canPublish'], isTrue);
+    // A cafe charges per person, so a price is required before publishing.
+    expect(draft['priceApplies'], isTrue);
+    expect(draft['price'], isNull);
+    expect(draft['canPublish'], isFalse);
+
+    final Map<String, Object?> priced = await dispatch(
+      'review.draft.set',
+      <String, Object?>{'price': 2},
+    ) as Map<String, Object?>;
+    expect(priced['price'], 2);
+    expect(priced['priceAmount'], 18);
+    expect(priced['priceCurrency'], 'EUR');
+    expect(priced['priceLabel'], isNotNull);
+    expect(priced['canPublish'], isTrue);
 
     final Map<String, Object?> friends = await dispatch(
       'review.draft.set',
       <String, Object?>{'visibility': 'friends'},
     ) as Map<String, Object?>;
     expect(friends['visibility'], 'friends');
+  });
+
+  test('a priced place refuses to publish without a price', () async {
+    await dispatch('review.compose', <String, Object?>{
+      'id': 'sample-harbour-coffee',
+    });
+    await dispatch('review.draft.set', <String, Object?>{
+      'stars': 5,
+      'text': 'No price picked',
+    });
+    await expectLater(
+      dispatch('review.publish'),
+      throwsA(isA<CommandException>()),
+    );
+    expect(reviews.published, isEmpty);
+  });
+
+  test('a free place omits the price tag', () async {
+    // The library is not a priced category: the draft never asks.
+    final Map<String, Object?> draft = await dispatch(
+      'review.compose',
+      <String, Object?>{'id': 'sample-city-library'},
+    ) as Map<String, Object?>;
+    expect(draft['priceApplies'], isFalse);
   });
 
   test('review.photo.add attaches bytes to the draft', () async {
@@ -96,6 +133,7 @@ void main() {
     await dispatch('review.draft.set', <String, Object?>{
       'stars': 5,
       'text': 'Excellent evening',
+      'price': 'free',
     });
     final Map<String, Object?> published =
         await dispatch('review.publish') as Map<String, Object?>;
@@ -115,6 +153,12 @@ void main() {
       ),
       isTrue,
     );
+    final Map<String, Object?> mine = list.firstWhere(
+      (Object? entry) =>
+          (entry! as Map<String, Object?>)['text'] == 'Excellent evening',
+    ) as Map<String, Object?>;
+    expect(mine['priceAmount'], 0);
+    expect(mine['priceCurrency'], isNull);
   });
 
   test('review.publish reports a failure as a command error', () async {

@@ -16,6 +16,27 @@ void main() {
     expect(decoded, place);
   });
 
+  test('round-trips the country code, rejecting a non-code', () {
+    const Place place = Place(
+      id: 'p1',
+      name: 'X',
+      position: LatLon(1, 2),
+      countryCode: 'de',
+    );
+    final Place? decoded = PlaceDto.fromJson(PlaceDto.toJson(place));
+    expect(decoded?.countryCode, 'DE');
+    expect(decoded?.regionCode, 'DE');
+
+    final Place? hostile = PlaceDto.fromJson(<String, Object?>{
+      'id': 'p1',
+      'name': 'X',
+      'lat': 1,
+      'lon': 2,
+      'country': 'Germany',
+    });
+    expect(hostile?.countryCode, isNull);
+  });
+
   test('round-trips the OSM contact fields', () {
     const Place place = Place(
       id: 'node/2764050762',

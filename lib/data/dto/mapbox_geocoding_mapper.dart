@@ -29,7 +29,53 @@ abstract final class MapboxGeocodingMapper {
       position: position,
       category: _category(raw),
       address: placeName is String && placeName.isNotEmpty ? placeName : null,
+      countryCode: _countryCode(raw),
     );
+  }
+
+  /// The country's ISO alpha-2 code: the feature's own `short_code` when it is
+  /// a country, else the `country` entry in `properties.context`.
+  static String? _countryCode(Map<String, Object?> feature) {
+    final Object? properties = feature['properties'];
+    if (properties is Map<String, Object?>) {
+      final String? own = _alpha2(properties['short_code']);
+      if (own != null) {
+        return own;
+      }
+      final String? fromContext = _countryInContext(properties['context']);
+      if (fromContext != null) {
+        return fromContext;
+      }
+    }
+    return _alpha2(_idCountry(feature['id']));
+  }
+
+  static String? _countryInContext(Object? context) {
+    if (context is! List<Object?>) {
+      return null;
+    }
+    for (final Object? entry in context) {
+      if (entry is! Map<String, Object?>) {
+        continue;
+      }
+      final Object? id = entry['id'];
+      if (id is String && id.startsWith('country.')) {
+        return _alpha2(entry['short_code']);
+      }
+    }
+    return null;
+  }
+
+  /// A country result's own id looks like `country.de`.
+  static String? _idCountry(Object? id) =>
+      id is String && id.startsWith('country.') ? id.substring(8) : null;
+
+  static String? _alpha2(Object? raw) {
+    if (raw is! String) {
+      return null;
+    }
+    final String value = raw.trim().toUpperCase();
+    return RegExp(r'^[A-Z]{2}$').hasMatch(value) ? value : null;
   }
 
   static String? _name(Map<String, Object?> feature) {

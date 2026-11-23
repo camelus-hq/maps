@@ -26,6 +26,7 @@ class Place {
     this.wheelchairAccessible,
     this.openingHours,
     this.osmTags = const <String, String>{},
+    this.countryCode,
   });
 
   final String id;
@@ -55,6 +56,33 @@ class Place {
   /// The raw OpenStreetMap tags for the element (Overpass `tags`), bounded
   /// by the data layer. Never empty for a place when OSM publishes any tags.
   final Map<String, String> osmTags;
+
+  /// The ISO 3166-1 alpha-2 country code (e.g. `DE`) the provider reported for
+  /// the place, when it publishes one. Drives region-aware currency.
+  final String? countryCode;
+
+  /// The country the place is in, for currency: [countryCode] when the provider
+  /// gave one, else an OSM `addr:country` / `is_in:country_code` tag. Returns
+  /// `null` when no country is known — the caller then uses a default.
+  String? get regionCode {
+    final String? direct = _alpha2(countryCode);
+    if (direct != null) {
+      return direct;
+    }
+    return _alpha2(osmTags['addr:country']) ??
+        _alpha2(osmTags['is_in:country_code']) ??
+        _alpha2(osmTags['country_code']);
+  }
+
+  static String? _alpha2(String? raw) {
+    if (raw == null) {
+      return null;
+    }
+    final String value = raw.trim().toUpperCase();
+    return _alpha2Pattern.hasMatch(value) ? value : null;
+  }
+
+  static final RegExp _alpha2Pattern = RegExp(r'^[A-Z]{2}$');
 
   /// Whether a phone number is known (drives the Call action).
   bool get hasPhone => phone != null && phone!.isNotEmpty;
@@ -117,6 +145,7 @@ class Place {
       wheelchairAccessible: wheelchairAccessible ?? osm.wheelchairAccessible,
       openingHours: openingHours ?? osm.openingHours,
       osmTags: osm.osmTags.isNotEmpty ? osm.osmTags : osmTags,
+      countryCode: countryCode ?? osm.countryCode,
     );
   }
 

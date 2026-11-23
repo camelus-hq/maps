@@ -23,6 +23,21 @@ void main() {
     expect(place.address, 'Street 1, Berlin');
   });
 
+  test('reads the country from context.country', () {
+    final Place? place = MapboxSearchBoxMapper.fromFeature(<String, Object?>{
+      'type': 'Feature',
+      'properties': <String, Object?>{
+        'name': 'Café Y',
+        'mapbox_id': 'poi.9',
+        'coordinates': <String, Object?>{'longitude': 13.4, 'latitude': 52.5},
+        'context': <String, Object?>{
+          'country': <String, Object?>{'name': 'Germany', 'country_code': 'de'},
+        },
+      },
+    });
+    expect(place?.regionCode, 'DE');
+  });
+
   test('maps a geometry.coordinates Search Box feature', () {
     final Place? place = MapboxSearchBoxMapper.fromFeature(<String, Object?>{
       'type': 'Feature',

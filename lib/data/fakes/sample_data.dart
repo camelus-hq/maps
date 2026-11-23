@@ -16,6 +16,7 @@ abstract final class SampleData {
       position: LatLon(52.5210, 13.4075),
       category: 'Cafe',
       address: '1 Lantern Way',
+      countryCode: 'DE',
     ),
     Place(
       id: 'sample-old-mill-cafe',
@@ -23,6 +24,7 @@ abstract final class SampleData {
       position: LatLon(52.5180, 13.4020),
       category: 'Cafe',
       address: '4 Miller Street',
+      countryCode: 'DE',
     ),
     Place(
       id: 'sample-riverside-kitchen',
@@ -30,6 +32,7 @@ abstract final class SampleData {
       position: LatLon(52.5230, 13.4100),
       category: 'Restaurant',
       address: '12 Embankment Road',
+      countryCode: 'DE',
     ),
     Place(
       id: 'sample-northgate-fuel',
@@ -37,6 +40,7 @@ abstract final class SampleData {
       position: LatLon(52.5260, 13.4010),
       category: 'Gas',
       address: '88 Northgate',
+      countryCode: 'DE',
     ),
     Place(
       id: 'sample-green-market',
@@ -44,6 +48,7 @@ abstract final class SampleData {
       position: LatLon(52.5175, 13.4090),
       category: 'Groceries',
       address: '5 Market Square',
+      countryCode: 'DE',
     ),
     Place(
       id: 'sample-station-hotel',
@@ -51,6 +56,7 @@ abstract final class SampleData {
       position: LatLon(52.5250, 13.4060),
       category: 'Hotel',
       address: '2 Platform Street',
+      countryCode: 'DE',
     ),
     Place(
       id: 'sample-willow-park',
@@ -58,6 +64,7 @@ abstract final class SampleData {
       position: LatLon(52.5150, 13.4030),
       category: 'Park',
       address: 'Willow Park',
+      countryCode: 'DE',
     ),
     Place(
       id: 'sample-city-library',
@@ -65,6 +72,7 @@ abstract final class SampleData {
       position: LatLon(52.5195, 13.4120),
       category: 'Library',
       address: '9 Reading Lane',
+      countryCode: 'DE',
     ),
   ];
 }

@@ -6,6 +6,7 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/errors/app_exception.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/utils/currency.dart';
 import '../../../domain/entities/place.dart';
 import '../../../domain/entities/review.dart';
 import '../../../domain/entities/review_place.dart';
@@ -121,6 +122,7 @@ class _PlaceReviewsSectionState extends ConsumerState<PlaceReviewsSection> {
     final List<Review> reviews = _friendsOnly
         ? summary.friendReviews
         : summary.reviews;
+    final CurrencyInfo currency = currencyForRegion(widget.place.regionCode);
     final Review? headline = summary.headline;
     final List<Review> rest = <Review>[
       for (final Review review in reviews)
@@ -159,11 +161,16 @@ class _PlaceReviewsSectionState extends ConsumerState<PlaceReviewsSection> {
         if (headline != null)
           ReviewTile(
             review: headline,
+            currency: currency,
             headline: true,
             onEdit: _isOwn(headline) ? _edit : null,
           ),
         for (final Review review in rest)
-          ReviewTile(review: review, onEdit: _isOwn(review) ? _edit : null),
+          ReviewTile(
+            review: review,
+            currency: currency,
+            onEdit: _isOwn(review) ? _edit : null,
+          ),
         if (_friendsOnly && reviews.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),

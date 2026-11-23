@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/currency.dart';
 import '../../../core/utils/format.dart';
 import '../../../core/utils/opening_hours.dart';
 import '../../../core/utils/osm_payments.dart';
 import '../../../domain/entities/lat_lon.dart';
 import '../../../domain/entities/place.dart';
+import '../../../domain/entities/price_range.dart';
 import '../../../domain/entities/review_place.dart';
 import '../../../domain/entities/review_summary.dart';
 import '../../../domain/entities/transit.dart';
@@ -253,7 +255,7 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet> {
                   const SizedBox(height: PlaySpace.xs),
                   _header(context, place),
                   const SizedBox(height: PlaySpace.sm),
-                  _ratingRow(context, summary, loading: reviewsLoading),
+                  _ratingRow(context, place, summary, loading: reviewsLoading),
                   // A place that takes Bitcoin Lightning / Chaumian ecash
                   // advertises it right below the review (the rest of its
                   // payments live in the Overview).
@@ -323,9 +325,12 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet> {
   }
 
   /// The rating line: stars and the review count, or — when nobody has reviewed
-  /// the place — the "Write a review" entry point.
+  /// the place — the "Write a review" entry point. A place whose reviewers
+  /// reported a per-person price shows the average (`€€€`) here too; a long
+  /// press explains what the band means in the place's own currency.
   Widget _ratingRow(
     BuildContext context,
+    Place place,
     ReviewSummary summary, {
     required bool loading,
   }) {
@@ -346,6 +351,12 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet> {
         ),
       );
     }
+    final CurrencyInfo currency = currencyForRegion(place.regionCode);
+    final PriceRange? averagePrice = summary.hasPrice
+        ? summary.averagePrice
+        : null;
+    final CurrencyInfo averageCurrency =
+        summary.averagePriceCurrency ?? currency;
     return Align(
       alignment: Alignment.centerLeft,
       child: PlayPressable(
@@ -366,6 +377,20 @@ class _PlaceDetailsSheetState extends ConsumerState<PlaceDetailsSheet> {
                 '(${summary.reviewCount})',
                 style: PlayType.caption.copyWith(color: colors.inkMuted),
               ),
+              if (averagePrice != null) ...<Widget>[
+                const SizedBox(width: PlaySpace.sm),
+                PlayTooltip(
+                  message: averagePrice.isFree
+                      ? 'Free of charge'
+                      : '${averagePrice.shortLabel(averageCurrency.symbol)} · '
+                            'about ${averagePrice.valueLabel(averageCurrency)} '
+                            'per person',
+                  child: PlayTag(
+                    label: averagePrice.shortLabel(averageCurrency.symbol),
+                    tone: PlayTone.soft,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
