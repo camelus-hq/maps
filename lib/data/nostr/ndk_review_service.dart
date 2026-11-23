@@ -5,9 +5,9 @@ import 'package:ndk/entities.dart'
 import 'package:ndk/ndk.dart';
 
 import '../../core/errors/app_exception.dart';
-import '../../core/utils/geohash.dart';
 import '../../domain/entities/review.dart';
 import '../../domain/entities/review_bounds.dart';
+import '../../domain/entities/review_bounds_cover.dart';
 import '../../domain/entities/review_draft.dart';
 import '../../domain/ports/review_service.dart';
 import 'review_event.dart';
@@ -36,12 +36,6 @@ class NdkReviewService implements ReviewService {
 
   /// Timeout for one relay read.
   static const Duration _queryTimeout = Duration(seconds: 8);
-
-  /// Precision search stops at this many covering cells.
-  static const int _maxCoverCells = 24;
-
-  /// Highest geohash precision we cover a viewport at (~150 m cells).
-  static const int _maxCoverPrecision = 7;
 
   /// A query never returns more than this many events.
   static const int _queryLimit = 500;
@@ -115,9 +109,9 @@ class NdkReviewService implements ReviewService {
 
   @override
   Future<List<Review>> reviewsInBounds(ReviewBounds bounds) async {
-    final _Cover? cover = _cover(bounds);
+    final ReviewBoundsCover? cover = ReviewBoundsCover.of(bounds);
     final List<Nip01Event> events = cover == null
-        // Too wide to cover with tags: read the kind and clip client-side.
+        // Too wide to cover with tags: read the kind; the caller clips.
         ? await _safeQuery(
             name: 'openmaps-reviews-all',
             filter: Filter(kinds: <int>[ReviewEvent.kind], limit: _queryLimit),
@@ -130,12 +124,11 @@ class NdkReviewService implements ReviewService {
               limit: _queryLimit,
             ),
           );
-    final List<Review> reviews = _toReviews(events);
-    // A relay may ignore the tag filter; never hand back off-screen pins.
-    return <Review>[
-      for (final Review review in reviews)
-        if (bounds.contains(review.position, marginDegrees: 0.002)) review,
-    ];
+    // The events are the whole covering cells, not clipped to `bounds`: the map
+    // caches them and clips locally (also its defence against a relay that
+    // ignores the tag filter), so a pan inside the same cells is served
+    // without another relay query.
+    return _toReviews(events);
   }
 
   @override
@@ -180,31 +173,6 @@ class NdkReviewService implements ReviewService {
       );
     }
     return List<String>.unmodifiable(urls);
-  }
-
-  /// The geohash cells that cover [bounds], or `null` when the viewport is too
-  /// wide for a tag query (the caller then reads by kind).
-  _Cover? _cover(ReviewBounds bounds) {
-    if (bounds.lonSpan > 180 || bounds.latSpan > 120) {
-      return null;
-    }
-    for (int precision = _maxCoverPrecision; precision >= 1; precision--) {
-      final List<String> cells = Geohash.cover(
-        north: bounds.north,
-        south: bounds.south,
-        east: bounds.east,
-        west: bounds.west,
-        precision: precision,
-        maxCells: 8,
-      );
-      if (cells.isEmpty) {
-        continue;
-      }
-      if (cells.length <= _maxCoverCells) {
-        return _Cover(precision: precision, prefixes: cells);
-      }
-    }
-    return null;
   }
 
   Future<List<Nip01Event>> _safeQuery({
@@ -307,12 +275,4 @@ class NdkReviewService implements ReviewService {
     }
     return cleaned;
   }
-}
-
-/// The geohash cells chosen to cover a viewport.
-class _Cover {
-  const _Cover({required this.precision, required this.prefixes});
-
-  final int precision;
-  final List<String> prefixes;
 }

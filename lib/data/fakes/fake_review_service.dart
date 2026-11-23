@@ -1,10 +1,12 @@
 import 'dart:typed_data';
 
 import '../../core/errors/app_exception.dart';
+import '../../core/utils/geohash.dart';
 import '../../domain/entities/friend.dart';
 import '../../domain/entities/lat_lon.dart';
 import '../../domain/entities/review.dart';
 import '../../domain/entities/review_bounds.dart';
+import '../../domain/entities/review_bounds_cover.dart';
 import '../../domain/entities/review_draft.dart';
 import '../../domain/entities/review_place.dart';
 import '../../domain/ports/review_service.dart';
@@ -31,6 +33,11 @@ class FakeReviewService implements ReviewService {
 
   /// When set, [publishReview] throws it (tests).
   AppException? publishError;
+
+  /// How many map-area reads the service was asked for. The controller only
+  /// calls it when the `#g` filter changes, so tests can assert that a pan
+  /// inside the same cells sends no new query.
+  int boundsQueries = 0;
 
   /// Whether this fake reports a signed-in identity.
   bool signedIn;
@@ -213,8 +220,23 @@ class FakeReviewService implements ReviewService {
 
   @override
   Future<List<Review>> reviewsInBounds(ReviewBounds bounds) async {
+    boundsQueries++;
+    final ReviewBoundsCover? cover = ReviewBoundsCover.of(bounds);
+    if (cover == null) {
+      // No tag cover: the caller clips; the fake has nothing coarser to offer.
+      return List<Review>.unmodifiable(_reviews);
+    }
+    // Mirror the relay's `#g` filter: a review belongs to the covering cells
+    // that its own geohash (at the cover's precision) falls in.
     return List<Review>.unmodifiable(
-      _reviews.where((Review review) => bounds.contains(review.position)),
+      _reviews.where((Review review) {
+        final String cell = Geohash.encode(
+          review.position.latitude,
+          review.position.longitude,
+          precision: cover.precision,
+        );
+        return cover.prefixes.contains(cell);
+      }),
     );
   }
 

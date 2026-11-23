@@ -30,26 +30,24 @@ class LoadPlaceReviews {
   }
 }
 
-/// Reads only the reviews inside the visible map rectangle.
+/// Reads the reviews under the geohash cells that cover the visible rectangle.
 ///
-/// The bounds are applied again here (with a small margin) so a relay that
-/// ignores a `#g` filter can never flood the map with off-screen pins.
+/// The service answers for the **whole covering cells** (a bounded superset);
+/// the map controller clips that to the exact viewport itself, so it can cache
+/// the result and serve a pan inside the same cells without another relay
+/// query. The clip also keeps a relay that ignores the `#g` filter from flooding
+/// the map with off-screen pins.
 class LoadVisibleReviews {
   const LoadVisibleReviews(this._service);
 
   final ReviewService _service;
 
-  /// Reviews whose position is at most this far outside the rectangle are kept,
-  /// so a pin that is half on screen does not flicker.
+  /// Reviews whose position is at most this far outside the rectangle are kept
+  /// by the caller, so a pin that is half on screen does not flicker.
   static const double edgeMarginDegrees = 0.002;
 
   Future<List<Review>> call(ReviewBounds bounds) async {
     final List<Review> reviews = await _service.reviewsInBounds(bounds);
-    final List<Review> visible = <Review>[
-      for (final Review review in reviews)
-        if (bounds.contains(review.position, marginDegrees: edgeMarginDegrees))
-          review,
-    ];
-    return LoadPlaceReviews.sortNewest(visible);
+    return LoadPlaceReviews.sortNewest(reviews);
   }
 }
