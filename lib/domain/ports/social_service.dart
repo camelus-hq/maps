@@ -1,7 +1,11 @@
+import 'dart:typed_data';
+
 import '../entities/friend.dart';
 import '../entities/friend_location.dart';
 import '../entities/live_share.dart';
 import '../entities/push.dart';
+import '../entities/user_profile.dart';
+import '../entities/user_relay_lists.dart';
 
 /// Publishes and receives live location over Nostr.
 ///
@@ -111,6 +115,53 @@ abstract interface class SocialService {
   /// Signs in with a raw private key (`nsec…` or 64-char hex). Agents and the
   /// login screen use this; the interactive widget path goes through NDK.
   Future<void> signInWithPrivateKey(String privateKey);
+
+  /// Whether this platform can sign in through a NIP-55 external signer app
+  /// (Android only).
+  bool get supportsSignerApp;
+
+  /// Signs in through a NIP-55 external signer app.
+  ///
+  /// Throws an [AppException] when no signer is installed, the user cancels, or
+  /// the platform does not support it.
+  Future<void> signInWithExternalSigner();
+
+  /// Connects to a NIP-46 remote signer ("bunker") from a `bunker://` URL.
+  ///
+  /// [onAuthUrl] is called when the bunker asks the user to approve the
+  /// connection at an HTTP URL, so the UI can offer to open it.
+  Future<void> signInWithBunker(
+    String bunkerUrl, {
+    void Function(String authUrl)? onAuthUrl,
+  });
+
+  /// Creates a brand-new identity, signs in with it, and returns its **private
+  /// key** as a bech32 `nsec…` string so the sign-up flow can show it for
+  /// backup.
+  ///
+  /// The caller must never send this value over the control channel or any
+  /// other transport (AGENTS.md: secrets never leave the device).
+  Future<String> createAccount();
+
+  /// Loads the signed-in user's own profile ([UserProfile]); empty fields when
+  /// nothing is published yet.
+  Future<UserProfile> loadOwnProfile();
+
+  /// Uploads a profile picture to a Blossom server and returns its public URL.
+  Future<String> uploadProfilePicture({
+    required Uint8List data,
+    required String mimeType,
+  });
+
+  /// Publishes the signed-in user's kind-0 profile metadata.
+  Future<void> publishProfile(UserProfile profile);
+
+  /// Loads the signed-in user's NIP-65 and NIP-17 DM relay lists.
+  Future<UserRelays> loadRelays();
+
+  /// Publishes the user's relay lists (NIP-65 kind 10002 and NIP-17 kind
+  /// 10050). Both lists must have at least one relay.
+  Future<void> publishRelays(UserRelays relays);
 
   /// Signs out of the current identity and stops watching.
   Future<void> logout();

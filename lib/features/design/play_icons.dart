@@ -89,6 +89,9 @@ abstract final class PlayIcons {
   static const IconData private = PhosphorIconsRegular.eyeSlash;
   static const IconData liveDot = PhosphorIconsFill.circle;
   static const IconData dot = PhosphorIconsRegular.circle;
+  static const IconData photo = PhosphorIconsRegular.image;
+  static const IconData zoomIn = PhosphorIconsRegular.magnifyingGlassPlus;
+  static const IconData zoomOut = PhosphorIconsRegular.magnifyingGlassMinus;
 
   // Categories (a small, kit-local subset; the app keeps the full table in
   // `place_result_icon.dart`). -------------------------------------------

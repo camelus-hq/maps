@@ -218,6 +218,9 @@ These are standard, not proposals:
 | NIP-01 | Base event/serialisation; `client` tag convention |
 | NIP-02 | Contact list (`kind: 3`) — "people you follow", for adding friends |
 | NIP-19 | `npub…`/`nsec…` bech32 keys (QR codes, sign-in) |
+| NIP-46 | Remote signer ("bunker") sign-in — the app never sees the private key |
+| NIP-55 | External signer app sign-in (Android) — the key stays in the signer app |
+| NIP-65 | Read/write relay list (`kind: 10002`); set to the app default during sign-up when the account has none, and editable from the profile |
 | NIP-51 | **Friends set** — categorized people set `kind: 30000` named `friends`; the keys live in the NIP-44 encrypted content, so relays never learn who your friends are |
 | Profile metadata (`kind: 0`) | Friend names and avatars |
 | NIP-44 + NIP-59 | Encryption and gift wrap used by live share and DMs; the live-share **updates** use the ephemeral gift wrap `kind: 21059`, which relays do not store |

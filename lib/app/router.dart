@@ -15,9 +15,13 @@ import '../features/saved/screens/saved_screen.dart';
 import '../features/search/screens/search_screen.dart';
 import '../features/settings/screens/settings_screen.dart';
 import '../features/social/screens/add_friend_screen.dart';
+import '../features/social/screens/edit_profile_screen.dart';
+import '../features/social/screens/edit_relays_screen.dart';
 import '../features/social/screens/friends_screen.dart';
 import '../features/social/screens/manage_friends_screen.dart';
 import '../features/social/screens/profile_screen.dart';
+import '../features/social/screens/sign_in_screen.dart';
+import '../features/social/screens/sign_up_screen.dart';
 import '../features/trips/screens/trip_detail_screen.dart';
 import '../features/trips/screens/trips_screen.dart';
 import '../state/navigation_keys.dart';
@@ -316,6 +320,28 @@ GoRouter buildAppRouter() {
         path: '/profile',
         pageBuilder: (BuildContext context, GoRouterState state) =>
             _page(state, const ProfileScreen()),
+        routes: <RouteBase>[
+          GoRoute(
+            path: 'edit',
+            pageBuilder: (BuildContext context, GoRouterState state) =>
+                _page(state, const EditProfileScreen()),
+          ),
+          GoRoute(
+            path: 'relays',
+            pageBuilder: (BuildContext context, GoRouterState state) =>
+                _page(state, const EditRelaysScreen()),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/signin',
+        pageBuilder: (BuildContext context, GoRouterState state) =>
+            _page(state, const SignInScreen()),
+      ),
+      GoRoute(
+        path: '/signup',
+        pageBuilder: (BuildContext context, GoRouterState state) =>
+            _page(state, const SignUpScreen()),
       ),
     ],
   );

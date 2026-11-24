@@ -1,7 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
-import 'package:ndk/entities.dart' show RelayBroadcastResponse;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
+import 'package:ndk/entities.dart'
+    show NdkFile, ReadWriteMarker, RelayBroadcastResponse, UserRelayList;
 import 'package:ndk/ndk.dart';
 import 'package:ndk/shared/nips/nip01/bip340.dart';
 import 'package:ndk_flutter/ndk_flutter.dart';
@@ -11,6 +15,8 @@ import '../../domain/entities/friend.dart';
 import '../../domain/entities/friend_location.dart';
 import '../../domain/entities/live_share.dart';
 import '../../domain/entities/push.dart';
+import '../../domain/entities/user_profile.dart';
+import '../../domain/entities/user_relay_lists.dart';
 import '../../domain/ports/social_service.dart';
 import 'live_location_payload.dart';
 import 'live_share_wire.dart';
@@ -33,7 +39,9 @@ class NdkSocialService implements SocialService {
     required this.ndk,
     required this.ndkFlutter,
     List<String> relays = const <String>[],
-  }) : _relays = _cleanRelays(relays);
+    List<String> blossomServers = const <String>[],
+  }) : _relays = _cleanRelays(relays),
+       _blossomServers = _cleanServers(blossomServers);
 
   /// Hard cap on how many friends one set contributes.
   static const int _maxFriends = 500;
@@ -57,6 +65,9 @@ class NdkSocialService implements SocialService {
   final NdkFlutter ndkFlutter;
 
   final List<String> _relays;
+
+  /// Blossom servers a profile picture is uploaded to (BUD-02).
+  final List<String> _blossomServers;
 
   final StreamController<FriendLocation> _incoming =
       StreamController<FriendLocation>.broadcast();
@@ -605,6 +616,267 @@ class NdkSocialService implements SocialService {
   }
 
   @override
+  bool get supportsSignerApp =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
+  @override
+  Future<void> signInWithExternalSigner() async {
+    if (!supportsSignerApp) {
+      throw const ValidationException(
+        'Signing in with a signer app is only available on Android.',
+      );
+    }
+    try {
+      const Nip55Signer signer = Nip55Signer();
+      final bool installed = await signer.isAppInstalled();
+      if (!installed) {
+        throw const ValidationException(
+          'No Nostr signer app found. Install one (for example Amber) and '
+          'try again.',
+        );
+      }
+      final Nip55LoginResult? result = await signer.login();
+      if (result == null) {
+        throw const ValidationException('Sign-in was cancelled.');
+      }
+      final Nip55EventSigner external = Nip55EventSigner(
+        publicKey: result.pubkey,
+        // Pin the signer captured at login so later requests can be silent.
+        nip55Signer: Nip55Signer(package: result.package),
+      );
+      if (ndk.accounts.isLoggedIn) {
+        ndk.accounts.logout();
+      }
+      ndk.accounts.loginExternalSigner(signer: external);
+      await ndkFlutter.saveAccountsState();
+    } on AppException {
+      rethrow;
+    } catch (error) {
+      throw UnknownException(
+        'Could not sign in with the signer app',
+        cause: error,
+      );
+    }
+  }
+
+  @override
+  Future<void> signInWithBunker(
+    String bunkerUrl, {
+    void Function(String authUrl)? onAuthUrl,
+  }) async {
+    final String url = bunkerUrl.trim();
+    if (!url.toLowerCase().startsWith('bunker://')) {
+      throw const ValidationException('Enter a bunker:// URL.');
+    }
+    final BunkerConnection? connection;
+    try {
+      connection = await ndk.accounts.loginWithBunkerUrl(
+        bunkerUrl: url,
+        bunkers: ndk.bunkers,
+        authCallback: onAuthUrl == null
+            ? null
+            : (String auth) => onAuthUrl(auth),
+      );
+    } on AppException {
+      rethrow;
+    } catch (error) {
+      throw ValidationException(
+        'That does not look like a valid bunker URL.',
+        cause: error,
+      );
+    }
+    if (connection == null) {
+      throw const ValidationException(
+        'The remote signer did not accept the connection.',
+      );
+    }
+    try {
+      await ndkFlutter.saveAccountsState();
+    } catch (_) {
+      // The in-memory account is enough to continue; persistence is a nicety.
+    }
+  }
+
+  @override
+  Future<String> createAccount() async {
+    try {
+      final (String privateKey, String publicKey) = ndk
+          .config
+          .eventSignerFactory
+          .generateKeyPair();
+      if (ndk.accounts.isLoggedIn) {
+        ndk.accounts.logout();
+      }
+      ndk.accounts.loginPrivateKey(pubkey: publicKey, privkey: privateKey);
+      await ndkFlutter.saveAccountsState();
+      return Nip19.encodePrivateKey(privateKey);
+    } on AppException {
+      rethrow;
+    } catch (error) {
+      throw UnknownException('Could not create a new identity', cause: error);
+    }
+  }
+
+  @override
+  Future<UserProfile> loadOwnProfile() async {
+    final String? me = currentUserPubkey;
+    if (me == null) {
+      return const UserProfile();
+    }
+    try {
+      final Metadata? metadata = await ndk.metadata.loadMetadata(
+        me,
+        forceRefresh: true,
+      );
+      if (metadata == null) {
+        return const UserProfile();
+      }
+      final String? name = _firstNonEmpty(<String?>[
+        metadata.displayName,
+        metadata.name,
+      ]);
+      final String? about = _firstNonEmpty(<String?>[metadata.about]);
+      final String? picture = _safeUrl(metadata.picture);
+      return UserProfile(
+        name: name ?? '',
+        about: about ?? '',
+        pictureUrl: picture,
+      );
+    } on AppException {
+      rethrow;
+    } catch (error) {
+      throw NetworkException('Could not load your profile', cause: error);
+    }
+  }
+
+  @override
+  Future<String> uploadProfilePicture({
+    required Uint8List data,
+    required String mimeType,
+  }) async {
+    if (data.isEmpty) {
+      throw const ValidationException('That image is empty.');
+    }
+    try {
+      final List<BlobUploadResult> results = await ndk.files
+          .upload(
+            file: NdkFile(data: data, mimeType: mimeType, size: data.length),
+            serverUrls: _blossomServers.isEmpty ? null : _blossomServers,
+            // Blossom uploads must present the signed kind-24242 auth event up
+            // front: several public servers answer 400, not 401, without it.
+            auth: _blossomAuth,
+          )
+          .timeout(_broadcastTimeout);
+      final String? url = _firstUploadedUrl(results);
+      if (url == null) {
+        throw const NetworkException(
+          'Could not upload your picture. Try again, or save without it.',
+        );
+      }
+      return url;
+    } on AppException {
+      rethrow;
+    } catch (error) {
+      throw NetworkException(
+        'Could not upload your picture. Try again, or save without it.',
+        cause: error,
+      );
+    }
+  }
+
+  @override
+  Future<void> publishProfile(UserProfile profile) async {
+    final String? me = currentUserPubkey;
+    final Account? account = ndk.accounts.getLoggedAccount();
+    if (me == null || account == null || !account.signer.canSign()) {
+      throw const ValidationException('Sign in to edit your profile');
+    }
+    final Metadata metadata = Metadata(pubKey: me);
+    metadata.name = profile.safeName.isEmpty ? null : profile.safeName;
+    metadata.displayName = profile.safeName.isEmpty ? null : profile.safeName;
+    metadata.about = profile.safeAbout.isEmpty ? null : profile.safeAbout;
+    metadata.picture = _safeUrl(profile.pictureUrl);
+    try {
+      await ndk.metadata.broadcastMetadata(
+        metadata,
+        // Publish to the same profile relays the reads use, so the change is
+        // visible to other clients straight away.
+        specificRelays: _profileRelays,
+      );
+    } on AppException {
+      rethrow;
+    } catch (error) {
+      throw NetworkException('Could not publish your profile', cause: error);
+    }
+  }
+
+  @override
+  Future<UserRelays> loadRelays() async {
+    final String? me = currentUserPubkey;
+    if (me == null) {
+      throw const ValidationException('Sign in to edit your relays');
+    }
+    try {
+      final UserRelayList? nip65 = await ndk.userRelayLists
+          .getSingleUserRelayList(me, forceRefresh: true);
+      final List<String>? dm = await ndk.userRelayLists.getDmRelays(
+        me,
+        forceRefresh: true,
+      );
+      return UserRelays(
+        nip65: nip65?.urls.toList() ?? const <String>[],
+        dm: dm ?? const <String>[],
+      );
+    } on AppException {
+      rethrow;
+    } catch (error) {
+      throw NetworkException('Could not load your relays', cause: error);
+    }
+  }
+
+  @override
+  Future<void> publishRelays(UserRelays relays) async {
+    final String? me = currentUserPubkey;
+    final Account? account = ndk.accounts.getLoggedAccount();
+    if (me == null || account == null || !account.signer.canSign()) {
+      throw const ValidationException('Sign in to edit your relays');
+    }
+    final List<String> nip65 = _cleanRelays(relays.nip65);
+    final List<String> dm = _cleanRelays(relays.dm);
+    if (nip65.isEmpty) {
+      throw const ValidationException(
+        'Keep at least one relay in your NIP-65 list.',
+      );
+    }
+    if (dm.isEmpty) {
+      throw const ValidationException(
+        'Keep at least one relay in your direct-message list.',
+      );
+    }
+    try {
+      final int now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      await ndk.userRelayLists.setInitialUserRelayList(
+        UserRelayList(
+          pubKey: me,
+          relays: <String, ReadWriteMarker>{
+            for (final String url in nip65) url: ReadWriteMarker.readWrite,
+          },
+          createdAt: now,
+          refreshedTimestamp: now,
+        ),
+      );
+      await ndk.dms.publishDmRelays(
+        relayUrlsOrdered: dm,
+        broadcastRelays: _relays.isEmpty ? null : _relays,
+      );
+    } on AppException {
+      rethrow;
+    } catch (error) {
+      throw NetworkException('Could not publish your relays', cause: error);
+    }
+  }
+
+  @override
   Future<void> logout() async {
     await stopWatching();
     try {
@@ -824,5 +1096,37 @@ class NdkSocialService implements SocialService {
       }
     }
     return cleaned;
+  }
+
+  static List<String> _cleanServers(List<String> servers) {
+    final List<String> cleaned = <String>[];
+    for (final String raw in servers) {
+      final String server = raw.trim().replaceAll(RegExp(r'/+$'), '');
+      if ((server.startsWith('https://') || server.startsWith('http://')) &&
+          !cleaned.contains(server)) {
+        cleaned.add(server);
+      }
+    }
+    return cleaned;
+  }
+
+  /// The Blossom auth policy: the signed-in account signs the kind-24242 event
+  /// up front (public servers answer 400, not 401, without it).
+  AuthPolicy? get _blossomAuth {
+    final Account? account = ndk.accounts.getLoggedAccount();
+    if (account == null || !account.signer.canSign()) {
+      return null;
+    }
+    return AuthPolicy.require(account);
+  }
+
+  static String? _firstUploadedUrl(List<BlobUploadResult> results) {
+    for (final BlobUploadResult result in results) {
+      final String? url = result.success ? result.descriptor?.url : null;
+      if (url != null && url.startsWith('http')) {
+        return url;
+      }
+    }
+    return null;
   }
 }

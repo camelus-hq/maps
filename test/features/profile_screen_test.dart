@@ -2,62 +2,64 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:ndk/ndk.dart';
-import 'package:ndk_flutter/l10n/app_localizations.dart' as ndk_l10n;
-import 'package:ndk_flutter/ndk_flutter.dart';
 import 'package:openmaps/data/fakes/fake_social_service.dart';
-import 'package:openmaps/features/common/material_host.dart';
+import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/social/screens/profile_screen.dart';
+import 'package:openmaps/features/social/screens/sign_in_screen.dart';
 import 'package:openmaps/state/ports.dart';
-import 'package:openmaps/state/social.dart';
 
-/// The profile screen hosts ndk_flutter's `NLogin`, which is built from the
-/// deprecated `package:flutter/material.dart` library. Its `TextField` asserts
-/// a `Material` ancestor of that same library, which neither the Play UI nor
-/// `material_ui` provides — only [MaterialHost] does. Without it this build
-/// throws "No Material widget found."
 void main() {
-  testWidgets('signed-out profile hosts NLogin without a Material crash', (
-    WidgetTester tester,
-  ) async {
-    final Ndk ndk = Ndk(
-      NdkConfig(
-        cache: MemCacheManager(),
-        eventVerifier: Bip340EventVerifier(),
-        bootstrapRelays: const <String>[],
-        // Otherwise Ndk starts a 15s periodic retry timer that the widget-test
-        // binding flags as pending after the tree is torn down.
-        pendingDeliveryRetriesEnabled: false,
-      ),
-    );
-    final NdkFlutter ndkFlutter = NdkFlutter(ndk: ndk);
-    final FakeSocialService social = FakeSocialService(signedIn: false);
-    addTearDown(social.dispose);
-
+  Future<FakeSocialService> pumpProfile(
+    WidgetTester tester, {
+    required bool signedIn,
+    FakeSocialService? service,
+  }) async {
+    final FakeSocialService social =
+        service ?? FakeSocialService(signedIn: signedIn);
     final ProviderContainer container = ProviderContainer(
-      overrides: <Override>[
-        ndkFlutterProvider.overrideWithValue(ndkFlutter),
-        socialServiceProvider.overrideWithValue(social),
-      ],
+      overrides: <Override>[socialServiceProvider.overrideWithValue(social)],
     );
     addTearDown(container.dispose);
+
+    // A tall surface keeps the whole (scrollable) form laid out.
+    tester.view.physicalSize = const Size(1000, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: MaterialApp(
-          localizationsDelegates:
-              ndk_l10n.AppLocalizations.localizationsDelegates,
-          supportedLocales: ndk_l10n.AppLocalizations.supportedLocales,
-          home: const ProfileScreen(),
-        ),
+        child: const MaterialApp(home: ProfileScreen()),
       ),
     );
     await tester.pumpAndSettle();
+    return social;
+  }
+
+  testWidgets('signed-out profile shows the Play sign-in form', (
+    WidgetTester tester,
+  ) async {
+    await pumpProfile(tester, signedIn: false);
 
     expect(tester.takeException(), isNull);
-    expect(find.byType(MaterialHost), findsOneWidget);
-    expect(find.byType(NLogin), findsOneWidget);
+    expect(find.byType(SignInView), findsOneWidget);
     expect(find.text('Sign in to Nostr'), findsOneWidget);
+    expect(find.text('Sign in with a signer app'), findsOneWidget);
+    expect(find.text('Create a new identity'), findsOneWidget);
+    // The old ndk_flutter login is gone.
+    expect(find.byType(PlayButton), findsWidgets);
+  });
+
+  testWidgets('signed-in profile offers profile, relays and sign out', (
+    WidgetTester tester,
+  ) async {
+    await pumpProfile(tester, signedIn: true);
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Edit profile'), findsOneWidget);
+    expect(find.text('Relays'), findsOneWidget);
+    expect(find.text('Friends'), findsOneWidget);
+    expect(find.text('Sign out'), findsOneWidget);
   });
 }

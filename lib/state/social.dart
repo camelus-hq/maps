@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ndk_flutter/ndk_flutter.dart';
@@ -13,6 +14,8 @@ import '../domain/entities/friend_marker.dart';
 import '../domain/entities/lat_lon.dart';
 import '../domain/entities/live_share.dart';
 import '../domain/entities/location_sample.dart';
+import '../domain/entities/user_profile.dart';
+import '../domain/entities/user_relay_lists.dart';
 import '../domain/ports/social_service.dart';
 import '../domain/usecases/load_friends.dart';
 import '../domain/usecases/publish_live_share.dart';
@@ -25,6 +28,11 @@ import 'ports.dart';
 final Provider<NdkFlutter?> ndkFlutterProvider = Provider<NdkFlutter?>(
   (Ref ref) => null,
 );
+
+/// The relay the app writes into a new account's NIP-65 and NIP-17 DM lists
+/// when the user has none yet. The sign-up flow and the relay editor both use
+/// it; the user can change it at any time.
+const String defaultNostrRelay = 'wss://relay.map.camelus.app';
 
 /// The keyless demo service when the app runs on fakes, else `null`.
 ///
@@ -117,6 +125,95 @@ final Provider<Map<String, Friend>> friendsByPubkeyProvider =
         for (final Friend friend in friends) friend.pubkey: friend,
       };
     });
+
+/// The signed-in user's editable profile (name, bio, picture), loaded from
+/// their NIP-01 kind-0 metadata. Empty when signed out or nothing is published.
+class ProfileController extends AsyncNotifier<UserProfile> {
+  @override
+  Future<UserProfile> build() async {
+    ref.watch(nostrPubkeyProvider);
+    final SocialService service = ref.read(socialServiceProvider);
+    if (!service.isLoggedIn) {
+      return const UserProfile();
+    }
+    return service.loadOwnProfile();
+  }
+
+  /// Uploads [pictureBytes] (when given) and publishes [profile].
+  ///
+  /// Throws an [AppException] on failure; the caller shows the message. On
+  /// success the loaded profile (and the avatar/name providers) are refreshed.
+  Future<UserProfile> save({
+    required UserProfile profile,
+    Uint8List? pictureBytes,
+    String? pictureMimeType,
+  }) async {
+    final SocialService service = ref.read(socialServiceProvider);
+    String? pictureUrl = profile.pictureUrl;
+    final Uint8List? bytes = pictureBytes;
+    if (bytes != null) {
+      pictureUrl = await service.uploadProfilePicture(
+        data: bytes,
+        mimeType: pictureMimeType ?? 'image/png',
+      );
+    }
+    final UserProfile next = profile.copyWith(pictureUrl: pictureUrl);
+    await service.publishProfile(next);
+    state = AsyncValue<UserProfile>.data(next);
+    ref.invalidate(myProfileProvider);
+    return next;
+  }
+}
+
+final AsyncNotifierProvider<ProfileController, UserProfile>
+profileControllerProvider =
+    AsyncNotifierProvider<ProfileController, UserProfile>(
+      ProfileController.new,
+    );
+
+/// The signed-in user's relay lists (NIP-65 + NIP-17 DM), loaded from the
+/// network and editable.
+class RelaysController extends AsyncNotifier<UserRelays> {
+  @override
+  Future<UserRelays> build() async {
+    ref.watch(nostrPubkeyProvider);
+    final SocialService service = ref.read(socialServiceProvider);
+    if (!service.isLoggedIn) {
+      return const UserRelays();
+    }
+    return service.loadRelays();
+  }
+
+  /// Fills an empty list with the default relay, leaving one that already has
+  /// entries untouched.
+  static UserRelays withDefaults(UserRelays relays) => UserRelays(
+    nip65: relays.nip65.isEmpty
+        ? const <String>[defaultNostrRelay]
+        : relays.nip65,
+    dm: relays.dm.isEmpty ? const <String>[defaultNostrRelay] : relays.dm,
+  );
+
+  Future<void> save(UserRelays relays) async {
+    await ref.read(socialServiceProvider).publishRelays(relays);
+    state = AsyncValue<UserRelays>.data(relays);
+  }
+
+  /// Ensures both relay lists are set, publishing the app default where one is
+  /// missing; returns the resulting lists.
+  Future<UserRelays> ensureDefaults() async {
+    final UserRelays current = await future;
+    final UserRelays filled = withDefaults(current);
+    if (filled != current) {
+      await save(filled);
+    }
+    return filled;
+  }
+}
+
+final AsyncNotifierProvider<RelaysController, UserRelays>
+relaysControllerProvider = AsyncNotifierProvider<RelaysController, UserRelays>(
+  RelaysController.new,
+);
 
 /// The friends currently sharing their live location with us.
 class FriendLocationsController extends Notifier<List<FriendLocation>> {

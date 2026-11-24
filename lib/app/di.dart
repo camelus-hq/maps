@@ -202,6 +202,7 @@ List<Override> buildAppOverrides(
       ndk: ndk,
       ndkFlutter: ndkFlutter,
       relays: config.liveShareRelays,
+      blossomServers: config.blossomServers,
     );
     final NdkReviewService reviews = NdkReviewService(
       ndk: ndk,

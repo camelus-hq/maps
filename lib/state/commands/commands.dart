@@ -46,6 +46,8 @@ import '../../domain/entities/transit.dart';
 import '../../domain/entities/transit_stop_marker.dart';
 import '../../domain/entities/travel_mode.dart';
 import '../../domain/entities/trip.dart';
+import '../../domain/entities/user_profile.dart';
+import '../../domain/entities/user_relay_lists.dart';
 import '../../domain/ports/app_database.dart';
 import '../../domain/ports/map_service.dart';
 import '../../domain/ports/settings_repository.dart';
@@ -1983,6 +1985,114 @@ List<Command> buildCommands(Ref ref) {
       },
     ),
     Command(
+      id: 'social.signin.signer',
+      description:
+          'Sign in through a NIP-55 external Nostr signer app (Android only).',
+      handler: (CommandRequest request) async {
+        await ref.read(socialServiceProvider).signInWithExternalSigner();
+        ref.invalidate(friendsProvider);
+        return <String, Object?>{
+          'signedIn': ref.read(socialServiceProvider).isLoggedIn,
+          'pubkey': ref.read(socialServiceProvider).currentUserPubkey,
+        };
+      },
+    ),
+    Command(
+      id: 'social.signin.bunker',
+      description:
+          'Sign in through a NIP-46 remote signer ("bunker") '
+          '(params: {bunker}).',
+      handler: (CommandRequest request) async {
+        final Object? raw = request.params['bunker'];
+        if (raw is! String || raw.trim().isEmpty) {
+          throw const CommandException('bad_params', '"bunker" is required');
+        }
+        await ref.read(socialServiceProvider).signInWithBunker(raw.trim());
+        ref.invalidate(friendsProvider);
+        return <String, Object?>{
+          'signedIn': ref.read(socialServiceProvider).isLoggedIn,
+          'pubkey': ref.read(socialServiceProvider).currentUserPubkey,
+        };
+      },
+    ),
+    Command(
+      id: 'social.signup',
+      description:
+          'Create a brand-new Nostr identity and sign in with it. The new '
+          'private key stays on the device (never returned); returns the new '
+          'public key.',
+      handler: (CommandRequest request) async {
+        await ref.read(socialServiceProvider).createAccount();
+        ref.invalidate(friendsProvider);
+        return <String, Object?>{
+          'signedIn': ref.read(socialServiceProvider).isLoggedIn,
+          'pubkey': ref.read(socialServiceProvider).currentUserPubkey,
+        };
+      },
+    ),
+    Command(
+      id: 'social.profile.get',
+      description:
+          'Return the signed-in user\'s own profile (name, bio, picture URL).',
+      handler: (CommandRequest request) async => _userProfileJson(
+        await ref.read(socialServiceProvider).loadOwnProfile(),
+      ),
+    ),
+    Command(
+      id: 'social.profile.save',
+      description:
+          'Publish the signed-in user\'s profile — these fields are public '
+          '(params: {name?, about?, picture?}). Omitted fields are cleared.',
+      handler: (CommandRequest request) async {
+        final String name = _stringParam(request, 'name') ?? '';
+        final String about = _stringParam(request, 'about') ?? '';
+        final String? picture = _stringParam(request, 'picture');
+        final UserProfile profile = UserProfile(
+          name: name,
+          about: about,
+          pictureUrl: (picture == null || picture.trim().isEmpty)
+              ? null
+              : picture.trim(),
+        );
+        await ref.read(socialServiceProvider).publishProfile(profile);
+        ref.invalidate(profileControllerProvider);
+        ref.invalidate(myProfileProvider);
+        return _userProfileJson(profile);
+      },
+    ),
+    Command(
+      id: 'social.relays.get',
+      description:
+          'Return the signed-in user\'s relay lists: NIP-65 (kind 10002) and '
+          'NIP-17 DM inbox relays (kind 10050).',
+      handler: (CommandRequest request) async =>
+          _userRelaysJson(await ref.read(socialServiceProvider).loadRelays()),
+    ),
+    Command(
+      id: 'social.relays.save',
+      description:
+          'Publish the signed-in user\'s relay lists, replacing both '
+          '(params: {nip65: [url,…], dm: [url,…]}). Each list needs at least '
+          'one wss:// relay.',
+      handler: (CommandRequest request) async {
+        final List<String> nip65 = _stringListParam(request, 'nip65');
+        final List<String> dm = _stringListParam(request, 'dm');
+        final UserRelays relays = UserRelays(nip65: nip65, dm: dm);
+        await ref.read(socialServiceProvider).publishRelays(relays);
+        ref.invalidate(relaysControllerProvider);
+        return _userRelaysJson(relays);
+      },
+    ),
+    Command(
+      id: 'social.relays.ensureDefaults',
+      description:
+          'Set the NIP-65 and NIP-17 DM relay lists to the app default '
+          '($defaultNostrRelay) wherever they are empty; returns the lists.',
+      handler: (CommandRequest request) async => _userRelaysJson(
+        await ref.read(relaysControllerProvider.notifier).ensureDefaults(),
+      ),
+    ),
+    Command(
       id: 'social.logout',
       description: 'Sign out of Nostr and stop watching friend shares.',
       handler: (CommandRequest request) async {
@@ -3184,6 +3294,43 @@ String? _stringParam(CommandRequest request, String name) {
   final String value = raw.trim();
   return value.isEmpty ? null : value;
 }
+
+/// A list of trimmed non-empty strings from a param (a single string is
+/// accepted as a one-element list); never throws on hostile input.
+List<String> _stringListParam(CommandRequest request, String name) {
+  final Object? raw = request.params[name];
+  final List<String> values = <String>[];
+  if (raw is String) {
+    final String value = raw.trim();
+    if (value.isNotEmpty) {
+      values.add(value);
+    }
+    return values;
+  }
+  if (raw is! List<Object?>) {
+    return values;
+  }
+  for (final Object? entry in raw) {
+    if (entry is String && entry.trim().isNotEmpty) {
+      values.add(entry.trim());
+    }
+  }
+  return values;
+}
+
+/// A serialisable view of the signed-in user's own profile.
+Map<String, Object?> _userProfileJson(UserProfile profile) => <String, Object?>{
+  'name': profile.safeName,
+  'about': profile.safeAbout,
+  'pictureUrl': profile.pictureUrl,
+};
+
+/// A serialisable view of the user's relay lists.
+Map<String, Object?> _userRelaysJson(UserRelays relays) => <String, Object?>{
+  'nip65': relays.nip65,
+  'dm': relays.dm,
+  'complete': relays.isComplete,
+};
 
 /// A short share line for a place: its name, address and OSM link / coordinates.
 String _shareText(Place place) {

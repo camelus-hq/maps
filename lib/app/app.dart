@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:ndk_flutter/l10n/app_localizations.dart' as ndk_l10n;
 
 import '../core/theme/app_theme.dart';
 import '../core/theme/play/play_colors.dart';
@@ -49,10 +48,6 @@ class _OpenMapsAppState extends State<OpenMapsApp> {
               AppThemeMode.dark => ThemeMode.dark,
               AppThemeMode.system => ThemeMode.system,
             },
-            // The ndk_flutter widgets (Nostr login) need their strings.
-            localizationsDelegates:
-                ndk_l10n.AppLocalizations.localizationsDelegates,
-            supportedLocales: ndk_l10n.AppLocalizations.supportedLocales,
             routerConfig: _router,
             builder: (BuildContext context, Widget? child) {
               // Resolve the Play palette from the theme the app actually

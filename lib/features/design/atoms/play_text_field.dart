@@ -32,6 +32,7 @@ class PlayTextField extends StatefulWidget {
     this.minLines,
     this.maxLength,
     this.clearable = true,
+    this.obscureText = false,
     this.padding,
   });
 
@@ -51,6 +52,10 @@ class PlayTextField extends StatefulWidget {
 
   /// Shows a clear (✕) button once there is text.
   final bool clearable;
+
+  /// Masks the text (used for secrets such as a private key). The clear button
+  /// is hidden while obscured so it never leaks a count.
+  final bool obscureText;
   final EdgeInsetsGeometry? padding;
 
   /// The fixed content height of a single-line field.
@@ -140,6 +145,7 @@ class _PlayTextFieldState extends State<PlayTextField> {
                 maxLines: widget.maxLines,
                 minLines: widget.minLines,
                 autofocus: widget.autofocus,
+                obscureText: widget.obscureText,
                 keyboardType: multiline
                     ? TextInputType.multiline
                     : TextInputType.text,
@@ -156,7 +162,10 @@ class _PlayTextFieldState extends State<PlayTextField> {
             ],
           ),
         ),
-        if (widget.clearable && hasText && !multiline) ...<Widget>[
+        if (widget.clearable &&
+            hasText &&
+            !multiline &&
+            !widget.obscureText) ...<Widget>[
           const SizedBox(width: PlaySpace.xs),
           PlayIconButton(
             icon: PlayIcons.close,

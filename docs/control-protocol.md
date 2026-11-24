@@ -232,9 +232,17 @@ sync test fails if it drifts from the registry.
 | `social.friends` | List the signed-in user's friends (the NIP-51 "friends" set) with their live status; re-reads from the network. |
 | `social.login` | Sign in to Nostr with a private key (params: {nsec}) so live location can be gift-wrap encrypted to friends. |
 | `social.logout` | Sign out of Nostr and stop watching friend shares. |
+| `social.profile.get` | Return the signed-in user's own profile (name, bio, picture URL). |
+| `social.profile.save` | Publish the signed-in user's profile — these fields are public (params: {name?, about?, picture?}). Omitted fields are cleared. |
+| `social.relays.ensureDefaults` | Set the NIP-65 and NIP-17 DM relay lists to the app default (wss://relay.map.camelus.app) wherever they are empty; returns the lists. |
+| `social.relays.get` | Return the signed-in user's relay lists: NIP-65 (kind 10002) and NIP-17 DM inbox relays (kind 10050). |
+| `social.relays.save` | Publish the signed-in user's relay lists, replacing both (params: {nip65: [url,…], dm: [url,…]}). Each list needs at least one wss:// relay. |
 | `social.share.start` | Start sharing live location (params: {recipients: [pubkey,…], "all", or "self" for a private preview; durationMinutes?}). Publishes the first gift-wrapped update and shows the ongoing notification. |
 | `social.share.state` | Return the outgoing live-share state. |
 | `social.share.stop` | Stop the active live-location share. |
+| `social.signin.bunker` | Sign in through a NIP-46 remote signer ("bunker") (params: {bunker}). |
+| `social.signin.signer` | Sign in through a NIP-55 external Nostr signer app (Android only). |
+| `social.signup` | Create a brand-new Nostr identity and sign in with it. The new private key stays on the device (never returned); returns the new public key. |
 | `social.simulate.friendLocation` | Demo/debug only: inject a synthetic friend live location (params: {pubkey?, lat?, lon?, minutes?}). Works only when the keyless fake backend is active. |
 | `social.state` | Return the social state: Nostr identity, live friends, outgoing live-share status. |
 | `transit.departures` | Open the departures board for a stop (params: {stopId, name?}). Returns the loaded departures. |

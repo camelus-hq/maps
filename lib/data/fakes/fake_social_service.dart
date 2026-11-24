@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import '../../core/errors/app_exception.dart';
 import '../../domain/entities/friend.dart';
@@ -8,6 +9,8 @@ import '../../domain/entities/friend_location.dart';
 import '../../domain/entities/lat_lon.dart';
 import '../../domain/entities/live_share.dart';
 import '../../domain/entities/push.dart';
+import '../../domain/entities/user_profile.dart';
+import '../../domain/entities/user_relay_lists.dart';
 import '../../domain/ports/social_service.dart';
 
 /// In-memory [SocialService] so the app runs, and tests run, without relays.
@@ -120,6 +123,34 @@ class FakeSocialService implements SocialService {
 
   /// The public key [signInWithPrivateKey] was called with.
   String? signedInWithKey;
+
+  /// The bunker URL [signInWithBunker] was called with.
+  String? signedInWithBunker;
+
+  /// Whether [signInWithExternalSigner] has been used.
+  bool signedInWithSignerApp = false;
+
+  /// Whether the fake advertises a NIP-55 signer app.
+  @override
+  bool supportsSignerApp = true;
+
+  /// How many times [createAccount] has been called.
+  int createAccountCalls = 0;
+
+  /// The profile last published through [publishProfile].
+  UserProfile profile = const UserProfile();
+
+  /// The relay lists last published through [publishRelays].
+  UserRelays relays = const UserRelays();
+
+  /// The bytes last handed to [uploadProfilePicture].
+  Uint8List? lastUploadedPicture;
+
+  /// The URL [uploadProfilePicture] returns.
+  String uploadedPictureUrl = 'https://example.test/avatar.png';
+
+  /// The last auth URL a bunker connection reported (for the auth-callback UI).
+  String? bunkerAuthUrl;
 
   /// How many times [resolveProfile] has been called (retry tests).
   int resolveProfileCalls = 0;
@@ -329,6 +360,93 @@ class FakeSocialService implements SocialService {
     signedInWithKey = privateKey.trim();
     signedIn = true;
     _identityController.add(currentUserPubkey);
+  }
+
+  @override
+  Future<void> signInWithExternalSigner() async {
+    if (!supportsSignerApp) {
+      throw const ValidationException(
+        'Signing in with a signer app is only available on Android.',
+      );
+    }
+    signedInWithSignerApp = true;
+    signedIn = true;
+    _identityController.add(currentUserPubkey);
+  }
+
+  @override
+  Future<void> signInWithBunker(
+    String bunkerUrl, {
+    void Function(String authUrl)? onAuthUrl,
+  }) async {
+    final String url = bunkerUrl.trim();
+    if (!url.toLowerCase().startsWith('bunker://')) {
+      throw const ValidationException('Enter a bunker:// URL.');
+    }
+    signedInWithBunker = url;
+    signedIn = true;
+    final String? auth = bunkerAuthUrl;
+    if (auth != null) {
+      onAuthUrl?.call(auth);
+    }
+    _identityController.add(currentUserPubkey);
+  }
+
+  @override
+  Future<String> createAccount() async {
+    createAccountCalls++;
+    signedIn = true;
+    _identityController.add(currentUserPubkey);
+    return 'nsec1demo';
+  }
+
+  @override
+  Future<UserProfile> loadOwnProfile() async => profile;
+
+  @override
+  Future<String> uploadProfilePicture({
+    required Uint8List data,
+    required String mimeType,
+  }) async {
+    if (data.isEmpty) {
+      throw const ValidationException('That image is empty.');
+    }
+    lastUploadedPicture = data;
+    return uploadedPictureUrl;
+  }
+
+  @override
+  Future<void> publishProfile(UserProfile profile) async {
+    if (!signedIn) {
+      throw const ValidationException('Sign in to edit your profile');
+    }
+    this.profile = profile;
+  }
+
+  @override
+  Future<UserRelays> loadRelays() async {
+    if (!signedIn) {
+      throw const ValidationException('Sign in to edit your relays');
+    }
+    return relays;
+  }
+
+  @override
+  Future<void> publishRelays(UserRelays relays) async {
+    if (!signedIn) {
+      throw const ValidationException('Sign in to edit your relays');
+    }
+    if (relays.nip65.isEmpty) {
+      throw const ValidationException(
+        'Keep at least one relay in your NIP-65 list.',
+      );
+    }
+    if (relays.dm.isEmpty) {
+      throw const ValidationException(
+        'Keep at least one relay in your direct-message list.',
+      );
+    }
+    this.relays = relays;
   }
 
   @override
