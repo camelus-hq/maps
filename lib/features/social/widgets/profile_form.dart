@@ -104,7 +104,11 @@ class _ProfileFormState extends State<ProfileForm> {
       final AvatarDraft? draft = _draft;
       if (draft != null) {
         try {
-          bytes = await renderProfileAvatar(draft.bytes, zoom: draft.zoom);
+          bytes = await renderProfileAvatar(
+            draft.bytes,
+            zoom: draft.zoom,
+            offset: draft.offset,
+          );
           mime = 'image/png';
         } catch (_) {
           if (mounted) {
@@ -150,17 +154,16 @@ class _ProfileFormState extends State<ProfileForm> {
   Widget build(BuildContext context) {
     final PlayColors colors = PlayColors.of(context);
     final String name = _name.text.trim();
-    return Column(
+    final Widget avatar = ProfileAvatarField(
+      label: name.isEmpty ? widget.profile.name : name,
+      imageUrl: _pictureRemoved ? null : widget.profile.pictureUrl,
+      draft: _draft,
+      busy: _busy,
+      onChanged: _onPictureChanged,
+    );
+    final Widget fields = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        ProfileAvatarField(
-          label: name.isEmpty ? widget.profile.name : name,
-          imageUrl: _pictureRemoved ? null : widget.profile.pictureUrl,
-          draft: _draft,
-          busy: _busy,
-          onChanged: _onPictureChanged,
-        ),
-        const SizedBox(height: PlaySpace.lg),
         _label(context, 'Name'),
         const SizedBox(height: PlaySpace.xs),
         PlayTextField(
@@ -200,6 +203,44 @@ class _ProfileFormState extends State<ProfileForm> {
           onPressed: _busy ? null : _submit,
         ),
       ],
+    );
+
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        // The picture is pinned (so dragging it never fights a scrollable) when
+        // there is room; on a very short viewport (the keyboard open) the whole
+        // form scrolls so nothing overflows.
+        if (constraints.maxHeight >= 380) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  PlaySpace.lg,
+                  PlaySpace.lg,
+                  PlaySpace.lg,
+                  0,
+                ),
+                child: avatar,
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(PlaySpace.lg),
+                  child: fields,
+                ),
+              ),
+            ],
+          );
+        }
+        return ListView(
+          padding: const EdgeInsets.all(PlaySpace.lg),
+          children: <Widget>[
+            avatar,
+            const SizedBox(height: PlaySpace.lg),
+            fields,
+          ],
+        );
+      },
     );
   }
 

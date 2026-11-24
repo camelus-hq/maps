@@ -18,7 +18,10 @@ class SignInScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PlayScaffold(
-      appBar: const PlayAppBar(title: 'Sign in'),
+      appBar: PlayAppBar(
+        title: 'Sign in',
+        onBackFallback: () => context.go('/'),
+      ),
       child: SignInView(
         onSignedIn: () {
           if (context.canPop()) {
@@ -133,7 +136,7 @@ class _SignInViewState extends ConsumerState<SignInView> {
           const SizedBox(height: PlaySpace.sm),
           Text(
             'Approves a sign-in request in an installed Nostr signer app '
-            '(for example Amber) — your key never enters OpenMaps.',
+            '(for example Amber) — your key never enters Maps.',
             style: PlayType.caption.copyWith(color: colors.inkMuted),
           ),
           const SizedBox(height: PlaySpace.xl),

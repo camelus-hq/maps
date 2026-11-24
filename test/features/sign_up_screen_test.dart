@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/data/fakes/fake_social_service.dart';
+import 'package:openmaps/domain/entities/user_relay_lists.dart';
 import 'package:openmaps/features/social/screens/sign_up_screen.dart';
 import 'package:openmaps/state/ports.dart';
 import 'package:openmaps/state/social.dart';
@@ -39,10 +40,19 @@ void main() {
     await tester.tap(find.text('Create my identity'));
     await tester.pumpAndSettle();
 
-    // The created key is revealed for backup.
+    // The created key is masked by default and can be revealed for backup.
     expect(social.createAccountCalls, 1);
     expect(find.text('Save your private key'), findsOneWidget);
+    expect(find.text('•••••••••'), findsOneWidget);
+    expect(find.text('nsec1demo'), findsNothing);
+
+    await tester.tap(find.bySemanticsLabel('Show private key'));
+    await tester.pumpAndSettle();
     expect(find.text('nsec1demo'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Hide private key'));
+    await tester.pumpAndSettle();
+    expect(find.text('•••••••••'), findsOneWidget);
 
     await tester.tap(find.text('I saved my key — continue'));
     await tester.pumpAndSettle();
@@ -58,7 +68,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('You are all set'), findsOneWidget);
-    expect(social.relays.nip65, <String>[defaultNostrRelay]);
+    expect(social.relays.nip65.single.url, defaultNostrRelay);
+    expect(social.relays.nip65.single.marker, RelayMarker.both);
     expect(social.relays.dm, <String>[defaultNostrRelay]);
   });
 

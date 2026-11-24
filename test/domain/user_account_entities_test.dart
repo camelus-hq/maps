@@ -32,28 +32,43 @@ void main() {
   group('UserRelays', () {
     test('isComplete requires both lists', () {
       expect(const UserRelays().isComplete, isFalse);
-      expect(const UserRelays(nip65: <String>['wss://a']).isComplete, isFalse);
+      expect(
+        const UserRelays(nip65: <RelayEntry>[RelayEntry(url: 'wss://a')])
+            .isComplete,
+        isFalse,
+      );
       expect(
         const UserRelays(
-          nip65: <String>['wss://a'],
+          nip65: <RelayEntry>[RelayEntry(url: 'wss://a')],
           dm: <String>['wss://b'],
         ).isComplete,
         isTrue,
       );
     });
 
+    test('RelayMarker maps inbox/outbox to read/write', () {
+      expect(RelayMarker.both.reads, isTrue);
+      expect(RelayMarker.both.writes, isTrue);
+      expect(RelayMarker.inbox.reads, isTrue);
+      expect(RelayMarker.inbox.writes, isFalse);
+      expect(RelayMarker.outbox.reads, isFalse);
+      expect(RelayMarker.outbox.writes, isTrue);
+    });
+
     test('equality compares contents', () {
       const UserRelays a = UserRelays(
-        nip65: <String>['wss://a'],
+        nip65: <RelayEntry>[RelayEntry(url: 'wss://a')],
         dm: <String>['wss://b'],
       );
       const UserRelays b = UserRelays(
-        nip65: <String>['wss://a'],
+        nip65: <RelayEntry>[RelayEntry(url: 'wss://a')],
         dm: <String>['wss://b'],
       );
       const UserRelays c = UserRelays(
-        nip65: <String>['wss://a'],
-        dm: <String>['wss://c'],
+        nip65: <RelayEntry>[
+          RelayEntry(url: 'wss://a', marker: RelayMarker.inbox),
+        ],
+        dm: <String>['wss://b'],
       );
       expect(a, b);
       expect(a, isNot(c));

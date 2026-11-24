@@ -21,13 +21,13 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final String? pubkey = ref.watch(nostrPubkeyProvider).value;
     if (pubkey == null) {
-      return const PlayScaffold(
-        appBar: PlayAppBar(title: 'You'),
-        child: SignInView(),
+      return PlayScaffold(
+        appBar: PlayAppBar(title: 'You', onBackFallback: () => context.go('/')),
+        child: const SignInView(),
       );
     }
     return PlayScaffold(
-      appBar: const PlayAppBar(title: 'You'),
+      appBar: PlayAppBar(title: 'You', onBackFallback: () => context.go('/')),
       child: _signedIn(context, ref, pubkey),
     );
   }

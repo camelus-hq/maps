@@ -2072,10 +2072,11 @@ List<Command> buildCommands(Ref ref) {
       id: 'social.relays.save',
       description:
           'Publish the signed-in user\'s relay lists, replacing both '
-          '(params: {nip65: [url,…], dm: [url,…]}). Each list needs at least '
-          'one wss:// relay.',
+          '(params: {nip65: [{url, marker?}] or [url,…], dm: [url,…]}). Each '
+          'list needs at least one wss:// relay; the NIP-65 marker is '
+          'inbox|outbox|both (default both).',
       handler: (CommandRequest request) async {
-        final List<String> nip65 = _stringListParam(request, 'nip65');
+        final List<RelayEntry> nip65 = _relayEntriesParam(request, 'nip65');
         final List<String> dm = _stringListParam(request, 'dm');
         final UserRelays relays = UserRelays(nip65: nip65, dm: dm);
         await ref.read(socialServiceProvider).publishRelays(relays);
@@ -3327,10 +3328,84 @@ Map<String, Object?> _userProfileJson(UserProfile profile) => <String, Object?>{
 
 /// A serialisable view of the user's relay lists.
 Map<String, Object?> _userRelaysJson(UserRelays relays) => <String, Object?>{
-  'nip65': relays.nip65,
+  'nip65': <Map<String, Object?>>[
+    for (final RelayEntry entry in relays.nip65)
+      <String, Object?>{
+        'url': entry.url,
+        'marker': entry.marker.name,
+        'read': entry.marker.reads,
+        'write': entry.marker.writes,
+      },
+  ],
   'dm': relays.dm,
   'complete': relays.isComplete,
 };
+
+/// Parses a NIP-65 relay list param: each entry is either a `url` string
+/// (marker `both`) or an object `{url, marker?}`.
+List<RelayEntry> _relayEntriesParam(CommandRequest request, String name) {
+  final Object? raw = request.params[name];
+  final List<RelayEntry> entries = <RelayEntry>[];
+  if (raw is String) {
+    final String url = raw.trim();
+    if (url.isNotEmpty) {
+      entries.add(RelayEntry(url: url));
+    }
+    return entries;
+  }
+  if (raw is! List<Object?>) {
+    return entries;
+  }
+  for (final Object? item in raw) {
+    if (item is String) {
+      final String url = item.trim();
+      if (url.isNotEmpty) {
+        entries.add(RelayEntry(url: url));
+      }
+    } else if (item is Map<Object?, Object?>) {
+      final Object? rawUrl = item['url'];
+      if (rawUrl is String && rawUrl.trim().isNotEmpty) {
+        entries.add(
+          RelayEntry(url: rawUrl.trim(), marker: _relayMarkerParam(item)),
+        );
+      }
+    }
+  }
+  return entries;
+}
+
+/// Reads a relay marker from an entry object: `marker` (inbox|outbox|both, and
+/// the read/write aliases) or `read`/`write` booleans.
+RelayMarker _relayMarkerParam(Map<Object?, Object?> item) {
+  final Object? raw = item['marker'];
+  if (raw is String) {
+    switch (raw.trim().toLowerCase()) {
+      case 'inbox':
+      case 'read':
+      case 'readonly':
+        return RelayMarker.inbox;
+      case 'outbox':
+      case 'write':
+      case 'writeonly':
+        return RelayMarker.outbox;
+      case 'both':
+      case 'readwrite':
+        return RelayMarker.both;
+    }
+  }
+  final bool reads = item['read'] is bool ? item['read']! as bool : true;
+  final bool writes = item['write'] is bool ? item['write']! as bool : true;
+  if (reads && writes) {
+    return RelayMarker.both;
+  }
+  if (reads) {
+    return RelayMarker.inbox;
+  }
+  if (writes) {
+    return RelayMarker.outbox;
+  }
+  return RelayMarker.both;
+}
 
 /// A short share line for a place: its name, address and OSM link / coordinates.
 String _shareText(Place place) {

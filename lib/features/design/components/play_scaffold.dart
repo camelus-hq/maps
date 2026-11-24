@@ -63,6 +63,7 @@ class PlayAppBar extends StatelessWidget {
     this.subtitle,
     this.actions = const <Widget>[],
     this.showBack = true,
+    this.onBackFallback,
   });
 
   final String? title;
@@ -70,12 +71,18 @@ class PlayAppBar extends StatelessWidget {
   final List<Widget> actions;
   final bool showBack;
 
+  /// When the navigator has nothing to pop (the screen was opened as the root,
+  /// e.g. via a deep link), the back button calls this instead of hiding — so
+  /// a screen is never a dead end.
+  final VoidCallback? onBackFallback;
+
   @override
   Widget build(BuildContext context) {
     final PlayColors colors = PlayColors.of(context);
     final double topInset = MediaQuery.viewPaddingOf(context).top;
     final NavigatorState? navigator = Navigator.maybeOf(context);
-    final bool canPop = showBack && (navigator?.canPop() ?? false);
+    final bool canPop = navigator?.canPop() ?? false;
+    final bool showButton = showBack && (canPop || onBackFallback != null);
     final String? heading = title;
     final String? sub = subtitle;
 
@@ -90,13 +97,19 @@ class PlayAppBar extends StatelessWidget {
         ),
         child: Row(
           children: <Widget>[
-            if (canPop)
+            if (showButton)
               PlayIconButton(
                 icon: PlayIcons.back,
                 variant: PlayIconButtonVariant.plain,
                 size: 44,
                 semanticLabel: 'Back',
-                onPressed: () => navigator?.maybePop(),
+                onPressed: () {
+                  if (canPop) {
+                    navigator?.maybePop();
+                  } else {
+                    onBackFallback?.call();
+                  }
+                },
               )
             else
               const SizedBox(width: PlaySpace.sm),

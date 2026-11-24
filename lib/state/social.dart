@@ -163,6 +163,14 @@ class ProfileController extends AsyncNotifier<UserProfile> {
     ref.invalidate(myProfileProvider);
     return next;
   }
+
+  /// Re-reads the signed-in user's profile from the network.
+  Future<void> refresh() async {
+    state = const AsyncValue<UserProfile>.loading();
+    state = await AsyncValue.guard(
+      () => ref.read(socialServiceProvider).loadOwnProfile(),
+    );
+  }
 }
 
 final AsyncNotifierProvider<ProfileController, UserProfile>
@@ -188,10 +196,20 @@ class RelaysController extends AsyncNotifier<UserRelays> {
   /// entries untouched.
   static UserRelays withDefaults(UserRelays relays) => UserRelays(
     nip65: relays.nip65.isEmpty
-        ? const <String>[defaultNostrRelay]
+        ? const <RelayEntry>[
+            RelayEntry(url: defaultNostrRelay, marker: RelayMarker.both),
+          ]
         : relays.nip65,
     dm: relays.dm.isEmpty ? const <String>[defaultNostrRelay] : relays.dm,
   );
+
+  /// Re-reads both relay lists from the network.
+  Future<void> refresh() async {
+    state = const AsyncValue<UserRelays>.loading();
+    state = await AsyncValue.guard(
+      () => ref.read(socialServiceProvider).loadRelays(),
+    );
+  }
 
   Future<void> save(UserRelays relays) async {
     await ref.read(socialServiceProvider).publishRelays(relays);

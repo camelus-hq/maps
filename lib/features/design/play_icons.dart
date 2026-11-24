@@ -87,6 +87,7 @@ abstract final class PlayIcons {
   static const IconData goTo = PhosphorIconsRegular.arrowUpRight;
   static const IconData send = PhosphorIconsRegular.paperPlaneRight;
   static const IconData private = PhosphorIconsRegular.eyeSlash;
+  static const IconData eye = PhosphorIconsRegular.eye;
   static const IconData liveDot = PhosphorIconsFill.circle;
   static const IconData dot = PhosphorIconsRegular.circle;
   static const IconData photo = PhosphorIconsRegular.image;

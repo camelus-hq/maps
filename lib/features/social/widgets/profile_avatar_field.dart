@@ -8,7 +8,8 @@ import 'package:image_picker/image_picker.dart';
 import '../../design/play.dart';
 
 /// A picked, not-yet-published profile picture: the source bytes, its MIME
-/// type and the zoom the user dialled in.
+/// type, the zoom the user dialled in and how far they dragged it (both
+/// normalised to the square preview, so they are resolution-independent).
 ///
 /// The bytes stay in memory only; [renderProfileAvatar] turns them into the
 /// square PNG that is uploaded.
@@ -17,6 +18,8 @@ class AvatarDraft {
     required this.bytes,
     required this.mimeType,
     this.zoom = 1,
+    this.offset = Offset.zero,
+    required this.aspectRatio,
   });
 
   final Uint8List bytes;
@@ -25,21 +28,55 @@ class AvatarDraft {
   /// The zoom factor applied inside the square crop (1 = fit the short side).
   final double zoom;
 
-  AvatarDraft copyWith({double? zoom}) =>
-      AvatarDraft(bytes: bytes, mimeType: mimeType, zoom: zoom ?? this.zoom);
+  /// The pan, in fractions of the preview square's side (so the same drag
+  /// shows the same crop at any display size).
+  final Offset offset;
+
+  /// The source image's width / height, used to clamp the pan so the picture
+  /// always covers the circle.
+  final double aspectRatio;
+
+  AvatarDraft copyWith({double? zoom, Offset? offset}) => AvatarDraft(
+    bytes: bytes,
+    mimeType: mimeType,
+    zoom: zoom ?? this.zoom,
+    offset: offset ?? this.offset,
+    aspectRatio: aspectRatio,
+  );
 }
 
 /// The fixed size (edge length in pixels) of the uploaded avatar.
 const int profileAvatarSize = 512;
 
+/// The display size of the circular preview.
+const double _previewSize = 132;
+
+/// Keeps a normalised pan offset inside the range where the (zoomed) picture
+/// still covers the square, for an image of [aspectRatio] (w/h).
+Offset clampAvatarOffset(
+  Offset offset, {
+  required double zoom,
+  required double aspectRatio,
+}) {
+  final double z = zoom.isFinite && zoom > 0 ? zoom : 1;
+  final double ar = aspectRatio.isFinite && aspectRatio > 0 ? aspectRatio : 1;
+  final double maxX = (math.max(1, ar) * z - 1) / 2;
+  final double maxY = (math.max(1, 1 / ar) * z - 1) / 2;
+  return Offset(
+    offset.dx.clamp(-maxX, maxX).toDouble(),
+    offset.dy.clamp(-maxY, maxY).toDouble(),
+  );
+}
+
 /// Renders [source] into a square, centre-cropped PNG at [size]×[size],
-/// applying [zoom] so the user can frame their picture.
+/// applying [zoom] and [offset] so the user can frame their picture.
 ///
 /// All drawing is local `dart:ui`; a decode failure throws, and the caller
 /// shows a "could not read that image" message instead of crashing.
 Future<Uint8List> renderProfileAvatar(
   Uint8List source, {
   double zoom = 1,
+  Offset offset = Offset.zero,
   int size = profileAvatarSize,
 }) async {
   final ui.Codec codec = await ui.instantiateImageCodec(source);
@@ -47,20 +84,36 @@ Future<Uint8List> renderProfileAvatar(
     final ui.FrameInfo frame = await codec.getNextFrame();
     final ui.Image image = frame.image;
     try {
+      final double w = image.width.toDouble();
+      final double h = image.height.toDouble();
       final double factor = zoom.isFinite && zoom > 0 ? zoom : 1;
-      final double side = math.min(image.width, image.height) / factor;
-      final double left = (image.width - side) / 2;
-      final double top = (image.height - side) / 2;
+      final double cover = math.max(size / w, size / h);
+      final double scale = cover * factor;
+      final Offset pan = clampAvatarOffset(
+        offset,
+        zoom: factor,
+        aspectRatio: w / h,
+      );
+      final double target = size.toDouble();
 
       final ui.PictureRecorder recorder = ui.PictureRecorder();
-      final Size target = Size(size.toDouble(), size.toDouble());
-      final Canvas canvas = Canvas(recorder, Offset.zero & target);
-      canvas.drawImageRect(
+      final Canvas canvas = Canvas(
+        recorder,
+        Offset.zero & Size(target, target),
+      );
+      canvas.save();
+      canvas.translate(
+        target / 2 + pan.dx * target,
+        target / 2 + pan.dy * target,
+      );
+      canvas.scale(scale);
+      canvas.translate(-w / 2, -h / 2);
+      canvas.drawImage(
         image,
-        Rect.fromLTWH(left, top, side, side),
-        Offset.zero & target,
+        Offset.zero,
         Paint()..filterQuality = FilterQuality.high,
       );
+      canvas.restore();
       final ui.Picture picture = recorder.endRecording();
       try {
         final ui.Image rendered = await picture.toImage(size, size);
@@ -86,10 +139,12 @@ Future<Uint8List> renderProfileAvatar(
   }
 }
 
-/// A circular profile-picture editor: tap to pick a photo, pinch/drag the zoom
-/// slider to frame it inside the circle, and watch the preview update.
+/// A circular profile-picture editor: tap to pick a photo, **drag** the picture
+/// to reposition it and use the zoom slider to size it, with the preview
+/// updating live.
 ///
-/// The parent owns the [draft]; this widget only picks, zooms and previews it.
+/// The parent owns the [draft]; this widget only picks, zooms, drags and
+/// previews it.
 class ProfileAvatarField extends StatefulWidget {
   const ProfileAvatarField({
     super.key,
@@ -123,6 +178,9 @@ class _ProfileAvatarFieldState extends State<ProfileAvatarField> {
   final ImagePicker _picker = ImagePicker();
   bool _picking = false;
 
+  // The pan at the start of a drag, so each update is absolute (no drift).
+  Offset? _dragStart;
+
   Future<void> _pick() async {
     if (_picking || widget.busy) {
       return;
@@ -149,19 +207,32 @@ class _ProfileAvatarFieldState extends State<ProfileAvatarField> {
         return;
       }
       // Decode once up front so a corrupt/unsupported file is rejected here
-      // rather than at upload time, and the zoom can be clamped to fit.
+      // rather than at upload time, and the pan can be clamped to fit.
+      final ui.Image decoded;
       try {
         final ui.Codec codec = await ui.instantiateImageCodec(bytes);
-        codec.dispose();
+        try {
+          decoded = (await codec.getNextFrame()).image;
+        } finally {
+          codec.dispose();
+        }
       } catch (_) {
         if (mounted) {
           showPlayToast(context, 'That image format is not supported');
         }
         return;
       }
+      final double aspect = decoded.height == 0
+          ? 1
+          : decoded.width / decoded.height;
+      decoded.dispose();
       if (mounted) {
         widget.onChanged(
-          AvatarDraft(bytes: bytes, mimeType: _guessMime(file.name)),
+          AvatarDraft(
+            bytes: bytes,
+            mimeType: _guessMime(file.name),
+            aspectRatio: aspect,
+          ),
         );
       }
     } catch (_) {
@@ -175,6 +246,33 @@ class _ProfileAvatarFieldState extends State<ProfileAvatarField> {
     }
   }
 
+  void _onPanStart(DragStartDetails details, AvatarDraft draft) {
+    _dragStart = draft.offset;
+  }
+
+  void _onPanUpdate(DragUpdateDetails details, AvatarDraft draft) {
+    if (widget.busy) {
+      return;
+    }
+    final Offset start = _dragStart ?? draft.offset;
+    final Offset next = Offset(
+      start.dx + details.delta.dx / _previewSize,
+      start.dy + details.delta.dy / _previewSize,
+    );
+    _dragStart = next;
+    widget.onChanged(
+      draft.copyWith(
+        offset: clampAvatarOffset(
+          next,
+          zoom: draft.zoom,
+          aspectRatio: draft.aspectRatio,
+        ),
+      ),
+    );
+  }
+
+  void _onPanEnd() => _dragStart = null;
+
   @override
   Widget build(BuildContext context) {
     final PlayColors colors = PlayColors.of(context);
@@ -186,12 +284,24 @@ class _ProfileAvatarFieldState extends State<ProfileAvatarField> {
       children: <Widget>[
         Center(
           child: SizedBox(
-            width: 132,
-            height: 132,
+            width: _previewSize,
+            height: _previewSize,
             child: Stack(
               children: <Widget>[
                 Positioned.fill(
-                  child: ClipOval(child: _preview(context, draft)),
+                  child: ClipOval(
+                    child: draft == null
+                        ? _staticPreview(context)
+                        : GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onPanStart: (DragStartDetails d) =>
+                                _onPanStart(d, draft),
+                            onPanUpdate: (DragUpdateDetails d) =>
+                                _onPanUpdate(d, draft),
+                            onPanEnd: (DragEndDetails _) => _onPanEnd(),
+                            child: _draftPreview(draft),
+                          ),
+                  ),
                 ),
                 Positioned.fill(
                   child: IgnorePointer(
@@ -211,7 +321,7 @@ class _ProfileAvatarFieldState extends State<ProfileAvatarField> {
         Center(
           child: Text(
             draft != null
-                ? 'Drag to frame your picture'
+                ? 'Drag to move, slide to zoom'
                 : (widget.imageUrl ?? '').isNotEmpty
                 ? 'Tap a picture to change it'
                 : 'Add a profile picture',
@@ -229,8 +339,19 @@ class _ProfileAvatarFieldState extends State<ProfileAvatarField> {
                   value: draft.zoom.clamp(1, 3).toDouble(),
                   onChanged: widget.busy
                       ? null
-                      : (double value) =>
-                            widget.onChanged(draft.copyWith(zoom: value)),
+                      : (double value) {
+                          final double zoom = value.clamp(1, 3).toDouble();
+                          widget.onChanged(
+                            draft.copyWith(
+                              zoom: zoom,
+                              offset: clampAvatarOffset(
+                                draft.offset,
+                                zoom: zoom,
+                                aspectRatio: draft.aspectRatio,
+                              ),
+                            ),
+                          );
+                        },
                 ),
               ),
               const SizedBox(width: PlaySpace.sm),
@@ -267,11 +388,16 @@ class _ProfileAvatarFieldState extends State<ProfileAvatarField> {
     );
   }
 
-  Widget _preview(BuildContext context, AvatarDraft? draft) {
-    final PlayColors colors = PlayColors.of(context);
-    if (draft != null) {
-      return Transform.scale(
-        scale: draft.zoom.clamp(1, 3).toDouble(),
+  /// The zoomed-and-panned picture, on a cover fit, clipped to the circle.
+  Widget _draftPreview(AvatarDraft draft) {
+    final double zoom = draft.zoom.clamp(1, 3).toDouble();
+    return Transform.translate(
+      offset: Offset(
+        draft.offset.dx * _previewSize,
+        draft.offset.dy * _previewSize,
+      ),
+      child: Transform.scale(
+        scale: zoom,
         child: Image.memory(
           draft.bytes,
           fit: BoxFit.cover,
@@ -280,8 +406,12 @@ class _ProfileAvatarFieldState extends State<ProfileAvatarField> {
           errorBuilder: (BuildContext _, Object _, StackTrace? _) =>
               _monogram(context),
         ),
-      );
-    }
+      ),
+    );
+  }
+
+  /// The published picture (or monogram) when no draft is being edited.
+  Widget _staticPreview(BuildContext context) {
     final String? url = widget.imageUrl;
     if (url != null && url.isNotEmpty) {
       return Image.network(
@@ -297,7 +427,10 @@ class _ProfileAvatarFieldState extends State<ProfileAvatarField> {
         ) => progress == null ? child : _monogram(context),
       );
     }
-    return ColoredBox(color: colors.primarySoft, child: _monogram(context));
+    return ColoredBox(
+      color: PlayColors.of(context).primarySoft,
+      child: _monogram(context),
+    );
   }
 
   Widget _monogram(BuildContext context) {

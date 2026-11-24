@@ -8,40 +8,58 @@ import '../../design/play.dart';
 import '../widgets/profile_form.dart';
 
 /// Edit the signed-in user's public profile (`/profile/edit`).
-class EditProfileScreen extends ConsumerWidget {
+class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<EditProfileScreen> createState() => _EditProfileScreenState();
+}
+
+class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Load the latest published values so the form is prefilled even when an
+    // earlier screen already built this provider with stale (empty) data.
+    WidgetsBinding.instance.addPostFrameCallback((Duration _) {
+      if (mounted) {
+        ref.read(profileControllerProvider.notifier).refresh();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final AsyncValue<UserProfile> profile = ref.watch(
       profileControllerProvider,
     );
     return PlayScaffold(
-      appBar: const PlayAppBar(title: 'Edit profile'),
+      appBar: PlayAppBar(
+        title: 'Edit profile',
+        onBackFallback: () => context.go('/'),
+      ),
       child: profile.when(
         loading: () => const Center(child: PlaySpinner()),
         error: (Object error, StackTrace stack) => _error(context, ref),
-        data: (UserProfile value) => ListView(
-          padding: const EdgeInsets.all(PlaySpace.lg),
-          children: <Widget>[
-            ProfileForm(
-              profile: value,
-              submitLabel: 'Save profile',
-              onSubmit: (ProfileSubmission submission) async {
-                await ref
-                    .read(profileControllerProvider.notifier)
-                    .save(
-                      profile: submission.profile,
-                      pictureBytes: submission.pictureBytes,
-                      pictureMimeType: submission.pictureMimeType,
-                    );
-                if (context.mounted) {
-                  showPlayToast(context, 'Profile saved');
-                  context.pop();
-                }
-              },
-            ),
-          ],
+        data: (UserProfile value) => ProfileForm(
+          // Rebuild the form (and its text controllers) when the loaded
+          // profile changes, so the fields are prefilled.
+          key: ValueKey<UserProfile>(value),
+          profile: value,
+          submitLabel: 'Save profile',
+          onSubmit: (ProfileSubmission submission) async {
+            await ref
+                .read(profileControllerProvider.notifier)
+                .save(
+                  profile: submission.profile,
+                  pictureBytes: submission.pictureBytes,
+                  pictureMimeType: submission.pictureMimeType,
+                );
+            if (context.mounted) {
+              showPlayToast(context, 'Profile saved');
+              context.pop();
+            }
+          },
         ),
       ),
     );
@@ -65,7 +83,8 @@ class EditProfileScreen extends ConsumerWidget {
             PlayButton(
               label: 'Retry',
               variant: PlayButtonVariant.ghost,
-              onPressed: () => ref.invalidate(profileControllerProvider),
+              onPressed: () =>
+                  ref.read(profileControllerProvider.notifier).refresh(),
             ),
           ],
         ),

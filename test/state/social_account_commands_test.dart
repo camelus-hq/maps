@@ -98,22 +98,35 @@ void main() {
 
   test('social.relays.get and social.relays.save round-trip', () async {
     social.relays = const UserRelays(
-      nip65: <String>['wss://a'],
+      nip65: <RelayEntry>[
+        RelayEntry(url: 'wss://a', marker: RelayMarker.inbox),
+      ],
       dm: <String>['wss://b'],
     );
 
     Map<String, Object?> got =
         await dispatch('social.relays.get') as Map<String, Object?>;
-    expect(got['nip65'], <String>['wss://a']);
+    final List<Object?> listed = got['nip65']! as List<Object?>;
+    final Map<String, Object?> first = listed.first! as Map<String, Object?>;
+    expect(first['url'], 'wss://a');
+    expect(first['marker'], 'inbox');
+    expect(first['read'], isTrue);
+    expect(first['write'], isFalse);
     expect(got['dm'], <String>['wss://b']);
     expect(got['complete'], isTrue);
 
     got = await dispatch('social.relays.save', <String, Object?>{
-      'nip65': <Object?>['wss://c'],
+      'nip65': <Object?>[
+        <String, Object?>{'url': 'wss://c', 'marker': 'outbox'},
+        'wss://e',
+      ],
       'dm': <Object?>['wss://d'],
     }) as Map<String, Object?>;
     expect(got['complete'], isTrue);
-    expect(social.relays.nip65, <String>['wss://c']);
+    expect(social.relays.nip65, <RelayEntry>[
+      const RelayEntry(url: 'wss://c', marker: RelayMarker.outbox),
+      const RelayEntry(url: 'wss://e'),
+    ]);
     expect(social.relays.dm, <String>['wss://d']);
 
     await expectLater(
@@ -128,18 +141,22 @@ void main() {
   test('social.relays.ensureDefaults fills empty lists only', () async {
     final Map<String, Object?> filled =
         await dispatch('social.relays.ensureDefaults') as Map<String, Object?>;
-    expect(filled['nip65'], <String>[defaultNostrRelay]);
+    final List<Object?> listed = filled['nip65']! as List<Object?>;
+    expect((listed.first! as Map<String, Object?>)['url'], defaultNostrRelay);
     expect(filled['dm'], <String>[defaultNostrRelay]);
-    expect(social.relays.nip65, <String>[defaultNostrRelay]);
+    expect(social.relays.nip65.first.url, defaultNostrRelay);
 
     social.relays = const UserRelays(
-      nip65: <String>['wss://mine'],
+      nip65: <RelayEntry>[RelayEntry(url: 'wss://mine')],
       dm: <String>[],
     );
     container.invalidate(relaysControllerProvider);
     final Map<String, Object?> next =
         await dispatch('social.relays.ensureDefaults') as Map<String, Object?>;
-    expect(next['nip65'], <String>['wss://mine']);
+    expect(
+      ((next['nip65']! as List<Object?>).first! as Map<String, Object?>)['url'],
+      'wss://mine',
+    );
     expect(next['dm'], <String>[defaultNostrRelay]);
   });
 }

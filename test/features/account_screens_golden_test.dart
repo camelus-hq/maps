@@ -83,7 +83,12 @@ void main() {
       const EditRelaysScreen(),
       service: FakeSocialService()
         ..relays = const UserRelays(
-          nip65: <String>['wss://relay.map.camelus.app'],
+          nip65: <RelayEntry>[
+            RelayEntry(
+              url: 'wss://relay.map.camelus.app',
+              marker: RelayMarker.both,
+            ),
+          ],
           dm: <String>['wss://relay.map.camelus.app'],
         ),
     );

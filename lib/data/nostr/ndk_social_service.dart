@@ -724,10 +724,11 @@ class NdkSocialService implements SocialService {
       return const UserProfile();
     }
     try {
-      final Metadata? metadata = await ndk.metadata.loadMetadata(
-        me,
-        forceRefresh: true,
-      );
+      // Use the same profile query path the friends list uses (explicit
+      // profile relays + cache), which is more reliable than a bare metadata
+      // load.
+      final Map<String, Metadata> profiles = await _loadProfiles(<String>[me]);
+      final Metadata? metadata = profiles[me];
       if (metadata == null) {
         return const UserProfile();
       }
@@ -824,7 +825,16 @@ class NdkSocialService implements SocialService {
         forceRefresh: true,
       );
       return UserRelays(
-        nip65: nip65?.urls.toList() ?? const <String>[],
+        nip65: nip65 == null
+            ? const <RelayEntry>[]
+            : <RelayEntry>[
+                for (final MapEntry<String, ReadWriteMarker> entry
+                    in nip65.relays.entries)
+                  RelayEntry(
+                    url: entry.key,
+                    marker: _markerFromReadWrite(entry.value),
+                  ),
+              ],
         dm: dm ?? const <String>[],
       );
     } on AppException {
@@ -841,7 +851,7 @@ class NdkSocialService implements SocialService {
     if (me == null || account == null || !account.signer.canSign()) {
       throw const ValidationException('Sign in to edit your relays');
     }
-    final List<String> nip65 = _cleanRelays(relays.nip65);
+    final List<RelayEntry> nip65 = _cleanRelayEntries(relays.nip65);
     final List<String> dm = _cleanRelays(relays.dm);
     if (nip65.isEmpty) {
       throw const ValidationException(
@@ -859,7 +869,8 @@ class NdkSocialService implements SocialService {
         UserRelayList(
           pubKey: me,
           relays: <String, ReadWriteMarker>{
-            for (final String url in nip65) url: ReadWriteMarker.readWrite,
+            for (final RelayEntry entry in nip65)
+              entry.url: _markerToReadWrite(entry.marker),
           },
           createdAt: now,
           refreshedTimestamp: now,
@@ -1097,6 +1108,37 @@ class NdkSocialService implements SocialService {
     }
     return cleaned;
   }
+
+  /// Cleans a NIP-65 list: valid `ws(s)://` URLs, deduped by URL (the first
+  /// marker wins), order preserved.
+  static List<RelayEntry> _cleanRelayEntries(List<RelayEntry> entries) {
+    final List<RelayEntry> cleaned = <RelayEntry>[];
+    final Set<String> seen = <String>{};
+    for (final RelayEntry entry in entries) {
+      final String url = entry.url.trim();
+      if (!url.startsWith('wss://') && !url.startsWith('ws://')) {
+        continue;
+      }
+      if (seen.add(url)) {
+        cleaned.add(entry.copyWith(url: url));
+      }
+    }
+    return cleaned;
+  }
+
+  static ReadWriteMarker _markerToReadWrite(RelayMarker marker) =>
+      switch (marker) {
+        RelayMarker.inbox => ReadWriteMarker.readOnly,
+        RelayMarker.outbox => ReadWriteMarker.writeOnly,
+        RelayMarker.both => ReadWriteMarker.readWrite,
+      };
+
+  static RelayMarker _markerFromReadWrite(ReadWriteMarker marker) =>
+      switch (marker) {
+        ReadWriteMarker.readOnly => RelayMarker.inbox,
+        ReadWriteMarker.writeOnly => RelayMarker.outbox,
+        ReadWriteMarker.readWrite => RelayMarker.both,
+      };
 
   static List<String> _cleanServers(List<String> servers) {
     final List<String> cleaned = <String>[];

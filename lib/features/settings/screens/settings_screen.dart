@@ -318,7 +318,7 @@ class _AccountTile extends ConsumerWidget {
           ),
           label: name,
           subtitle: npub,
-          showChevron: false,
+          onTap: () => context.push('/profile'),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(

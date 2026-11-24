@@ -59,7 +59,9 @@ void main() {
       const EditRelaysScreen(),
       service: FakeSocialService()
         ..relays = const UserRelays(
-          nip65: <String>['wss://a.example'],
+          nip65: <RelayEntry>[
+            RelayEntry(url: 'wss://a.example', marker: RelayMarker.inbox),
+          ],
           dm: <String>['wss://b.example'],
         ),
     );
@@ -67,6 +69,10 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('wss://a.example'), findsOneWidget);
     expect(find.text('wss://b.example'), findsOneWidget);
+    // Each NIP-65 relay offers an inbox/outbox/both marker.
+    expect(find.text('Both'), findsOneWidget);
+    expect(find.text('Inbox'), findsOneWidget);
+    expect(find.text('Outbox'), findsOneWidget);
     expect(find.text('Save relays'), findsOneWidget);
   });
 

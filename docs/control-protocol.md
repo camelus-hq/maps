@@ -236,7 +236,7 @@ sync test fails if it drifts from the registry.
 | `social.profile.save` | Publish the signed-in user's profile — these fields are public (params: {name?, about?, picture?}). Omitted fields are cleared. |
 | `social.relays.ensureDefaults` | Set the NIP-65 and NIP-17 DM relay lists to the app default (wss://relay.map.camelus.app) wherever they are empty; returns the lists. |
 | `social.relays.get` | Return the signed-in user's relay lists: NIP-65 (kind 10002) and NIP-17 DM inbox relays (kind 10050). |
-| `social.relays.save` | Publish the signed-in user's relay lists, replacing both (params: {nip65: [url,…], dm: [url,…]}). Each list needs at least one wss:// relay. |
+| `social.relays.save` | Publish the signed-in user's relay lists, replacing both (params: {nip65: [{url, marker?}] or [url,…], dm: [url,…]}). Each list needs at least one wss:// relay; the NIP-65 marker is inbox\|outbox\|both (default both). |
 | `social.share.start` | Start sharing live location (params: {recipients: [pubkey,…], "all", or "self" for a private preview; durationMinutes?}). Publishes the first gift-wrapped update and shows the ongoing notification. |
 | `social.share.state` | Return the outgoing live-share state. |
 | `social.share.stop` | Stop the active live-location share. |

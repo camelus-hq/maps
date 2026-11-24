@@ -62,4 +62,13 @@ void main() {
     expect(find.text('Friends'), findsOneWidget);
     expect(find.text('Sign out'), findsOneWidget);
   });
+
+  testWidgets('the profile screen always offers a way out', (
+    WidgetTester tester,
+  ) async {
+    // Opened as the root (nothing to pop), the app bar still shows a back
+    // affordance via the home fallback.
+    await pumpProfile(tester, signedIn: true);
+    expect(find.byIcon(PlayIcons.back), findsOneWidget);
+  });
 }

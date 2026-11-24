@@ -105,6 +105,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       appBar: PlayAppBar(
         title: 'Create your identity',
         subtitle: _step < 3 ? 'Step ${_step + 1} of 3' : null,
+        onBackFallback: () => context.go('/'),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -198,33 +199,50 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   }
 
   Widget _profileStep(BuildContext context, PlayColors colors) {
-    return ListView(
-      padding: const EdgeInsets.all(PlaySpace.lg),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Text(
-          'Your profile',
-          style: PlayType.headline.copyWith(color: colors.ink),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            PlaySpace.lg,
+            PlaySpace.lg,
+            PlaySpace.lg,
+            0,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                'Your profile',
+                style: PlayType.headline.copyWith(color: colors.ink),
+              ),
+              const SizedBox(height: PlaySpace.sm),
+              Text(
+                'Add a name, a short bio and a picture so friends recognise '
+                'you. You can change all of this later.',
+                style: PlayType.body.copyWith(color: colors.inkMuted),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: PlaySpace.sm),
-        Text(
-          'Add a name, a short bio and a picture so friends recognise you. You '
-          'can change all of this later.',
-          style: PlayType.body.copyWith(color: colors.inkMuted),
+        Expanded(
+          child: ProfileForm(
+            profile:
+                ref.read(profileControllerProvider).value ??
+                const UserProfile(),
+            submitLabel: 'Save and continue',
+            onSubmit: _saveProfile,
+          ),
         ),
-        const SizedBox(height: PlaySpace.xl),
-        ProfileForm(
-          profile:
-              ref.read(profileControllerProvider).value ?? const UserProfile(),
-          submitLabel: 'Save and continue',
-          onSubmit: _saveProfile,
-        ),
-        const SizedBox(height: PlaySpace.sm),
-        Center(
-          child: PlayButton(
-            label: 'Skip for now',
-            variant: PlayButtonVariant.ghost,
-            size: PlayButtonSize.sm,
-            onPressed: () => setState(() => _step = 2),
+        Padding(
+          padding: const EdgeInsets.all(PlaySpace.sm),
+          child: Center(
+            child: PlayButton(
+              label: 'Skip for now',
+              variant: PlayButtonVariant.ghost,
+              size: PlayButtonSize.sm,
+              onPressed: () => setState(() => _step = 2),
+            ),
           ),
         ),
       ],
@@ -324,15 +342,26 @@ class _StepBar extends StatelessWidget {
   }
 }
 
-/// The revealed private key with a copy button and a warning.
-class _SecretCard extends StatelessWidget {
+/// The private key with a visibility toggle, copy button and a warning.
+class _SecretCard extends StatefulWidget {
   const _SecretCard({required this.nsec});
 
   final String nsec;
 
   @override
+  State<_SecretCard> createState() => _SecretCardState();
+}
+
+class _SecretCardState extends State<_SecretCard> {
+  bool _visible = false;
+
+  @override
   Widget build(BuildContext context) {
     final PlayColors colors = PlayColors.of(context);
+    final String displayedKey = _visible
+        ? widget.nsec
+        : List<String>.filled(widget.nsec.length, '•').join();
+
     return PlaySurface(
       radius: PlayRadii.md,
       borderWidth: 1,
@@ -350,13 +379,22 @@ class _SecretCard extends StatelessWidget {
                 'Private key (nsec)',
                 style: PlayType.bodyStrong.copyWith(color: colors.ink),
               ),
+              const Spacer(),
+              PlayIconButton(
+                icon: _visible ? PlayIcons.private : PlayIcons.eye,
+                variant: PlayIconButtonVariant.plain,
+                size: 40,
+                iconSize: 20,
+                semanticLabel: _visible ? 'Hide private key' : 'Show private key',
+                onPressed: () => setState(() => _visible = !_visible),
+              ),
             ],
           ),
           const SizedBox(height: PlaySpace.sm),
           SelectableRegion(
             selectionControls: emptyTextSelectionControls,
             child: Text(
-              nsec,
+              displayedKey,
               style: PlayType.body.copyWith(
                 color: colors.ink,
                 fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
@@ -371,7 +409,7 @@ class _SecretCard extends StatelessWidget {
               icon: PlayIcons.copy,
               variant: PlayButtonVariant.ghost,
               size: PlayButtonSize.sm,
-              onPressed: () => unawaited(_copy(context, nsec)),
+              onPressed: () => unawaited(_copy(context, widget.nsec)),
             ),
           ),
         ],
