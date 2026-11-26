@@ -2201,10 +2201,10 @@ List<Command> buildCommands(Ref ref) {
           final String value => int.tryParse(value),
           _ => null,
         };
-        if (minutes != null && (minutes < 1 || minutes > 720)) {
+        if (minutes != null && (minutes < 1 || minutes > 1440)) {
           throw const CommandException(
             'bad_params',
-            '"durationMinutes" must be between 1 and 720',
+            '"durationMinutes" must be between 1 and 1440',
           );
         }
         await ref

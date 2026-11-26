@@ -16,10 +16,70 @@ const List<LiveShareDuration> liveShareDurations = <LiveShareDuration>[
   LiveShareDuration('30 min', Duration(minutes: 30)),
   LiveShareDuration('1 hour', Duration(hours: 1)),
   LiveShareDuration('4 hours', Duration(hours: 4)),
+  LiveShareDuration('12 hours', Duration(hours: 12)),
+  LiveShareDuration('24 hours', Duration(hours: 24)),
 ];
 
 /// Default duration selected when the share sheet opens.
 const Duration defaultLiveShareDuration = Duration(hours: 1);
+
+/// The offered duration whose length is [minutes], or `null` when it is not one
+/// of [liveShareDurations] (a removed or renamed option reads back as "not
+/// set", so a later build never selects a choice the row no longer shows).
+Duration? liveShareDurationForMinutes(int? minutes) {
+  if (minutes == null) {
+    return null;
+  }
+  for (final LiveShareDuration option in liveShareDurations) {
+    if (option.duration.inMinutes == minutes) {
+      return option.duration;
+    }
+  }
+  return null;
+}
+
+/// The choices remembered from the last live-location share, so the share sheet
+/// can pre-select who it went to and for how long the next time it opens.
+class LiveShareDefaults {
+  const LiveShareDefaults({this.recipients = const <String>[], this.duration});
+
+  /// Public keys of the friends the last share went to. May name people who are
+  /// no longer friends; callers intersect this with the current friend list.
+  final List<String> recipients;
+
+  /// The duration chosen last time, or `null` when it was never stored or is no
+  /// longer an offered option (see [liveShareDurationForMinutes]).
+  final Duration? duration;
+
+  /// Whether nothing was remembered (a first share, or every stored value was
+  /// dropped as invalid).
+  bool get isEmpty => recipients.isEmpty && duration == null;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LiveShareDefaults &&
+      _sameRecipients(other.recipients) &&
+      other.duration == duration;
+
+  @override
+  int get hashCode => Object.hash(Object.hashAll(recipients), duration);
+
+  bool _sameRecipients(List<String> other) {
+    if (other.length != recipients.length) {
+      return false;
+    }
+    for (int i = 0; i < recipients.length; i++) {
+      if (recipients[i] != other[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @override
+  String toString() =>
+      'LiveShareDefaults(${recipients.length} recipients, $duration)';
+}
 
 /// The lifecycle of an outgoing live-location share.
 enum LiveShareStatus {

@@ -12,6 +12,7 @@ import 'package:ndk_flutter/ndk_flutter.dart';
 
 import '../core/config/app_config.dart';
 import '../data/http/api_key_client.dart';
+import '../data/local/database/database_live_share_preferences.dart';
 import '../data/local/database/database_places_repository.dart';
 import '../data/local/database/database_trips_repository.dart';
 import '../data/local/local_settings_repository.dart';
@@ -96,6 +97,13 @@ List<Override> buildAppOverrides(
     // (posted as a location foreground-service notification so a share keeps
     // publishing with the app backgrounded).
     liveShareStoreProvider.overrideWith((Ref ref) => PrefsLiveShareStore()),
+    // The last-used share choices (who + how long) live in the app database so
+    // the share sheet can pre-select them on the next open.
+    liveSharePreferencesProvider.overrideWith(
+      (Ref ref) => DatabaseLiveSharePreferences(
+        database: ref.watch(appDatabaseProvider),
+      ),
+    ),
     liveShareNotificationsProvider.overrideWith(
       (Ref ref) => LocalLiveShareNotifications(),
     ),

@@ -66,6 +66,12 @@ setting (`AppSettings.recentTripsLimit`, one of 10/20/50, default 20), so the
 oldest trips are deleted automatically. Trips are local-only and can be exported
 as GPX (`trips.export`).
 
+The **last live-location share** (`DatabaseLiveSharePreferences`) is remembered
+under the `liveShare.lastRecipients` and `liveShare.lastDurationMinutes` keys, so
+the share sheet can pre-select who the location went to and for how long the next
+time it opens. Only public keys and the chosen duration are stored; nothing
+secret.
+
 The **persistent anonymous Nostr identity** (see
 [`docs/nostr-nips.md`](nostr-nips.md)) is a JSON value under the
 `identity.anonymous` key: a key pair generated once on first use and reused, so

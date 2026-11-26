@@ -43,11 +43,86 @@ class _ShareLiveLocationSheetState
   int _durationIndex = _defaultDurationIndex;
   bool _starting = false;
 
+  /// Guards the one-time application of the remembered choices, so a slow load
+  /// never clobbers a selection the user already made.
+  bool _userTouched = false;
+
+  /// One key per duration chip, so the selected one can be scrolled into view
+  /// (the row builds every chip eagerly, so the keys are always valid).
+  late final List<GlobalKey> _durationKeys = List<GlobalKey>.generate(
+    liveShareDurations.length,
+    (_) => GlobalKey(),
+  );
+  bool _revealedSelection = false;
+
   static int get _defaultDurationIndex {
     final int index = liveShareDurations.indexWhere(
       (LiveShareDuration option) => option.duration == defaultLiveShareDuration,
     );
     return index < 0 ? 0 : index;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_restoreDefaults());
+  }
+
+  /// Pre-selects the last share's recipients and duration, once the friend list
+  /// has loaded so a remembered pubkey that is no longer a friend is dropped.
+  Future<void> _restoreDefaults() async {
+    final LiveShareDefaults defaults = await ref
+        .read(liveSharePreferencesProvider)
+        .load();
+    if (!mounted || _userTouched || defaults.isEmpty) {
+      return;
+    }
+    final List<Friend> friends;
+    try {
+      friends = await ref.read(friendsProvider.future);
+    } on Object {
+      return;
+    }
+    if (!mounted || _userTouched) {
+      return;
+    }
+    final Set<String> available = <String>{
+      for (final Friend friend in friends) friend.pubkey,
+    };
+    final int index = liveShareDurations.indexWhere(
+      (LiveShareDuration option) => option.duration == defaults.duration,
+    );
+    setState(() {
+      _selected
+        ..clear()
+        ..addAll(defaults.recipients.where(available.contains));
+      if (index >= 0) {
+        _durationIndex = index;
+      }
+    });
+    _revealSelectedDuration();
+  }
+
+  /// Scrolls the horizontal row so the selected duration is in view (e.g. a
+  /// remembered 24-hour choice sits off the right edge of a phone).
+  void _revealSelectedDuration() {
+    if (!_revealedSelection) {
+      _revealedSelection = true;
+      _revealDuration(_durationIndex);
+    }
+  }
+
+  void _revealDuration(int index) {
+    final BuildContext? chipContext = _durationKeys[index].currentContext;
+    if (chipContext == null) {
+      return;
+    }
+    Scrollable.ensureVisible(
+      chipContext,
+      alignment: 1,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
   }
 
   @override
@@ -238,6 +313,7 @@ class _ShareLiveLocationSheetState
               onTap: _starting
                   ? null
                   : () => setState(() {
+                      _userTouched = true;
                       if (_selected.contains(friend.pubkey)) {
                         _selected.remove(friend.pubkey);
                       } else {
@@ -251,18 +327,36 @@ class _ShareLiveLocationSheetState
   }
 
   Widget _durationRow() {
-    return Wrap(
-      spacing: PlaySpace.sm,
-      runSpacing: PlaySpace.sm,
-      children: <Widget>[
-        for (int i = 0; i < liveShareDurations.length; i++)
-          PlayChip(
-            label: liveShareDurations[i].label,
-            selected: _durationIndex == i,
-            onTap: _starting ? null : () => setState(() => _durationIndex = i),
-          ),
-      ],
+    // A horizontal strip so the five options stay on one line: when they do not
+    // fit (a phone), the row scrolls instead of wrapping onto a second line.
+    return SizedBox(
+      height: 52,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: <Widget>[
+            for (int i = 0; i < liveShareDurations.length; i++) ...<Widget>[
+              if (i > 0) const SizedBox(width: PlaySpace.sm),
+              PlayChip(
+                key: _durationKeys[i],
+                label: liveShareDurations[i].label,
+                selected: _durationIndex == i,
+                onTap: _starting ? null : () => _selectDuration(i),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
+  }
+
+  void _selectDuration(int index) {
+    setState(() {
+      _userTouched = true;
+      _durationIndex = index;
+    });
+    _revealedSelection = true;
+    _revealDuration(index);
   }
 
   Widget _consentNote(BuildContext context, AsyncValue<List<Friend>> friends) {
