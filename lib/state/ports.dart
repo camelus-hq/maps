@@ -6,6 +6,7 @@ import '../data/fakes/fake_app_version_source.dart';
 import '../data/fakes/fake_external_actions.dart';
 import '../data/fakes/fake_feedback_service.dart';
 import '../data/fakes/fake_live_share_notifications.dart';
+import '../data/fakes/fake_live_share_preferences.dart';
 import '../data/fakes/fake_live_share_store.dart';
 import '../data/fakes/fake_location_service.dart';
 import '../data/fakes/fake_map_service.dart';
@@ -32,6 +33,7 @@ import '../domain/ports/app_version_source.dart';
 import '../domain/ports/external_actions.dart';
 import '../domain/ports/feedback_service.dart';
 import '../domain/ports/live_share_notifications.dart';
+import '../domain/ports/live_share_preferences.dart';
 import '../domain/ports/live_share_store.dart';
 import '../domain/ports/location_service.dart';
 import '../domain/ports/map_service.dart';
@@ -155,6 +157,12 @@ final Provider<PushNotifications> pushNotificationsProvider =
 
 final Provider<LiveShareStore> liveShareStoreProvider =
     Provider<LiveShareStore>((Ref ref) => FakeLiveShareStore());
+
+/// Remembers the last live-share choices (recipients + duration). The keyless
+/// default keeps them in memory; `lib/app/di.dart` swaps in the database-backed
+/// adapter once the app database is open.
+final Provider<LiveSharePreferences> liveSharePreferencesProvider =
+    Provider<LiveSharePreferences>((Ref ref) => FakeLiveSharePreferences());
 
 /// Place reviews (Nostr kind 31987) and Blossom photo uploads. The keyless
 /// default is a seeded in-memory fake; `lib/app/di.dart` swaps in the NDK

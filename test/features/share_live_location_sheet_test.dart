@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:openmaps/data/fakes/fake_live_share_notifications.dart';
+import 'package:openmaps/data/fakes/fake_live_share_preferences.dart';
 import 'package:openmaps/data/fakes/fake_social_service.dart';
 import 'package:openmaps/domain/entities/friend.dart';
+import 'package:openmaps/domain/entities/live_share.dart';
 import 'package:openmaps/features/design/play.dart';
 import 'package:openmaps/features/social/screens/share_live_location_sheet.dart';
 import 'package:openmaps/state/ports.dart';
@@ -132,6 +134,138 @@ void main() {
         .widget<Text>(find.textContaining('Sharing will stop automatically at'))
         .data!;
     expect(after, isNot(before));
+  });
+
+  testWidgets("pre-selects the last share's friends and duration", (
+    WidgetTester tester,
+  ) async {
+    setSurface(tester);
+    final FakeLiveSharePreferences preferences = FakeLiveSharePreferences()
+      ..defaults = LiveShareDefaults(
+        recipients: <String>[
+          FakeSocialService.demoFriends[0].pubkey, // Mira
+          FakeSocialService.demoFriends[1].pubkey, // Timo
+        ],
+        duration: const Duration(hours: 24),
+      );
+    final ProviderContainer container = ProviderContainer(
+      overrides: <Override>[
+        socialServiceProvider.overrideWithValue(FakeSocialService()),
+        liveSharePreferencesProvider.overrideWithValue(preferences),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: Scaffold(body: ShareLiveLocationSheet()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 selected'), findsOneWidget);
+    expect(find.text('Share live with 2 friends'), findsOneWidget);
+    expect(
+      tester
+          .widget<PlayChip>(find.widgetWithText(PlayChip, '24 hours'))
+          .selected,
+      isTrue,
+    );
+
+    // 24 hours is the last chip, so it starts off the right edge: remembering
+    // it must scroll the row so the selected choice is actually in view.
+    final Finder horizontal = find.byWidgetPredicate(
+      (Widget widget) =>
+          widget is SingleChildScrollView &&
+          widget.scrollDirection == Axis.horizontal,
+    );
+    expect(horizontal, findsOneWidget);
+    final Rect viewport = tester.getRect(horizontal);
+    final Rect chip = tester.getRect(find.widgetWithText(PlayChip, '24 hours'));
+    expect(chip.left, greaterThanOrEqualTo(viewport.left - 1));
+    expect(chip.right, lessThanOrEqualTo(viewport.right + 1));
+  });
+
+  testWidgets('a remembered friend who is no longer a friend is dropped', (
+    WidgetTester tester,
+  ) async {
+    setSurface(tester);
+    final FakeLiveSharePreferences preferences = FakeLiveSharePreferences()
+      ..defaults = LiveShareDefaults(
+        recipients: <String>[
+          FakeSocialService.demoFriends[0].pubkey, // Mira, still a friend
+          'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+        ],
+        duration: const Duration(hours: 4),
+      );
+    final ProviderContainer container = ProviderContainer(
+      overrides: <Override>[
+        socialServiceProvider.overrideWithValue(FakeSocialService()),
+        liveSharePreferencesProvider.overrideWithValue(preferences),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: Scaffold(body: ShareLiveLocationSheet()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 selected'), findsOneWidget);
+    expect(find.text('Only Mira can see your location'), findsOneWidget);
+  });
+
+  testWidgets('starting a share remembers the friends and duration', (
+    WidgetTester tester,
+  ) async {
+    setSurface(tester);
+    final FakeLiveSharePreferences preferences = FakeLiveSharePreferences();
+    final ProviderContainer container = ProviderContainer(
+      overrides: <Override>[
+        socialServiceProvider.overrideWithValue(FakeSocialService()),
+        liveShareNotificationsProvider.overrideWithValue(
+          FakeLiveShareNotifications(),
+        ),
+        liveSharePreferencesProvider.overrideWithValue(preferences),
+      ],
+    );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: Scaffold(body: ShareLiveLocationSheet()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Mira'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('4 hours'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Share live with 1 friend'));
+    await tester.pumpAndSettle();
+
+    final List<Friend> friends = await container.read(friendsProvider.future);
+    final Friend mira = friends.firstWhere(
+      (Friend friend) => friend.displayName == 'Mira',
+    );
+    expect(preferences.saves, 1);
+    expect(preferences.defaults.recipients, <String>[mira.pubkey]);
+    expect(preferences.defaults.duration, const Duration(hours: 4));
+
+    // Stop before the test ends so the share's expiry timer is cancelled.
+    await container.read(liveShareProvider.notifier).stop();
+    addTearDown(container.dispose);
   });
 
   testWidgets('a signed-out user is asked to sign in first', (

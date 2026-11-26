@@ -191,6 +191,20 @@ void main() {
     expect(stopped['status'], 'idle');
   });
 
+  test('social.share.start accepts the longest offered duration', () async {
+    final Map<String, Object?> started = await dispatch(
+      'social.share.start',
+      <String, Object?>{'recipients': 'all', 'durationMinutes': 1440},
+    ) as Map<String, Object?>;
+
+    expect(started['status'], 'active');
+    final DateTime startedAt = DateTime.parse(started['startedAt']! as String);
+    final DateTime expiresAt = DateTime.parse(started['expiresAt']! as String);
+    expect(expiresAt.difference(startedAt), const Duration(hours: 24));
+
+    await dispatch('social.share.stop');
+  });
+
   test('social.friend.select focuses the camera, or only opens on request', () async {
     await dispatch('social.simulate.friendLocation', <String, Object?>{
       'lat': 52.6,

@@ -623,6 +623,12 @@ class LiveShareController extends Notifier<LiveShareState> {
       expiresAt: session.expiresAt,
       lastPublishedAt: now,
     );
+    // Remember who and how long for the next time the share sheet opens.
+    await ref
+        .read(liveSharePreferencesProvider)
+        .save(
+          LiveShareDefaults(recipients: session.recipients, duration: duration),
+        );
     await _showNotification(session);
     if (!ref.mounted) {
       return;
